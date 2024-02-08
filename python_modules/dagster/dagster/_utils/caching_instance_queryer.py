@@ -184,10 +184,10 @@ class CachingInstanceQueryer(DynamicPartitionsStore):
         return self._asset_record_cache[asset_key]
 
     def _event_type_for_key(self, asset_key: AssetKey) -> DagsterEventType:
-        if self.asset_graph.is_source(asset_key):
-            return DagsterEventType.ASSET_OBSERVATION
-        else:
+        if self.asset_graph.is_materializable(asset_key):
             return DagsterEventType.ASSET_MATERIALIZATION
+        else:
+            return DagsterEventType.ASSET_OBSERVATION
 
     @cached_method
     def _get_latest_materialization_or_observation_record(

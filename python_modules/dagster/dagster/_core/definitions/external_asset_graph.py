@@ -49,11 +49,11 @@ class ExternalAssetGraph(AssetGraph):
         repo_handles_by_key: Mapping[AssetKey, RepositoryHandle],
         job_names_by_key: Mapping[AssetKey, Sequence[str]],
         code_versions_by_key: Mapping[AssetKey, Optional[str]],
-        is_observable_by_key: Mapping[AssetKey, bool],
         auto_observe_interval_minutes_by_key: Mapping[AssetKey, Optional[float]],
         required_assets_and_checks_by_key: Mapping[
             AssetKeyOrCheckKey, AbstractSet[AssetKeyOrCheckKey]
         ],
+        execution_types_by_key: Mapping[AssetKey, AssetExecutionType],
     ):
         super().__init__(
             asset_dep_graph=asset_dep_graph,
@@ -65,9 +65,9 @@ class ExternalAssetGraph(AssetGraph):
             auto_materialize_policies_by_key=auto_materialize_policies_by_key,
             backfill_policies_by_key=backfill_policies_by_key,
             code_versions_by_key=code_versions_by_key,
-            is_observable_by_key=is_observable_by_key,
             auto_observe_interval_minutes_by_key=auto_observe_interval_minutes_by_key,
             required_assets_and_checks_by_key=required_assets_and_checks_by_key,
+            execution_types_by_key=execution_types_by_key,
         )
         self._repo_handles_by_key = repo_handles_by_key
         self._materialization_job_names_by_key = job_names_by_key
@@ -142,7 +142,7 @@ class ExternalAssetGraph(AssetGraph):
         job_names_by_key = {
             node.asset_key: node.job_names
             for _, node in repo_handle_external_asset_nodes
-            if not node.is_source or node.is_observable
+            if node.is_executable
         }
         code_versions_by_key = {
             node.asset_key: node.code_version
@@ -150,17 +150,21 @@ class ExternalAssetGraph(AssetGraph):
             if not node.is_source
         }
 
+        execution_types_by_key: Dict[AssetKey, AssetExecutionType] = {}
+        for _, node in repo_handle_external_asset_nodes:
+            execution_types_by_key[node.asset_key] = (
+                _merge_execution_types(execution_types_by_key[node.asset_key], node.execution_type)
+                if node.asset_key in execution_types_by_key
+                else node.execution_type
+            )
+
         all_non_source_keys = {
             node.asset_key for _, node in repo_handle_external_asset_nodes if not node.is_source
         }
 
-        is_observable_by_key = {}
         auto_observe_interval_minutes_by_key = {}
 
         for repo_handle, node in repo_handle_external_asset_nodes:
-            is_observable_by_key[node.asset_key] = (
-                node.execution_type == AssetExecutionType.OBSERVATION
-            )
             auto_observe_interval_minutes_by_key[
                 node.asset_key
             ] = node.auto_observe_interval_minutes
@@ -221,9 +225,9 @@ class ExternalAssetGraph(AssetGraph):
             repo_handles_by_key=repo_handles_by_key,
             job_names_by_key=job_names_by_key,
             code_versions_by_key=code_versions_by_key,
-            is_observable_by_key=is_observable_by_key,
             auto_observe_interval_minutes_by_key=auto_observe_interval_minutes_by_key,
             required_assets_and_checks_by_key=required_assets_and_checks_by_key,
+            execution_types_by_key=execution_types_by_key,
         )
 
     @property
@@ -317,3 +321,19 @@ class ExternalAssetGraph(AssetGraph):
                 asset_key
             )
         return list(asset_keys_by_repo.values())
+
+
+# Rank execution types by (descending) priority. When an asset is present in two code locations with
+# different execution types, the canonical execution type in the `ExternalAssetGraph` will be the
+# highest-priority type of the two.
+_EXECUTION_TYPE_RANKING = [
+    AssetExecutionType.MATERIALIZATION,
+    AssetExecutionType.OBSERVATION,
+    AssetExecutionType.UNEXECUTABLE,
+]
+
+
+def _merge_execution_types(
+    type_1: AssetExecutionType, type_2: AssetExecutionType
+) -> AssetExecutionType:
+    return min(type_1, type_2, key=_EXECUTION_TYPE_RANKING.index)
