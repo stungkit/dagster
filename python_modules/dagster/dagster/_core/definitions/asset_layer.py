@@ -376,7 +376,7 @@ class AssetLayer(NamedTuple):
             keys for each asset key produced by this job.
     """
 
-    asset_keys_to_execute: AbstractSet[AssetKey]
+    target_asset_keys: AbstractSet[AssetKey]
     assets_defs_by_key: Mapping[AssetKey, "AssetsDefinition"]
     assets_defs_by_node_handle: Mapping[NodeHandle, "AssetsDefinition"]
     asset_keys_by_node_input_handle: Mapping[NodeInputHandle, AssetKey]
@@ -584,13 +584,13 @@ class AssetLayer(NamedTuple):
             },
         }
 
-        asset_keys_to_execute = {
+        target_asset_keys = {
             key
             for assets_def in assets_to_execute_by_node_handle.values()
             for key in assets_def.keys
         }
         return AssetLayer(
-            asset_keys_to_execute=asset_keys_to_execute,
+            target_asset_keys=target_asset_keys,
             asset_keys_by_node_input_handle=asset_key_by_input,
             asset_info_by_node_output_handle=asset_info_by_output,
             check_key_by_node_output_handle=check_key_by_output,
@@ -617,21 +617,15 @@ class AssetLayer(NamedTuple):
         return {k for k, v in self.asset_deps.items() if asset_key in v}
 
     @property
-    def target_asset_keys(self) -> Iterable[AssetKey]:
-        return self.asset_keys_to_execute
-        # return set(self.dependency_node_handles_by_asset_key.keys()) & self.executable_asset_keys
-
-    @property
-    def asset_keys(self) -> Iterable[AssetKey]:
-        # return self.dependency_node_handles_by_asset_key.keys()
+    def all_asset_keys(self) -> Iterable[AssetKey]:
         return self.assets_defs_by_key.keys()
 
     @property
-    def observable_asset_keys(self) -> Iterable[AssetKey]:
+    def executable_asset_keys(self) -> Iterable[AssetKey]:
         return {
             asset_key
             for asset_key, assets_def in self.assets_defs_by_key.items()
-            if assets_def.is_observable
+            if assets_def.is_executable
         }
 
     @property
@@ -643,11 +637,19 @@ class AssetLayer(NamedTuple):
         }
 
     @property
-    def executable_asset_keys(self) -> Iterable[AssetKey]:
+    def observable_asset_keys(self) -> Iterable[AssetKey]:
         return {
             asset_key
             for asset_key, assets_def in self.assets_defs_by_key.items()
-            if assets_def.is_executable
+            if assets_def.is_observable
+        }
+
+    @property
+    def external_asset_keys(self) -> AbstractSet[AssetKey]:
+        return {
+            asset_key
+            for asset_key, assets_def in self.assets_defs_by_key.items()
+            if assets_def.is_external
         }
 
     @property

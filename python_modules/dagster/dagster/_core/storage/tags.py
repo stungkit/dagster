@@ -5,6 +5,10 @@ import dagster._check as check
 SYSTEM_TAG_PREFIX = "dagster/"
 HIDDEN_TAG_PREFIX = ".dagster/"
 
+# Used for the ops attached to unobservable external assets. Can be removed when AssetsDefinitions
+# with a `None` op become possible.
+UNEXECUTABLE_NODE_TAG = f"{SYSTEM_TAG_PREFIX}unexecutable"
+
 REPOSITORY_LABEL_TAG = f"{HIDDEN_TAG_PREFIX}repository"
 
 SCHEDULE_NAME_TAG = f"{SYSTEM_TAG_PREFIX}schedule_name"

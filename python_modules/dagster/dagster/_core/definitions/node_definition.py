@@ -14,6 +14,7 @@ import dagster._check as check
 from dagster._core.definitions.configurable import NamedConfigurableDefinition
 from dagster._core.definitions.policy import RetryPolicy
 from dagster._core.errors import DagsterInvariantViolationError
+from dagster._core.storage.tags import UNEXECUTABLE_NODE_TAG
 
 from .hook_definition import HookDefinition
 from .utils import check_valid_name, validate_tags
@@ -133,6 +134,10 @@ class NodeDefinition(NamedConfigurableDefinition):
     @property
     def output_dict(self) -> Mapping[str, "OutputDefinition"]:
         return self._output_dict
+
+    @property
+    def is_executable(self) -> bool:
+        return UNEXECUTABLE_NODE_TAG not in self.tags
 
     def has_input(self, name: str) -> bool:
         check.str_param(name, "name")

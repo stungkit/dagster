@@ -15,6 +15,7 @@ from dagster._core.definitions.source_asset import (
 )
 from dagster._core.errors import DagsterInvariantViolationError
 from dagster._core.execution.context.compute import AssetExecutionContext
+from dagster._core.storage.tags import UNEXECUTABLE_NODE_TAG
 from dagster._utils.warnings import disable_dagster_warnings
 
 
@@ -145,8 +146,23 @@ def create_external_asset_from_source_asset(source_asset: SourceAsset) -> Assets
             else {}
         ),
     }
+    execution_type = (
+        AssetExecutionType.UNEXECUTABLE
+        if source_asset.observe_fn is None
+        else AssetExecutionType.OBSERVATION
+    )
+    op_tags = (
+        {UNEXECUTABLE_NODE_TAG: "true"}
+        if execution_type == AssetExecutionType.UNEXECUTABLE
+        else None
+    )
 
     with disable_dagster_warnings():
+        _execution_type = (
+            AssetExecutionType.UNEXECUTABLE
+            if source_asset.observe_fn is None
+            else AssetExecutionType.OBSERVATION
+        )
 
         @asset(
             key=source_asset.key,
@@ -154,11 +170,8 @@ def create_external_asset_from_source_asset(source_asset: SourceAsset) -> Assets
             group_name=source_asset.group_name,
             description=source_asset.description,
             partitions_def=source_asset.partitions_def,
-            _execution_type=(
-                AssetExecutionType.UNEXECUTABLE
-                if source_asset.observe_fn is None
-                else AssetExecutionType.OBSERVATION
-            ),
+            _execution_type=execution_type,
+            op_tags=op_tags,
             io_manager_key=source_asset.io_manager_key,
             # We don't pass the `io_manager_def` because it will already be present in
             # `resource_defs` (it is added during `SourceAsset` initialization).

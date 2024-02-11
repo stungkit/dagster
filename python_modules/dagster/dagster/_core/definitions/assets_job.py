@@ -224,6 +224,9 @@ def build_assets_job(
         *(asset.node_def for asset in assets_to_execute),
         *(asset_check.node_def for asset_check in asset_checks),
     ]
+    for node_def in node_defs:
+        check.invariant(node_def.is_executable, f"Node {node_def.name} is not executable.")
+
     graph = GraphDefinition(
         name=name,
         node_defs=node_defs,
