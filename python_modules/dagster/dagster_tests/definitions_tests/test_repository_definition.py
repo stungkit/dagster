@@ -1228,7 +1228,7 @@ def test_list_load():
         return [combo_list]
 
     assert len(combo_repo.get_all_jobs()) == 2
-    assert set(combo_repo.get_all_jobs()[0].asset_layer.asset_keys) == {
+    assert set(combo_repo.get_all_jobs()[0].asset_layer.target_asset_keys) == {
         AssetKey(["asset3"]),
     }
 

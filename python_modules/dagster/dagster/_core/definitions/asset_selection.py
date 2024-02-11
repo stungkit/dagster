@@ -793,7 +793,7 @@ class UpstreamAssetSelection(
         if len(selection) == 0:
             return selection
         all_upstream = _fetch_all_upstream(selection, asset_graph, self.depth, self.include_self)
-        return {key for key in all_upstream if key not in asset_graph.source_asset_keys}
+        return {key for key in all_upstream if key in asset_graph.materializable_asset_keys}
 
     def to_serializable_asset_selection(self, asset_graph: AssetGraph) -> "AssetSelection":
         return self.replace(child=self.child.to_serializable_asset_selection(asset_graph))
@@ -825,7 +825,7 @@ class ParentSourcesAssetSelection(
         if len(selection) == 0:
             return selection
         all_upstream = _fetch_all_upstream(selection, asset_graph)
-        return {key for key in all_upstream if key in asset_graph.source_asset_keys}
+        return {key for key in all_upstream if key in asset_graph.external_asset_keys}
 
     def to_serializable_asset_selection(self, asset_graph: AssetGraph) -> "AssetSelection":
         return self.replace(child=self.child.to_serializable_asset_selection(asset_graph))

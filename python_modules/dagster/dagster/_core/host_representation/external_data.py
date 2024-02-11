@@ -1418,12 +1418,6 @@ def external_repository_data_from_def(
             for resource_key in asset.required_top_level_resources:
                 resource_asset_usage_map[resource_key].append(asset.asset_key)
 
-    # collect resource usage from source assets
-    for source_asset_key, source_asset in repository_def.source_assets_by_key.items():
-        if source_asset.required_resource_keys:
-            for resource_key in source_asset.required_resource_keys:
-                resource_asset_usage_map[resource_key].append(source_asset_key)
-
     resource_schedule_usage_map: Dict[str, List[str]] = defaultdict(list)
     for schedule in repository_def.schedule_defs:
         if schedule.required_resource_keys:
@@ -1578,9 +1572,7 @@ def external_asset_nodes_from_defs(
         asset_info_by_node_output = asset_layer.asset_info_by_node_output_handle
 
         for node_output_handle, asset_info in asset_info_by_node_output.items():
-            if not asset_info.is_required or not asset_layer.is_materializable_for_asset(
-                asset_info.key
-            ):
+            if not asset_info.is_required:
                 continue
             output_key = asset_info.key
             if output_key not in op_names_by_asset_key:
@@ -1644,6 +1636,7 @@ def external_asset_nodes_from_defs(
             dependencies=list(deps[asset_key].values()),
             depended_by=list(dep_by[asset_key].values()),
             execution_type=AssetExecutionType.UNEXECUTABLE,
+            is_source=True,
             job_names=[],
             group_name=group_name_by_asset_key.get(asset_key),
             code_version=code_version_by_asset_key.get(asset_key),
@@ -1714,7 +1707,10 @@ def external_asset_nodes_from_defs(
             else output_def.metadata
         )
 
-        job_names = [job_def.name for _, job_def in node_tuple_list]
+        if execution_types_by_asset_key[asset_key] == AssetExecutionType.UNEXECUTABLE:
+            job_names = []
+        else:
+            job_names = [job_def.name for _, job_def in node_tuple_list]
 
         partitions_def_data: Optional[ExternalPartitionsDefinitionData] = None
 
@@ -1743,6 +1739,8 @@ def external_asset_nodes_from_defs(
                 dependencies=list(deps[asset_key].values()),
                 depended_by=list(dep_by[asset_key].values()),
                 execution_type=execution_types_by_asset_key[asset_key],
+                is_source=execution_types_by_asset_key[asset_key]
+                != AssetExecutionType.MATERIALIZATION,
                 compute_kind=node_def.tags.get("kind"),
                 # backcompat
                 op_name=graph_name
@@ -1934,7 +1932,6 @@ def external_resource_data_from_def(
         )
         else False
     )
-
     return ExternalResourceData(
         name=name,
         resource_snapshot=build_resource_def_snap(name, resource_def),

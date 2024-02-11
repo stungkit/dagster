@@ -45,7 +45,9 @@ def build_dep_structure_snapshot_from_graph_def(
     check.inst_param(graph_def, "graph_def", GraphDefinition)
     return DependencyStructureSnapshot(
         node_invocation_snaps=[
-            build_node_invocation_snap(graph_def, node) for node in graph_def.nodes
+            build_node_invocation_snap(graph_def, node)
+            for node in graph_def.nodes
+            if node.definition.is_executable
         ]
     )
 

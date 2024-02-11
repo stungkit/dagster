@@ -332,7 +332,9 @@ def build_node_defs_snapshot(job_def: JobDefinition) -> NodeDefsSnapshot:
     op_def_snaps = []
     graph_def_snaps = []
     for node_def in job_def.all_node_defs:
-        if isinstance(node_def, OpDefinition):
+        if not node_def.is_executable:
+            continue
+        elif isinstance(node_def, OpDefinition):
             op_def_snaps.append(build_op_def_snap(node_def))
         elif isinstance(node_def, GraphDefinition):
             graph_def_snaps.append(build_graph_def_snap(node_def))

@@ -770,7 +770,7 @@ class JobDefinition(IHasInternalInit):
         check.opt_set_param(asset_check_selection, "asset_check_selection", AssetCheckKey)
 
         nonexistent_assets = [
-            asset for asset in asset_selection if asset not in self.asset_layer.asset_keys
+            asset for asset in asset_selection if asset not in self.asset_layer.target_asset_keys
         ]
         nonexistent_asset_strings = [
             asset_str
@@ -1254,7 +1254,7 @@ def _infer_asset_layer_from_source_asset_deps(job_graph_def: GraphDefinition) ->
         for source_asset in source_assets_list
     }
     return AssetLayer(
-        asset_keys_to_execute=set(),
+        target_asset_keys=set(),
         assets_defs_by_node_handle={},
         asset_keys_by_node_input_handle=asset_keys_by_node_input_handle,
         asset_info_by_node_output_handle={},

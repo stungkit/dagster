@@ -1052,11 +1052,9 @@ class TestAssetAwareEventLog(ExecutingGraphQLContextTestMatrix):
         assert result.data
         assert result.data["assetNodes"]
 
-        assert len(result.data["assetNodes"]) == 2
+        assert len(result.data["assetNodes"]) == 1
         exec_asset_node = result.data["assetNodes"][0]
         assert exec_asset_node["isExecutable"] is True
-        unexec_asset_node = result.data["assetNodes"][1]
-        assert unexec_asset_node["isExecutable"] is False
 
     def test_asset_partitions_in_pipeline(self, graphql_context: WorkspaceRequestContext):
         selector = infer_job_selector(graphql_context, "two_assets_job")
