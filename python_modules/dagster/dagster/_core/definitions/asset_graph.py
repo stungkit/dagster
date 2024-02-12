@@ -29,7 +29,7 @@ from dagster._core.errors import DagsterInvalidInvocationError
 from dagster._core.instance import DynamicPartitionsStore
 from dagster._core.selector.subset_selector import (
     DependencyGraph,
-    fetch_sources,
+    fetch_roots,
     generate_asset_dep_graph,
 )
 from dagster._utils.cached_method import cached_method
@@ -149,18 +149,18 @@ class AssetGraph:
         return self._source_asset_keys
 
     @functools.cached_property
-    def root_asset_keys(self) -> AbstractSet[AssetKey]:
-        """Non-source asset keys that have no non-source parents."""
+    def root_materializable_asset_keys(self) -> AbstractSet[AssetKey]:
+        """Materializable asset keys that have no materializable parents."""
         from .asset_selection import AssetSelection
 
         return AssetSelection.keys(*self.materializable_asset_keys).roots().resolve(self)
 
     @functools.cached_property
     def root_executable_asset_keys(self) -> AbstractSet[AssetKey]:
-        """Materializable or observable source asset keys that have no parents which are
+        """Materializable or observable asset keys that have no parents which are
         materializable or observable.
         """
-        return fetch_sources(self._asset_dep_graph, self.executable_asset_keys)
+        return fetch_roots(self._asset_dep_graph, self.executable_asset_keys)
 
     @property
     def freshness_policies_by_key(self) -> Mapping[AssetKey, Optional[FreshnessPolicy]]:
@@ -587,30 +587,30 @@ class AssetGraph:
             current_time=current_time,
         )
 
-    def is_source(self, asset_key: AssetKey) -> bool:
-        return (
-            asset_key in self.source_asset_keys or asset_key not in self.materializable_asset_keys
+    def is_external(self, asset_key: AssetKey) -> bool:
+        return AssetExecutionType.MATERIALIZATION not in self._execution_types_by_key.get(
+            asset_key, []
         )
 
-    def has_non_source_parents(self, asset_key: AssetKey) -> bool:
-        """Determines if an asset has any parents which are not source assets."""
-        if self.is_source(asset_key):
+    def has_materializable_parents(self, asset_key: AssetKey) -> bool:
+        """Determines if an asset has any materializable parents assets."""
+        if self.is_external(asset_key):
             return False
         return any(
-            not self.is_source(parent_key)
+            not self.is_external(parent_key)
             for parent_key in self.get_parents(asset_key) - {asset_key}
         )
 
-    def get_non_source_roots(self, asset_key: AssetKey) -> AbstractSet[AssetKey]:
-        """Returns all assets upstream of the given asset which do not consume any other
-        AssetsDefinitions (but may consume SourceAssets).
+    def get_materializable_roots(self, asset_key: AssetKey) -> AbstractSet[AssetKey]:
+        """Returns all materializable assets upstream of the given asset which do not consume any
+        other materializable assets.
         """
-        if not self.has_non_source_parents(asset_key):
+        if not self.has_materializable_parents(asset_key):
             return {asset_key}
         return {
             key
             for key in self.upstream_key_iterator(asset_key)
-            if not self.is_source(key) and not self.has_non_source_parents(key)
+            if not self.is_external(key) and not self.has_materializable_parents(key)
         }
 
     def upstream_key_iterator(self, asset_key: AssetKey) -> Iterator[AssetKey]:
@@ -619,7 +619,7 @@ class AssetGraph:
         queue = deque([asset_key])
         while queue:
             current_key = queue.popleft()
-            if self.is_source(current_key):
+            if self.is_external(current_key):
                 continue
             for parent_key in self.get_parents(current_key):
                 if parent_key not in visited:
@@ -882,7 +882,7 @@ class InternalAssetGraph(AssetGraph):
         self, asset_keys: AbstractSet[AssetKey]
     ) -> bool:
         """Returns true if the given asset keys contains at least one materializable asset and
-        at least one source asset.
+        at least one external asset.
         """
         selected_external_assets = self.external_asset_keys & asset_keys
         selected_regular_assets = asset_keys - self.external_asset_keys

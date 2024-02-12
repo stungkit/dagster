@@ -175,7 +175,7 @@ class CachingDataTimeResolver:
 
         for parent_key in self.asset_graph.get_parents(asset_key):
             if (
-                parent_key in self.asset_graph.source_asset_keys
+                parent_key in self.asset_graph.external_asset_keys
                 and not self.asset_graph.is_observable(parent_key)
             ):
                 continue
@@ -218,7 +218,7 @@ class CachingDataTimeResolver:
             asset_key, record_id, record_tags_dict
         )
         if not upstream_records_by_key:
-            if not self.asset_graph.has_non_source_parents(asset_key):
+            if not self.asset_graph.has_materializable_parents(asset_key):
                 return {
                     asset_key: datetime.datetime.fromtimestamp(
                         record_timestamp, tz=datetime.timezone.utc
@@ -307,7 +307,7 @@ class CachingDataTimeResolver:
         current_time: datetime.datetime,
     ) -> Mapping[AssetKey, Optional[datetime.datetime]]:
         if record_id is None:
-            return {key: None for key in self.asset_graph.get_non_source_roots(asset_key)}
+            return {key: None for key in self.asset_graph.get_materializable_roots(asset_key)}
         record_timestamp = check.not_none(record_timestamp)
 
         partitions_def = self.asset_graph.get_partitions_def(asset_key)
@@ -372,7 +372,7 @@ class CachingDataTimeResolver:
 
         # if you're here, then this asset is planned, but not materialized. in the worst case, this
         # asset's data time will be equal to the current time once it finishes materializing
-        if not self.asset_graph.has_non_source_parents(asset_key):
+        if not self.asset_graph.has_materializable_parents(asset_key):
             return current_time
 
         data_time = current_time

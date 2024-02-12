@@ -14,8 +14,8 @@ from dagster._core.definitions.asset_checks import AssetChecksDefinition
 from dagster._core.errors import DagsterInvalidSubsetError
 from dagster._core.selector.subset_selector import (
     fetch_connected,
+    fetch_roots,
     fetch_sinks,
-    fetch_sources,
     parse_clause,
 )
 from dagster._serdes.serdes import whitelist_for_serdes
@@ -634,7 +634,7 @@ class RootsAssetSelection(
 
     def resolve_inner(self, asset_graph: AssetGraph) -> AbstractSet[AssetKey]:
         selection = self.child.resolve_inner(asset_graph)
-        return fetch_sources(asset_graph.asset_dep_graph, selection)
+        return fetch_roots(asset_graph.asset_dep_graph, selection)
 
     def to_serializable_asset_selection(self, asset_graph: AssetGraph) -> "AssetSelection":
         return self.replace(child=self.child.to_serializable_asset_selection(asset_graph))

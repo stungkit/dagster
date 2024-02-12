@@ -283,7 +283,7 @@ class CachingInstanceQueryer(DynamicPartitionsStore):
             after_cursor (Optional[int]): Filter parameter such that only records with a storage_id
                 greater than this value will be considered.
         """
-        if not self.asset_graph.is_source(asset_partition.asset_key):
+        if not self.asset_graph.is_external(asset_partition.asset_key):
             asset_record = self.get_asset_record(asset_partition.asset_key)
             if (
                 asset_record is None
@@ -534,7 +534,7 @@ class CachingInstanceQueryer(DynamicPartitionsStore):
         """Finds asset partitions of the given child whose parents have been materialized since
         latest_storage_id.
         """
-        if self.asset_graph.is_source(child_asset_key):
+        if self.asset_graph.is_external(child_asset_key):
             return set(), latest_storage_id
 
         child_partitions_def = self.asset_graph.get_partitions_def(child_asset_key)
@@ -549,9 +549,9 @@ class CachingInstanceQueryer(DynamicPartitionsStore):
         ]
         for parent_asset_key in self.asset_graph.get_parents(child_asset_key):
             # ignore non-observable sources
-            if self.asset_graph.is_source(parent_asset_key) and not self.asset_graph.is_observable(
+            if self.asset_graph.is_external(
                 parent_asset_key
-            ):
+            ) and not self.asset_graph.is_observable(parent_asset_key):
                 continue
 
             # if the parent has not been updated at all since the latest_storage_id, then skip
@@ -803,7 +803,8 @@ class CachingInstanceQueryer(DynamicPartitionsStore):
         if not updated_after_cursor:
             return set()
         if after_cursor is None or (
-            not self.asset_graph.is_source(asset_key) and not respect_materialization_data_versions
+            not self.asset_graph.is_external(asset_key)
+            and not respect_materialization_data_versions
         ):
             return updated_after_cursor
 
@@ -863,7 +864,7 @@ class CachingInstanceQueryer(DynamicPartitionsStore):
                 continue
 
             # ignore non-observable source parents
-            if self.asset_graph.is_source(parent_key) and not self.asset_graph.is_observable(
+            if self.asset_graph.is_external(parent_key) and not self.asset_graph.is_observable(
                 parent_key
             ):
                 continue
@@ -909,7 +910,7 @@ class CachingInstanceQueryer(DynamicPartitionsStore):
     def get_outdated_ancestors(
         self, *, asset_partition: AssetKeyPartitionKey
     ) -> AbstractSet[AssetKey]:
-        if self.asset_graph.is_source(asset_partition.asset_key):
+        if self.asset_graph.is_external(asset_partition.asset_key):
             return set()
 
         parent_asset_partitions = self.asset_graph.get_parents_partitions(

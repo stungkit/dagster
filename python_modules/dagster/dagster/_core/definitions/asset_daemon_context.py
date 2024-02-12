@@ -150,7 +150,7 @@ class AssetDaemonContext:
         return [
             key
             for key in self.auto_materialize_asset_keys_and_parents
-            if not self.asset_graph.is_source(key)
+            if not self.asset_graph.is_external(key)
         ]
 
     @property

@@ -710,7 +710,7 @@ class SkipOnParentMissingRule(AutoMaterializeRule, NamedTuple("_SkipOnParentMiss
                 asset_partition=candidate
             ):
                 # ignore non-observable sources, which will never have a materialization or observation
-                if context.asset_graph.is_source(
+                if context.asset_graph.is_external(
                     parent.asset_key
                 ) and not context.asset_graph.is_observable(parent.asset_key):
                     continue
