@@ -182,7 +182,6 @@ class UnresolvedAssetJobDefinition(
     ) -> "JobDefinition":
         """Resolve this UnresolvedAssetJobDefinition into a JobDefinition."""
         assets = asset_graph.assets
-        source_assets = asset_graph.source_assets
         selected_asset_keys = self.selection.resolve(asset_graph)
         selected_asset_checks = self.selection.resolve_checks(asset_graph)
 
@@ -224,7 +223,7 @@ class UnresolvedAssetJobDefinition(
             assets=assets,
             asset_checks=asset_graph.asset_checks,
             config=self.config,
-            source_assets=source_assets,
+            source_assets=[],
             description=self.description,
             tags=self.tags,
             metadata=self.metadata,

@@ -39,7 +39,6 @@ class ExternalAssetGraph(AssetGraph):
     def __init__(
         self,
         asset_dep_graph: DependencyGraph[AssetKey],
-        source_asset_keys: AbstractSet[AssetKey],
         partitions_defs_by_key: Mapping[AssetKey, Optional[PartitionsDefinition]],
         partition_mappings_by_key: Mapping[AssetKey, Optional[Mapping[AssetKey, PartitionMapping]]],
         group_names_by_key: Mapping[AssetKey, Optional[str]],
@@ -57,7 +56,6 @@ class ExternalAssetGraph(AssetGraph):
     ):
         super().__init__(
             asset_dep_graph=asset_dep_graph,
-            source_asset_keys=source_asset_keys,
             partitions_defs_by_key=partitions_defs_by_key,
             partition_mappings_by_key=partition_mappings_by_key,
             group_names_by_key=group_names_by_key,
@@ -124,7 +122,6 @@ class ExternalAssetGraph(AssetGraph):
         external_asset_checks: Sequence["ExternalAssetCheck"],
     ) -> "ExternalAssetGraph":
         upstream: Dict[AssetKey, AbstractSet[AssetKey]] = {}
-        source_asset_keys: Set[AssetKey] = set()
         partitions_defs_by_key: Dict[AssetKey, Optional[PartitionsDefinition]] = {}
         partition_mappings_by_key: Dict[AssetKey, Dict[AssetKey, PartitionMapping]] = defaultdict(
             defaultdict
@@ -137,7 +134,7 @@ class ExternalAssetGraph(AssetGraph):
         repo_handles_by_key = {
             node.asset_key: repo_handle
             for repo_handle, node in repo_handle_external_asset_nodes
-            if not node.is_source or node.is_observable
+            if node.is_executable
         }
         job_names_by_key = {
             node.asset_key: node.job_names
@@ -147,7 +144,7 @@ class ExternalAssetGraph(AssetGraph):
         code_versions_by_key = {
             node.asset_key: node.code_version
             for _, node in repo_handle_external_asset_nodes
-            if not node.is_source
+            if node.is_executable
         }
 
         execution_types_by_key: Dict[AssetKey, List[AssetExecutionType]] = {}
@@ -156,22 +153,12 @@ class ExternalAssetGraph(AssetGraph):
             if node.execution_type != AssetExecutionType.UNEXECUTABLE:
                 execution_types.append(node.execution_type)
 
-        all_non_source_keys = {
-            node.asset_key for _, node in repo_handle_external_asset_nodes if not node.is_source
-        }
-
         auto_observe_interval_minutes_by_key = {}
 
         for repo_handle, node in repo_handle_external_asset_nodes:
             auto_observe_interval_minutes_by_key[
                 node.asset_key
             ] = node.auto_observe_interval_minutes
-            if node.is_source:
-                if node.asset_key in all_non_source_keys:
-                    # one location's source is another location's non-source
-                    continue
-
-                source_asset_keys.add(node.asset_key)
 
             upstream[node.asset_key] = {dep.upstream_asset_key for dep in node.dependencies}
             for dep in node.dependencies:
@@ -213,7 +200,6 @@ class ExternalAssetGraph(AssetGraph):
 
         return cls(
             asset_dep_graph={"upstream": upstream, "downstream": downstream},
-            source_asset_keys=source_asset_keys,
             partitions_defs_by_key=partitions_defs_by_key,
             partition_mappings_by_key=partition_mappings_by_key,
             group_names_by_key=group_names_by_key,

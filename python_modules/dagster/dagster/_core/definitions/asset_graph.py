@@ -36,7 +36,7 @@ from dagster._utils.cached_method import cached_method
 
 from .asset_check_spec import AssetCheckKey
 from .asset_checks import AssetChecksDefinition
-from .assets import AssetsDefinition
+from .assets import AssetsDefinition, normalize_assets
 from .backfill_policy import BackfillPolicy
 from .events import AssetKey, AssetKeyPartitionKey
 from .freshness_policy import FreshnessPolicy
@@ -76,7 +76,6 @@ class AssetGraph:
     def __init__(
         self,
         asset_dep_graph: DependencyGraph[AssetKey],
-        source_asset_keys: AbstractSet[AssetKey],
         partitions_defs_by_key: Mapping[AssetKey, Optional[PartitionsDefinition]],
         partition_mappings_by_key: Mapping[AssetKey, Optional[Mapping[AssetKey, PartitionMapping]]],
         group_names_by_key: Mapping[AssetKey, Optional[str]],
@@ -91,7 +90,6 @@ class AssetGraph:
         execution_types_by_key: Mapping[AssetKey, Sequence[AssetExecutionType]],
     ):
         self._asset_dep_graph = asset_dep_graph
-        self._source_asset_keys = source_asset_keys
         self._partitions_defs_by_key = partitions_defs_by_key
         self._partition_mappings_by_key = partition_mappings_by_key
         self._group_names_by_key = group_names_by_key
@@ -100,7 +98,6 @@ class AssetGraph:
         self._backfill_policies_by_key = backfill_policies_by_key
         self._code_versions_by_key = code_versions_by_key
         self._auto_observe_interval_minutes_by_key = auto_observe_interval_minutes_by_key
-        # source assets keys can sometimes appear in the upstream dict
         self._required_assets_and_checks_by_key = required_assets_and_checks_by_key
         self._execution_types_by_key = execution_types_by_key
 
@@ -143,10 +140,6 @@ class AssetGraph:
             for k, v in self._execution_types_by_key.items()
             if AssetExecutionType.MATERIALIZATION not in v
         }
-
-    @property
-    def source_asset_keys(self) -> AbstractSet[AssetKey]:
-        return self._source_asset_keys
 
     @functools.cached_property
     def root_materializable_asset_keys(self) -> AbstractSet[AssetKey]:
@@ -192,8 +185,9 @@ class AssetGraph:
             SYSTEM_METADATA_KEY_AUTO_OBSERVE_INTERVAL_MINUTES,
         )
 
+        all_assets = normalize_assets(all_assets)
+
         assets_defs: List[AssetsDefinition] = []
-        source_assets: List[SourceAsset] = []
         partitions_defs_by_key: Dict[AssetKey, Optional[PartitionsDefinition]] = {}
         partition_mappings_by_key: Dict[
             AssetKey, Optional[Mapping[AssetKey, PartitionMapping]]
@@ -210,59 +204,43 @@ class AssetGraph:
         ] = {}
 
         for asset in all_assets:
-            if isinstance(asset, SourceAsset):
-                source_assets.append(asset)
-                partitions_defs_by_key[asset.key] = asset.partitions_def
-                group_names_by_key[asset.key] = asset.group_name
-                auto_observe_interval_minutes_by_key[
-                    asset.key
-                ] = asset.auto_observe_interval_minutes
-                execution_types_by_key[asset.key] = (
-                    [AssetExecutionType.OBSERVATION] if asset.is_observable else []
+            assets_defs.append(asset)
+            partition_mappings_by_key.update({key: asset.partition_mappings for key in asset.keys})
+            partitions_defs_by_key.update({key: asset.partitions_def for key in asset.keys})
+            group_names_by_key.update(asset.group_names_by_key)
+            freshness_policies_by_key.update(asset.freshness_policies_by_key)
+            auto_materialize_policies_by_key.update(asset.auto_materialize_policies_by_key)
+            backfill_policies_by_key.update({key: asset.backfill_policy for key in asset.keys})
+            code_versions_by_key.update(asset.code_versions_by_key)
+            for key in asset.keys:
+                execution_types_by_key[key] = (
+                    []
+                    if asset.execution_type == AssetExecutionType.UNEXECUTABLE
+                    else [asset.execution_type]
                 )
-            else:  # AssetsDefinition
-                assets_defs.append(asset)
-                partition_mappings_by_key.update(
-                    {key: asset.partition_mappings for key in asset.keys}
-                )
-                partitions_defs_by_key.update({key: asset.partitions_def for key in asset.keys})
-                group_names_by_key.update(asset.group_names_by_key)
-                freshness_policies_by_key.update(asset.freshness_policies_by_key)
-                auto_materialize_policies_by_key.update(asset.auto_materialize_policies_by_key)
-                backfill_policies_by_key.update({key: asset.backfill_policy for key in asset.keys})
-                code_versions_by_key.update(asset.code_versions_by_key)
-                for key in asset.keys:
-                    execution_types_by_key[key] = (
-                        []
-                        if asset.execution_type == AssetExecutionType.UNEXECUTABLE
-                        else [asset.execution_type]
-                    )
 
-                # Set auto_observe_interval_minutes for external observable assets
-                # This can be removed when/if we have a a solution for mapping
-                # `auto_observe_interval_minutes` to an AutoMaterialzePolicy
-                first_key = next(iter(asset.keys), None)
-                if (
-                    first_key
-                    and SYSTEM_METADATA_KEY_AUTO_OBSERVE_INTERVAL_MINUTES
-                    in asset.metadata_by_key[first_key]
-                ):
-                    interval = asset.metadata_by_key[first_key][
-                        SYSTEM_METADATA_KEY_AUTO_OBSERVE_INTERVAL_MINUTES
-                    ]
-                    auto_observe_interval_minutes_by_key.update(
-                        {key: interval for key in asset.keys}
-                    )
+            # Set auto_observe_interval_minutes for external observable assets
+            # This can be removed when/if we have a a solution for mapping
+            # `auto_observe_interval_minutes` to an AutoMaterialzePolicy
+            first_key = next(iter(asset.keys), None)
+            if (
+                first_key
+                and SYSTEM_METADATA_KEY_AUTO_OBSERVE_INTERVAL_MINUTES
+                in asset.metadata_by_key[first_key]
+            ):
+                interval = asset.metadata_by_key[first_key][
+                    SYSTEM_METADATA_KEY_AUTO_OBSERVE_INTERVAL_MINUTES
+                ]
+                auto_observe_interval_minutes_by_key.update({key: interval for key in asset.keys})
 
-                if not asset.can_subset:
-                    all_required_keys = {*asset.check_keys, *asset.keys}
-                    if len(all_required_keys) > 1:
-                        for key in all_required_keys:
-                            required_assets_and_checks_by_key[key] = all_required_keys
+            if not asset.can_subset:
+                all_required_keys = {*asset.check_keys, *asset.keys}
+                if len(all_required_keys) > 1:
+                    for key in all_required_keys:
+                        required_assets_and_checks_by_key[key] = all_required_keys
 
         return InternalAssetGraph(
-            asset_dep_graph=generate_asset_dep_graph(assets_defs, source_assets),
-            source_asset_keys={source_asset.key for source_asset in source_assets},
+            asset_dep_graph=generate_asset_dep_graph(assets_defs),
             partitions_defs_by_key=partitions_defs_by_key,
             partition_mappings_by_key=partition_mappings_by_key,
             group_names_by_key=group_names_by_key,
@@ -271,7 +249,6 @@ class AssetGraph:
             backfill_policies_by_key=backfill_policies_by_key,
             assets=assets_defs,
             asset_checks=asset_checks or [],
-            source_assets=source_assets,
             code_versions_by_key=code_versions_by_key,
             auto_observe_interval_minutes_by_key=auto_observe_interval_minutes_by_key,
             required_assets_and_checks_by_key=required_assets_and_checks_by_key,
@@ -820,7 +797,6 @@ class InternalAssetGraph(AssetGraph):
     def __init__(
         self,
         asset_dep_graph: DependencyGraph[AssetKey],
-        source_asset_keys: AbstractSet[AssetKey],
         partitions_defs_by_key: Mapping[AssetKey, Optional[PartitionsDefinition]],
         partition_mappings_by_key: Mapping[AssetKey, Optional[Mapping[AssetKey, PartitionMapping]]],
         group_names_by_key: Mapping[AssetKey, Optional[str]],
@@ -828,7 +804,6 @@ class InternalAssetGraph(AssetGraph):
         auto_materialize_policies_by_key: Mapping[AssetKey, Optional[AutoMaterializePolicy]],
         backfill_policies_by_key: Mapping[AssetKey, Optional[BackfillPolicy]],
         assets: Sequence[AssetsDefinition],
-        source_assets: Sequence[SourceAsset],
         asset_checks: Sequence[AssetChecksDefinition],
         code_versions_by_key: Mapping[AssetKey, Optional[str]],
         auto_observe_interval_minutes_by_key: Mapping[AssetKey, Optional[float]],
@@ -839,7 +814,6 @@ class InternalAssetGraph(AssetGraph):
     ):
         super().__init__(
             asset_dep_graph=asset_dep_graph,
-            source_asset_keys=source_asset_keys,
             partitions_defs_by_key=partitions_defs_by_key,
             partition_mappings_by_key=partition_mappings_by_key,
             group_names_by_key=group_names_by_key,
@@ -852,7 +826,6 @@ class InternalAssetGraph(AssetGraph):
             execution_types_by_key=execution_types_by_key,
         )
         self._assets = assets
-        self._source_assets = source_assets
         self._asset_checks = asset_checks
 
         asset_check_keys = set()
@@ -869,10 +842,6 @@ class InternalAssetGraph(AssetGraph):
     @property
     def assets(self) -> Sequence[AssetsDefinition]:
         return self._assets
-
-    @property
-    def source_assets(self) -> Sequence[SourceAsset]:
-        return self._source_assets
 
     @property
     def asset_checks(self) -> Sequence[AssetChecksDefinition]:

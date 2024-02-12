@@ -8,12 +8,11 @@ from ..errors import DagsterInvariantViolationError
 from ..instance import DagsterInstance
 from ..storage.io_manager import IOManagerDefinition
 from ..storage.mem_io_manager import mem_io_manager
-from .assets import AssetsDefinition
+from .assets import AssetsDefinition, normalize_assets
 from .source_asset import SourceAsset
 
 if TYPE_CHECKING:
     from dagster._core.definitions.asset_selection import CoercibleToAssetSelection
-    from dagster._core.definitions.events import AssetKey
 
     from ..execution.execute_in_process_result import ExecuteInProcessResult
 
@@ -85,15 +84,12 @@ def materialize(
     """
     from dagster._core.definitions.definitions_class import Definitions
 
-    assets = check.sequence_param(assets, "assets", of_type=(AssetsDefinition, SourceAsset))
+    assets = normalize_assets(
+        check.sequence_param(assets, "assets", of_type=(AssetsDefinition, SourceAsset))
+    )
     instance = check.opt_inst_param(instance, "instance", DagsterInstance)
     partition_key = check.opt_str_param(partition_key, "partition_key")
     resources = check.opt_mapping_param(resources, "resources", key_type=str)
-
-    all_executable_keys: Set[AssetKey] = set()
-    for asset in assets:
-        if isinstance(asset, AssetsDefinition):
-            all_executable_keys = all_executable_keys.union(set(asset.keys))
 
     defs = Definitions(
         jobs=[define_asset_job(name=EPHEMERAL_JOB_NAME, selection=selection)],
@@ -169,7 +165,9 @@ def materialize_to_memory(
             # executes a run that materializes just asset1
             materialize([asset1, asset2], selection=[asset1])
     """
-    assets = check.sequence_param(assets, "assets", of_type=(AssetsDefinition, SourceAsset))
+    assets = normalize_assets(
+        check.sequence_param(assets, "assets", of_type=(AssetsDefinition, SourceAsset))
+    )
 
     # Gather all resource defs for the purpose of checking io managers.
     resources_dict = resources or {}
@@ -203,7 +201,7 @@ def materialize_to_memory(
 
 
 def _get_required_io_manager_keys(
-    assets: Sequence[Union[AssetsDefinition, SourceAsset]],
+    assets: Sequence[AssetsDefinition],
 ) -> Set[str]:
     io_manager_keys = set()
     for asset in assets:

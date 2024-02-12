@@ -49,13 +49,14 @@ from dagster._core.errors import (
     DagsterInvalidInvocationError,
     DagsterInvalidObservationError,
 )
+from dagster._utils.merger import merge_dicts
 
 if TYPE_CHECKING:
+    from dagster._core.definitions.assets import AssetsDefinition
     from dagster._core.definitions.decorators.op_decorator import (
         DecoratedOpFunction,
     )
 from dagster._core.storage.io_manager import IOManagerDefinition
-from dagster._utils.merger import merge_dicts
 from dagster._utils.warnings import disable_dagster_warnings
 
 # Going with this catch-all for the time-being to permit pythonic resources
@@ -179,7 +180,6 @@ class SourceAsset(ResourceAddable):
     group_name: PublicAttr[str]
     resource_defs: PublicAttr[Dict[str, ResourceDefinition]]
     observe_fn: PublicAttr[Optional[SourceAssetObserveFunction]]
-    _node_def: Optional[OpDefinition]  # computed lazily
     auto_observe_interval_minutes: Optional[float]
 
     def __init__(
@@ -282,12 +282,7 @@ class SourceAsset(ResourceAddable):
     @property
     def is_observable(self) -> bool:
         """bool: Whether the asset is observable."""
-        return self.node_def is not None
-
-    @property
-    def is_materializable(self) -> bool:
-        """bool: Whether the asset is materializable."""
-        return False
+        return self.observe_fn is not None
 
     @property
     def required_resource_keys(self) -> AbstractSet[str]:
@@ -342,12 +337,12 @@ class SourceAsset(ResourceAddable):
             for key, resource_def in merged_resource_defs.items()
             if key in relevant_keys
         }
-
         io_manager_key = (
             self.get_io_manager_key()
             if self.get_io_manager_key() != DEFAULT_IO_MANAGER_KEY
             else None
         )
+
         with disable_dagster_warnings():
             return SourceAsset(
                 key=self.key,
@@ -361,6 +356,11 @@ class SourceAsset(ResourceAddable):
                 auto_observe_interval_minutes=self.auto_observe_interval_minutes,
                 _required_resource_keys=self._required_resource_keys,
             )
+
+    def to_assets_def(self) -> "AssetsDefinition":
+        from dagster._core.definitions.external_asset import create_external_asset_from_source_asset
+
+        return create_external_asset_from_source_asset(self)
 
     def with_attributes(
         self, group_name: Optional[str] = None, key: Optional[AssetKey] = None

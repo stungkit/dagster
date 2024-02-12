@@ -25,7 +25,7 @@ from dagster._utils.merger import merge_dicts
 
 from .asset_checks import AssetChecksDefinition
 from .asset_layer import AssetLayer
-from .assets import AssetsDefinition
+from .assets import AssetsDefinition, normalize_assets
 from .config import ConfigMapping
 from .dependency import (
     BlockingAssetChecksDependencyDefinition,
@@ -140,11 +140,10 @@ def build_assets_job(
 
     Args:
         name (str): The name of the job.
-        assets (List[AssetsDefinition]): A list of assets or
-            multi-assets - usually constructed using the :py:func:`@asset` or :py:func:`@multi_asset`
-            decorator.
-        source_assets (Optional[Sequence[Union[SourceAsset, AssetsDefinition]]]): A list of
-            assets that are not materialized by this job, but that assets in this job depend on.
+        assets_to_execute (Sequence[AssetsDefinition, SourceAsset]): The assets that will be
+            materialized or observed by the job. Passed `SourceAsset` objects must be observable.
+        other_assets (Optional[Sequence[Union[SourceAsset, AssetsDefinition]]]): Assets that will
+            not be materialized or observed, but that can be loaded as inputs for executed assets.
         resource_defs (Optional[Mapping[str, object]]): Resource defs to be included in
             this job.
         description (Optional[str]): A description of the job.
@@ -167,13 +166,16 @@ def build_assets_job(
     Returns:
         JobDefinition: A job that materializes the given assets.
     """
-    from dagster._core.definitions.external_asset import create_external_asset_from_source_asset
     from dagster._core.execution.build_resources import wrap_resources_for_execution
 
     check.str_param(name, "name")
-    check.iterable_param(assets_to_execute, "assets", of_type=(AssetsDefinition, SourceAsset))
-    other_assets = check.opt_sequence_param(
-        other_assets, "source_assets", of_type=(SourceAsset, AssetsDefinition)
+    assets_to_execute = normalize_assets(
+        check.iterable_param(assets_to_execute, "assets", of_type=(AssetsDefinition, SourceAsset))
+    )
+    other_assets = normalize_assets(
+        check.opt_sequence_param(
+            other_assets, "source_assets", of_type=(SourceAsset, AssetsDefinition)
+        )
     )
     asset_checks = check.opt_sequence_param(
         asset_checks, "asset_checks", of_type=AssetChecksDefinition
@@ -187,16 +189,6 @@ def build_assets_job(
     resource_defs = check.opt_mapping_param(resource_defs, "resource_defs")
     resource_defs = merge_dicts({DEFAULT_IO_MANAGER_KEY: default_job_io_manager}, resource_defs)
     wrapped_resource_defs = wrap_resources_for_execution(resource_defs)
-
-    # normalize SourceAssets to AssetsDefinition (external assets)
-    assets_to_execute = [
-        create_external_asset_from_source_asset(a) if isinstance(a, SourceAsset) else a
-        for a in assets_to_execute
-    ]
-    other_assets = [
-        create_external_asset_from_source_asset(a) if isinstance(a, SourceAsset) else a
-        for a in other_assets or []
-    ]
 
     all_assets = [*assets_to_execute, *other_assets]
 
@@ -245,7 +237,7 @@ def build_assets_job(
         resolved_asset_deps=resolved_asset_deps,
     )
 
-    all_resource_defs = get_all_resource_defs(all_assets, asset_checks, [], wrapped_resource_defs)
+    all_resource_defs = get_all_resource_defs(all_assets, asset_checks, wrapped_resource_defs)
 
     if _asset_selection_data:
         original_job = _asset_selection_data.parent_job_def
@@ -506,7 +498,7 @@ def _attempt_resolve_cycles(
     """
     from dagster._core.selector.subset_selector import generate_asset_dep_graph
 
-    asset_deps = generate_asset_dep_graph([*assets_to_execute, *other_assets], [])
+    asset_deps = generate_asset_dep_graph([*assets_to_execute, *other_assets])
     assets_to_execute_by_asset_key = {k: ad for ad in assets_to_execute for k in ad.keys}
 
     # color for each asset
@@ -562,13 +554,11 @@ def _attempt_resolve_cycles(
 
 def _ensure_resources_dont_conflict(
     assets: Iterable[AssetsDefinition],
-    source_assets: Sequence[SourceAsset],
     resource_defs: Mapping[str, ResourceDefinition],
 ) -> None:
     """Ensures that resources between assets, source assets, and provided resource dictionary do not conflict."""
     resource_defs_from_assets = {}
-    all_assets: Sequence[Union[AssetsDefinition, SourceAsset]] = [*assets, *source_assets]
-    for asset in all_assets:
+    for asset in assets:
         for resource_key, resource_def in asset.resource_defs.items():
             if resource_key not in resource_defs_from_assets:
                 resource_defs_from_assets[resource_key] = resource_def
@@ -595,7 +585,6 @@ def _ensure_resources_dont_conflict(
 
 def check_resources_satisfy_requirements(
     assets: Iterable[AssetsDefinition],
-    source_assets: Sequence[SourceAsset],
     asset_checks: Iterable[AssetChecksDefinition],
     resource_defs: Mapping[str, ResourceDefinition],
 ) -> None:
@@ -603,10 +592,9 @@ def check_resources_satisfy_requirements(
 
     Note that resources provided on assets cannot satisfy resource requirements provided on other assets.
     """
-    _ensure_resources_dont_conflict(assets, source_assets, resource_defs)
+    _ensure_resources_dont_conflict(assets, resource_defs)
 
-    all_assets: Sequence[Union[AssetsDefinition, SourceAsset]] = [*assets, *source_assets]
-    for asset in all_assets:
+    for asset in assets:
         ensure_requirements_satisfied(
             merge_dicts(resource_defs, asset.resource_defs), list(asset.get_resource_requirements())
         )
@@ -620,15 +608,13 @@ def check_resources_satisfy_requirements(
 def get_all_resource_defs(
     assets: Iterable[AssetsDefinition],
     asset_checks: Iterable[AssetChecksDefinition],
-    source_assets: Sequence[SourceAsset],
     resource_defs: Mapping[str, ResourceDefinition],
 ) -> Mapping[str, ResourceDefinition]:
     # Ensures that no resource keys conflict, and each asset has its resource requirements satisfied.
-    check_resources_satisfy_requirements(assets, source_assets, asset_checks, resource_defs)
+    check_resources_satisfy_requirements(assets, asset_checks, resource_defs)
 
     all_resource_defs = dict(resource_defs)
-    all_assets: Sequence[Union[AssetsDefinition, SourceAsset]] = [*assets, *source_assets]
-    for asset in all_assets:
+    for asset in assets:
         all_resource_defs = merge_dicts(all_resource_defs, asset.resource_defs)
 
     for asset_check in asset_checks:

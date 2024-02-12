@@ -1556,3 +1556,10 @@ def get_self_dep_time_window_partition_mapping(
 
         return time_partition_mapping.partition_mapping
     return None
+
+
+def normalize_assets(
+    assets: Iterable[Union[AssetsDefinition, SourceAsset]],
+) -> Sequence[AssetsDefinition]:
+    """Utility function to convert a mixed list of AssetsDefinition and SourceAsset into all AssetsDefinition."""
+    return [a.to_assets_def() if isinstance(a, SourceAsset) else a for a in assets]

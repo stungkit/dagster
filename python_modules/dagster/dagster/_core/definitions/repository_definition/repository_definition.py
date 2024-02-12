@@ -245,6 +245,12 @@ class RepositoryDefinition:
         return self._repository_data.get_source_assets_by_key()
 
     @property
+    def external_assets_by_key(self) -> Mapping[AssetKey, "AssetsDefinition"]:
+        return {
+            k: v for k, v in self._repository_data.get_assets_defs_by_key().items() if v.is_external
+        }
+
+    @property
     def assets_defs_by_key(self) -> Mapping[AssetKey, "AssetsDefinition"]:
         return self._repository_data.get_assets_defs_by_key()
 

@@ -1646,48 +1646,6 @@ def external_asset_nodes_from_defs(
         for asset_key in asset_keys_without_definitions
     ]
 
-    for source_asset in source_assets_by_key.values():
-        if source_asset.key not in node_defs_by_asset_key:
-            job_names = (
-                [
-                    job_def.name
-                    for job_def in job_defs
-                    if source_asset.key in job_def.asset_layer.target_asset_keys
-                    and (
-                        # explicit source-asset observation job
-                        not job_def.asset_layer.has_assets_defs
-                        # "base asset job" will have both source and materializable assets
-                        or is_base_asset_job_name(job_def.name)
-                        and (
-                            source_asset.partitions_def is None
-                            or source_asset.partitions_def == job_def.partitions_def
-                        )
-                    )
-                ]
-                if source_asset.node_def is not None
-                else []
-            )
-            asset_nodes.append(
-                ExternalAssetNode(
-                    asset_key=source_asset.key,
-                    dependencies=list(deps[source_asset.key].values()),
-                    depended_by=list(dep_by[source_asset.key].values()),
-                    execution_type=source_asset.execution_type,
-                    job_names=job_names,
-                    op_description=source_asset.description,
-                    metadata=source_asset.metadata,
-                    group_name=source_asset.group_name,
-                    is_source=True,
-                    is_observable=source_asset.is_observable,
-                    auto_observe_interval_minutes=source_asset.auto_observe_interval_minutes,
-                    partitions_def_data=(
-                        external_partitions_definition_from_def(source_asset.partitions_def)
-                        if source_asset.partitions_def
-                        else None
-                    ),
-                )
-            )
-
     for asset_key, node_tuple_list in node_defs_by_asset_key.items():
         node_output_handle, job_def = node_tuple_list[0]
 
