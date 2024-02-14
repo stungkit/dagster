@@ -39,6 +39,7 @@ from dagster._core.definitions import AssetIn, SourceAsset, asset
 from dagster._core.definitions.asset_graph import AssetGraph
 from dagster._core.definitions.asset_selection import AssetSelection, CoercibleToAssetSelection
 from dagster._core.definitions.assets_job import get_base_asset_jobs
+from dagster._core.definitions.data_version import DataVersion
 from dagster._core.definitions.dependency import NodeHandle, NodeInvocation
 from dagster._core.definitions.executor_definition import in_process_executor
 from dagster._core.definitions.job_definition import JobDefinition
@@ -2887,3 +2888,36 @@ def test_subset_cycle_dependencies():
     result = job.execute_in_process()
     assert result.success
     assert _all_asset_keys(result) == {AssetKey("a"), AssetKey("b")}
+
+
+def test_mixed_asset_job():
+    with disable_dagster_warnings():
+
+        class MyIOManager(IOManager):
+            def handle_output(self, context, obj):
+                pass
+
+            def load_input(self, context):
+                return 5
+
+        @observable_source_asset
+        def foo():
+            return DataVersion("alpha")
+
+        @asset
+        def bar(foo):
+            return foo + 1
+
+        defs = Definitions(
+            assets=[foo, bar],
+            jobs=[define_asset_job("mixed_assets_job", [foo, bar])],
+            resources={"io_manager": MyIOManager()},
+        )
+
+        job_def = defs.get_job_def("mixed_assets_job")
+        result = job_def.execute_in_process()
+        assert result.success
+        assert len(result.asset_materializations_for_node("foo")) == 0
+        assert len(result.asset_observations_for_node("foo")) == 1
+        assert len(result.asset_materializations_for_node("bar")) == 1
+        assert len(result.asset_observations_for_node("bar")) == 0
