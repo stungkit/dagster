@@ -5,6 +5,7 @@ import datetime
 import errno
 import functools
 import inspect
+import itertools
 import multiprocessing
 import os
 import re
@@ -29,6 +30,7 @@ from typing import (
     Generator,
     Generic,
     Hashable,
+    Iterable,
     Iterator,
     List,
     Mapping,
@@ -774,3 +776,11 @@ def tail_file(path_or_fd: Union[str, int], should_stop: Callable[[], bool]) -> I
                 break
             else:
                 time.sleep(0.01)
+
+
+# An equivalent function exists as itertools.batched starting in Python 3.12
+def batched(iterable: Iterable[T], batch_size: int) -> Iterator[Sequence[T]]:
+    """Yield successive n-sized chunks from iterable."""
+    iterator = iter(iterable)
+    for first_of_batch in iterator:
+        yield [first_of_batch, *itertools.islice(iterator, batch_size - 1)]

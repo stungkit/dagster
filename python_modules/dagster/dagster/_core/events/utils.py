@@ -1,9 +1,66 @@
 from json import JSONDecodeError
+from typing import List, Sequence
 
 import dagster._check as check
-from dagster._core.events import DagsterEvent
+from dagster._core.definitions.events import AssetMaterialization, AssetObservation
+from dagster._core.events import (
+    AssetObservationData,
+    AssetPartitionRangeMaterializationData,
+    AssetPartitionRangeObservationData,
+    DagsterEvent,
+    DagsterEventType,
+    StepMaterializationData,
+    get_materialization_message,
+)
+from dagster._core.events.log import EventLogEntry
 from dagster._serdes.errors import DeserializationError
 from dagster._serdes.serdes import deserialize_value
+
+
+def unpack_asset_partition_range_event(event: EventLogEntry) -> Sequence[EventLogEntry]:
+    """Explode a partition range event into its constituent events."""
+    check.inst_param(event, "event", EventLogEntry)
+
+    data = event.get_dagster_event().event_specific_data
+    if isinstance(data, AssetPartitionRangeMaterializationData):
+        member_asset_events = data.materializations
+        event_type = DagsterEventType.ASSET_MATERIALIZATION
+    elif isinstance(data, AssetPartitionRangeObservationData):
+        member_asset_events = data.observations
+        event_type = DagsterEventType.ASSET_OBSERVATION
+    else:
+        check.failed(f"Unexpected event type: {type(data)}")
+
+    events: List[EventLogEntry] = []
+    for asset_event in member_asset_events:
+        if isinstance(asset_event, AssetMaterialization):
+            event_specific_data = StepMaterializationData(materialization=asset_event)
+            message = get_materialization_message(asset_event)
+        elif isinstance(asset_event, AssetObservation):
+            event_specific_data = AssetObservationData(asset_observation=asset_event)
+            message = None
+        else:
+            check.failed(f"Unexpected event type: {type(asset_event)}")
+
+        events.append(
+            EventLogEntry(
+                error_info=None,
+                level=event.level,
+                user_message=event.user_message,
+                run_id=event.run_id,
+                timestamp=event.timestamp,
+                step_key=event.step_key,
+                job_name=event.job_name,
+                dagster_event=DagsterEvent.from_parent_event(
+                    event_type=event_type,
+                    event_specific_data=event_specific_data,
+                    parent_event=event.get_dagster_event(),
+                    message=message,
+                ),
+            )
+        )
+
+    return events
 
 
 def filter_dagster_events_from_cli_logs(log_lines):

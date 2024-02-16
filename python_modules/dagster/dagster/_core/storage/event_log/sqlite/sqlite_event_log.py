@@ -32,6 +32,7 @@ from dagster._core.events import (
     DagsterEventType,
 )
 from dagster._core.events.log import EventLogEntry
+from dagster._core.events.utils import unpack_asset_partition_range_event
 from dagster._core.storage.dagster_run import DagsterRunStatus, RunsFilter
 from dagster._core.storage.event_log.base import EventLogCursor, EventLogRecord, EventRecordsFilter
 from dagster._core.storage.sql import (
@@ -235,6 +236,11 @@ class SqliteEventLogStorage(SqlEventLogStorage, ConfigurableClass):
         Args:
             event (EventLogEntry): The event to store.
         """
+        if event.is_synthetic_dagster_event:
+            for event in unpack_asset_partition_range_event(event):
+                self.store_event(event)
+            return
+
         check.inst_param(event, "event", EventLogEntry)
         insert_event_statement = self.prepare_insert_event(event)
         run_id = event.run_id
@@ -263,7 +269,7 @@ class SqliteEventLogStorage(SqlEventLogStorage, ConfigurableClass):
                     "Cannot store asset event tags for null event id."
                 )
 
-            self.store_asset_event_tags(event, event_id)
+            self.store_asset_event_tags([event], [event_id])
 
         if event.is_dagster_event and event.dagster_event_type in ASSET_CHECK_EVENTS:
             self.store_asset_check_event(event, None)

@@ -12,6 +12,8 @@ from watchdog.observers import Observer
 
 import dagster._check as check
 from dagster._config import StringSource
+from dagster._core.events.log import EventLogEntry
+from dagster._core.events.utils import unpack_asset_partition_range_event
 from dagster._core.storage.dagster_run import DagsterRunStatus
 from dagster._core.storage.event_log.base import EventLogCursor
 from dagster._core.storage.sql import (
@@ -110,6 +112,14 @@ class ConsolidatedSqliteEventLogStorage(SqlEventLogStorage, ConfigurableClass):
 
     def index_connection(self):
         return self._connect()
+
+    def store_event(self, event: EventLogEntry):
+        if event.is_synthetic_dagster_event:
+            for event in unpack_asset_partition_range_event(event):
+                self.store_event(event)
+            return
+
+        super(ConsolidatedSqliteEventLogStorage, self).store_event(event)
 
     def has_table(self, table_name: str) -> bool:
         engine = create_engine(self._conn_string, poolclass=NullPool)

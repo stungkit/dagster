@@ -8,6 +8,8 @@ from dagster._core.definitions.utils import DEFAULT_OUTPUT
 from dagster._core.errors import DagsterError, DagsterInvariantViolationError
 from dagster._core.events import (
     AssetObservationData,
+    AssetPartitionRangeMaterializationData,
+    AssetPartitionRangeObservationData,
     DagsterEvent,
     DagsterEventType,
     ExpectationResult,
@@ -161,16 +163,36 @@ class ExecutionResult(ABC):
 
     def asset_materializations_for_node(self, node_name: str) -> Sequence[AssetMaterialization]:
         return [
-            cast(StepMaterializationData, event.event_specific_data).materialization
-            for event in self.events_for_node(node_name)
-            if event.event_type_value == DagsterEventType.ASSET_MATERIALIZATION.value
+            *[
+                cast(StepMaterializationData, event.event_specific_data).materialization
+                for event in self.events_for_node(node_name)
+                if event.event_type == DagsterEventType.ASSET_MATERIALIZATION
+            ],
+            *[
+                materialization
+                for event in self.events_for_node(node_name)
+                if event.event_type == DagsterEventType.ASSET_PARTITION_RANGE_MATERIALIZATION
+                for materialization in cast(
+                    AssetPartitionRangeMaterializationData, event.event_specific_data
+                ).materializations
+            ],
         ]
 
     def asset_observations_for_node(self, node_name: str) -> Sequence[AssetObservation]:
         return [
-            cast(AssetObservationData, event.event_specific_data).asset_observation
-            for event in self.events_for_node(node_name)
-            if event.event_type_value == DagsterEventType.ASSET_OBSERVATION.value
+            *[
+                cast(AssetObservationData, event.event_specific_data).asset_observation
+                for event in self.events_for_node(node_name)
+                if event.event_type == DagsterEventType.ASSET_OBSERVATION
+            ],
+            *[
+                observation
+                for event in self.events_for_node(node_name)
+                if event.event_type == DagsterEventType.ASSET_PARTITION_RANGE_OBSERVATION
+                for observation in cast(
+                    AssetPartitionRangeObservationData, event.event_specific_data
+                ).observations
+            ],
         ]
 
     def get_asset_materialization_events(self) -> Sequence[DagsterEvent]:

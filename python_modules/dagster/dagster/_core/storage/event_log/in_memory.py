@@ -7,6 +7,7 @@ from typing import Any, Callable, Optional
 import sqlalchemy as db
 from sqlalchemy.pool import NullPool
 
+from dagster._core.events.utils import unpack_asset_partition_range_event
 from dagster._core.storage.event_log.base import EventLogCursor
 from dagster._core.storage.sql import create_engine, get_alembic_config, stamp_alembic_rev
 from dagster._core.storage.sqlite import create_in_memory_conn_string
@@ -81,6 +82,11 @@ class InMemoryEventLogStorage(SqlEventLogStorage, ConfigurableClass):
         pass
 
     def store_event(self, event):
+        if event.is_synthetic_dagster_event:
+            for event in unpack_asset_partition_range_event(event):
+                self.store_event(event)
+            return
+
         super(InMemoryEventLogStorage, self).store_event(event)
         self._storage_id += 1
 

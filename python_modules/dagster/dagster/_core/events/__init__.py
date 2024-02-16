@@ -82,6 +82,8 @@ EventSpecificData = Union[
     "AssetMaterializationPlannedData",
     "AssetCheckEvaluation",
     "AssetCheckEvaluationPlanned",
+    "AssetPartitionRangeMaterializationData",
+    "AssetPartitionRangeObservationData",
 ]
 
 
@@ -115,6 +117,8 @@ class DagsterEventType(str, Enum):
     STEP_EXPECTATION_RESULT = "STEP_EXPECTATION_RESULT"
     ASSET_CHECK_EVALUATION_PLANNED = "ASSET_CHECK_EVALUATION_PLANNED"
     ASSET_CHECK_EVALUATION = "ASSET_CHECK_EVALUATION"
+    ASSET_PARTITION_RANGE_MATERIALIZATION = "ASSET_PARTITION_RANGE_MATERIALIZATION"
+    ASSET_PARTITION_RANGE_OBSERVATION = "ASSET_PARTITION_RANGE_OBSERVATION"
 
     # We want to display RUN_* events in the Dagster UI and in our LogManager output, but in order to
     # support backcompat for our storage layer, we need to keep the persisted value to be strings
@@ -178,6 +182,8 @@ STEP_EVENTS = {
     DagsterEventType.STEP_SKIPPED,
     DagsterEventType.ASSET_MATERIALIZATION,
     DagsterEventType.ASSET_OBSERVATION,
+    DagsterEventType.ASSET_PARTITION_RANGE_MATERIALIZATION,
+    DagsterEventType.ASSET_PARTITION_RANGE_OBSERVATION,
     DagsterEventType.STEP_EXPECTATION_RESULT,
     DagsterEventType.ASSET_CHECK_EVALUATION,
     DagsterEventType.OBJECT_STORE_OPERATION,
@@ -244,6 +250,11 @@ ASSET_EVENTS = {
     DagsterEventType.ASSET_MATERIALIZATION_PLANNED,
 }
 
+ASSET_PARTITION_RANGE_EVENTS = {
+    DagsterEventType.ASSET_PARTITION_RANGE_MATERIALIZATION,
+    DagsterEventType.ASSET_PARTITION_RANGE_OBSERVATION,
+}
+
 ASSET_CHECK_EVENTS = {
     DagsterEventType.ASSET_CHECK_EVALUATION,
     DagsterEventType.ASSET_CHECK_EVALUATION_PLANNED,
@@ -299,6 +310,14 @@ def _validate_event_specific_data(
         check.inst_param(event_specific_data, "event_specific_data", AssetCheckEvaluationPlanned)
     elif event_type == DagsterEventType.ASSET_CHECK_EVALUATION:
         check.inst_param(event_specific_data, "event_specific_data", AssetCheckEvaluation)
+    elif event_type == DagsterEventType.ASSET_PARTITION_RANGE_MATERIALIZATION:
+        check.inst_param(
+            event_specific_data, "event_specific_data", AssetPartitionRangeMaterializationData
+        )
+    elif event_type == DagsterEventType.ASSET_PARTITION_RANGE_OBSERVATION:
+        check.inst_param(
+            event_specific_data, "event_specific_data", AssetPartitionRangeObservationData
+        )
 
     return event_specific_data
 
@@ -478,6 +497,25 @@ class DagsterEvent(
         )
         log_resource_event(log_manager, event)
         return event
+
+    @staticmethod
+    def from_parent_event(
+        event_type: DagsterEventType,
+        event_specific_data: "EventSpecificData",
+        parent_event: "DagsterEvent",
+        message: Optional[str] = None,
+    ) -> "DagsterEvent":
+        return DagsterEvent(
+            event_type_value=event_type.value,
+            job_name=parent_event.job_name,
+            step_handle=parent_event.step_handle,
+            node_handle=parent_event.node_handle,
+            step_kind_value=parent_event.step_kind_value,
+            logging_tags=parent_event.logging_tags,
+            event_specific_data=_validate_event_specific_data(event_type, event_specific_data),
+            message=message,
+            pid=parent_event.pid,
+        )
 
     def __new__(
         cls,
@@ -955,6 +993,30 @@ class DagsterEvent(
         )
 
     @staticmethod
+    def asset_partition_range_materialization(
+        step_context: IStepContext,
+        asset_key: AssetKey,
+        materializations: Sequence[AssetMaterialization],
+    ) -> "DagsterEvent":
+        return DagsterEvent.from_step(
+            event_type=DagsterEventType.ASSET_PARTITION_RANGE_MATERIALIZATION,
+            step_context=step_context,
+            event_specific_data=AssetPartitionRangeMaterializationData(asset_key, materializations),
+        )
+
+    @staticmethod
+    def asset_partition_range_observation(
+        step_context: IStepContext,
+        asset_key: AssetKey,
+        observations: Sequence[AssetObservation],
+    ) -> "DagsterEvent":
+        return DagsterEvent.from_step(
+            event_type=DagsterEventType.ASSET_PARTITION_RANGE_OBSERVATION,
+            step_context=step_context,
+            event_specific_data=AssetPartitionRangeObservationData(asset_key, observations),
+        )
+
+    @staticmethod
     def asset_materialization(
         step_context: IStepContext,
         materialization: AssetMaterialization,
@@ -963,18 +1025,13 @@ class DagsterEvent(
             event_type=DagsterEventType.ASSET_MATERIALIZATION,
             step_context=step_context,
             event_specific_data=StepMaterializationData(materialization),
-            message=(
-                materialization.description
-                if materialization.description
-                else "Materialized value{label_clause}.".format(
-                    label_clause=f" {materialization.label}" if materialization.label else ""
-                )
-            ),
+            message=get_materialization_message(materialization),
         )
 
     @staticmethod
     def asset_observation(
-        step_context: IStepContext, observation: AssetObservation
+        step_context: IStepContext,
+        observation: AssetObservation,
     ) -> "DagsterEvent":
         return DagsterEvent.from_step(
             event_type=DagsterEventType.ASSET_OBSERVATION,
@@ -1521,6 +1578,58 @@ class StepMaterializationData(
             ),
             asset_lineage=check.opt_sequence_param(
                 asset_lineage, "asset_lineage", of_type=AssetLineageInfo
+            ),
+        )
+
+
+# This is factored out because it is used both when directly constructing materialization step
+# events and when unpacking synthetic AssetPartitionRangeMaterialization events.
+def get_materialization_message(materialization: AssetMaterialization) -> str:
+    return (
+        materialization.description
+        if materialization.description
+        else "Materialized value{label_clause}.".format(
+            label_clause=f" {materialization.label}" if materialization.label else ""
+        )
+    )
+
+
+@whitelist_for_serdes
+class AssetPartitionRangeMaterializationData(
+    NamedTuple(
+        "_AssetPartitionRangeMaterializationData",
+        [
+            ("asset_key", AssetKey),
+            ("materializations", Sequence[AssetMaterialization]),
+        ],
+    )
+):
+    def __new__(cls, asset_key: AssetKey, materializations: Sequence[AssetMaterialization]):
+        return super(AssetPartitionRangeMaterializationData, cls).__new__(
+            cls,
+            asset_key=check.inst_param(asset_key, "asset_key", AssetKey),
+            materializations=check.sequence_param(
+                materializations, "materializations", of_type=AssetMaterialization
+            ),
+        )
+
+
+@whitelist_for_serdes
+class AssetPartitionRangeObservationData(
+    NamedTuple(
+        "_AssetPartitionRangeObservationData",
+        [
+            ("asset_key", AssetKey),
+            ("observations", Sequence[AssetObservation]),
+        ],
+    )
+):
+    def __new__(cls, asset_key: AssetKey, observations: Sequence[AssetObservation]):
+        return super(AssetPartitionRangeObservationData, cls).__new__(
+            cls,
+            asset_key=check.inst_param(asset_key, "asset_key", AssetKey),
+            observations=check.sequence_param(
+                observations, "observations", of_type=AssetObservation
             ),
         )
 

@@ -3,7 +3,7 @@ from typing import Mapping, NamedTuple, Optional, Union
 import dagster._check as check
 from dagster._annotations import PublicAttr, public
 from dagster._core.definitions.events import AssetMaterialization, AssetObservation
-from dagster._core.events import DagsterEvent, DagsterEventType
+from dagster._core.events import ASSET_PARTITION_RANGE_EVENTS, DagsterEvent, DagsterEventType
 from dagster._core.utils import coerce_valid_log_level
 from dagster._serdes.serdes import (
     deserialize_value,
@@ -94,6 +94,13 @@ class EventLogEntry(
     def is_dagster_event(self) -> bool:
         """bool: If this entry contains a DagsterEvent."""
         return bool(self.dagster_event)
+
+    @property
+    def is_synthetic_dagster_event(self) -> bool:
+        return (
+            self.is_dagster_event
+            and self.get_dagster_event().event_type in ASSET_PARTITION_RANGE_EVENTS
+        )
 
     @public
     def get_dagster_event(self) -> DagsterEvent:

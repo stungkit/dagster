@@ -4,6 +4,7 @@ from typing import (
     AbstractSet,
     Any,
     Dict,
+    Final,
     Iterator,
     Mapping,
     Optional,
@@ -72,7 +73,7 @@ from dagster._core.execution.plan.outputs import StepOutputData, StepOutputHandl
 from dagster._core.execution.resolve_versions import resolve_step_output_versions
 from dagster._core.storage.tags import BACKFILL_ID_TAG, MEMOIZED_RUN_TAG
 from dagster._core.types.dagster_type import DagsterType
-from dagster._utils import iterate_with_context
+from dagster._utils import batched, iterate_with_context
 from dagster._utils.timing import time_execution_scope
 from dagster._utils.warnings import (
     disable_dagster_warnings,
@@ -666,6 +667,7 @@ def _get_output_asset_events(
 
     if execution_type == AssetExecutionType.MATERIALIZATION:
         event_class = AssetMaterialization
+        event_class = AssetMaterialization
     elif execution_type == AssetExecutionType.OBSERVATION:
         event_class = AssetObservation
     else:
@@ -924,20 +926,52 @@ def _log_materialization_or_observation_events_for_asset(
             f"Unexpected asset execution type {execution_type}",
         )
 
-        yield from (
-            (
-                _dagster_event_for_asset_event(step_context, event)
-                for event in _get_output_asset_events(
-                    asset_key,
-                    partitions,
-                    output,
-                    output_def,
-                    manager_metadata,
-                    step_context,
-                    execution_type,
-                )
-            )
+        asset_event_iterator = _get_output_asset_events(
+            asset_key,
+            partitions,
+            output,
+            output_def,
+            manager_metadata,
+            step_context,
+            execution_type,
         )
+
+        # When materializaing/observing partitions, package into batches before emitting
+        if partitions:
+            yield from _batch_asset_events(
+                step_context, asset_key, execution_type, asset_event_iterator
+            )
+        else:
+            yield from (
+                _dagster_event_for_asset_event(step_context, evt)
+                for evt in asset_event_iterator
+            )
+
+
+# Sets the number of asset events to package into a single BatchedEvent
+_ASSET_EVENT_BATCH_SIZE: Final = 100
+
+
+def _batch_asset_events(
+    step_context: StepExecutionContext,
+    asset_key: AssetKey,
+    execution_type: AssetExecutionType,
+    asset_event_iterator: Iterator[Union[AssetMaterialization, AssetObservation]],
+) -> Iterator[DagsterEvent]:
+    if execution_type == AssetExecutionType.MATERIALIZATION:
+        asset_event_iterator = cast(Iterator[AssetMaterialization], asset_event_iterator)
+        yield from (
+            DagsterEvent.asset_partition_range_materialization(step_context, asset_key, batch)
+            for batch in batched(asset_event_iterator, _ASSET_EVENT_BATCH_SIZE)
+        )
+    elif execution_type == AssetExecutionType.OBSERVATION:
+        asset_event_iterator = cast(Iterator[AssetObservation], asset_event_iterator)
+        yield from (
+            DagsterEvent.asset_partition_range_observation(step_context, asset_key, batch)
+            for batch in batched(asset_event_iterator, _ASSET_EVENT_BATCH_SIZE)
+        )
+    else:
+        check.failed(f"Unexpected asset execution type {execution_type}")
 
 
 def _dagster_event_for_asset_event(
