@@ -364,6 +364,15 @@ def dagster_instance_config_schema() -> Mapping[str, Field]:
             {
                 "enabled": Field(bool, is_required=False, default_value=False),
                 "max_retries": Field(int, is_required=False, default_value=0),
+                "retry_runs_on_step_failures": Field(
+                    bool,
+                    is_required=False,
+                    default_value=True,
+                    description="Whether to retry runs that failed due to steps in the run failing. "
+                    "Set this to false if you only want to retry failures that occur "
+                    "due to the run worker crashing or unexpectedly terminating, and instead "
+                    "rely on op or asset-level retry policies to retry step failures.",
+                ),
             }
         ),
         "code_servers": Field(
