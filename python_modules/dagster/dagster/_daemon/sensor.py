@@ -14,6 +14,7 @@ from typing import (
     NamedTuple,
     Optional,
     Sequence,
+    Set,
     Type,
     Union,
     cast,
@@ -323,6 +324,8 @@ def execute_sensor_iteration(
     tick_retention_settings = instance.get_tick_retention_settings(InstigatorType.SENSOR)
 
     sensors: Dict[str, ExternalSensor] = {}
+    error_locations: Set[str] = set()
+
     for location_entry in workspace_snapshot.values():
         code_location = location_entry.code_location
         if code_location:
@@ -336,11 +339,30 @@ def execute_sensor_iteration(
                         all_sensor_states.get(selector_id)
                     ).is_running:
                         sensors[selector_id] = sensor
-        elif location_entry.load_error and log_verbose_checks:
-            logger.warning(
-                f"Could not load location {location_entry.origin.location_name} to check for"
-                f" sensors due to the following error: {location_entry.load_error}"
+        elif location_entry.load_error:
+            if log_verbose_checks:
+                logger.warning(
+                    f"Could not load location {location_entry.origin.location_name} to check for"
+                    f" sensors due to the following error: {location_entry.load_error}"
+                )
+            error_locations.add(location_entry.origin.location_name)
+
+    # Remove any sensor states that can no longer be found in the workspace
+    # (if they are later added back again, their timestamps will start at the correct place)
+    states_to_delete = [
+        schedule_state
+        for selector_id, schedule_state in all_sensor_states.items()
+        if selector_id not in sensors
+    ]
+    for state in states_to_delete:
+        location_name = state.origin.external_repository_origin.code_location_origin.location_name
+        # don't clean up state if its location is an error state
+        if location_name not in error_locations:
+            logger.info(
+                f"Removing state for sensor {state.instigator_name} "
+                f"that is no longer present in {location_name}."
             )
+            instance.delete_instigator_state(state.instigator_origin_id, state.selector_id)
 
     if not sensors:
         if log_verbose_checks:
