@@ -25,6 +25,21 @@ from typing import (
 
 import dagster._check as check
 from dagster._annotations import PublicAttr, public
+from dagster._core.definitions.partition import (
+    DEFAULT_DATE_FORMAT,
+    AllPartitionsSubset,
+    PartitionedConfig,
+    PartitionsDefinition,
+    PartitionsSubset,
+    ScheduleType,
+    cron_schedule_from_schedule_type_and_offsets,
+)
+from dagster._core.definitions.partition_key_range import PartitionKeyRange
+from dagster._core.definitions.timestamp import TimestampWithTimezone
+from dagster._core.errors import (
+    DagsterInvalidDefinitionError,
+    DagsterInvalidDeserializationVersionError,
+)
 from dagster._core.instance import DynamicPartitionsStore
 from dagster._record import IHaveNew, record_custom
 from dagster._serdes import whitelist_for_serdes
@@ -43,19 +58,6 @@ from dagster._utils.schedules import (
     is_valid_cron_schedule,
     reverse_cron_string_iterator,
 )
-
-from ..errors import DagsterInvalidDefinitionError, DagsterInvalidDeserializationVersionError
-from .partition import (
-    DEFAULT_DATE_FORMAT,
-    AllPartitionsSubset,
-    PartitionedConfig,
-    PartitionsDefinition,
-    PartitionsSubset,
-    ScheduleType,
-    cron_schedule_from_schedule_type_and_offsets,
-)
-from .partition_key_range import PartitionKeyRange
-from .timestamp import TimestampWithTimezone
 
 
 def is_second_ambiguous_time(dt: datetime, tz: str):
@@ -961,6 +963,22 @@ class TimeWindowPartitionsDefinition(PartitionsDefinition, IHaveNew):
 
     def empty_subset(self) -> "PartitionsSubset":
         return self.partitions_subset_class.empty_subset(self)
+
+    def subset_with_all_partitions(
+        self,
+        current_time: Optional[datetime] = None,
+        dynamic_partitions_store: Optional[DynamicPartitionsStore] = None,
+    ) -> "PartitionsSubset":
+        first_window = self.get_first_partition_window(current_time)
+        last_window = self.get_last_partition_window(current_time)
+        windows = (
+            []
+            if first_window is None or last_window is None
+            else [TimeWindow(first_window.start, last_window.end)]
+        )
+        return TimeWindowPartitionsSubset(
+            partitions_def=self, num_partitions=None, included_time_windows=windows
+        )
 
     def get_serializable_unique_identifier(
         self, dynamic_partitions_store: Optional[DynamicPartitionsStore] = None
@@ -2131,16 +2149,14 @@ class PartitionKeysTimeWindowPartitionsSubset(BaseTimeWindowPartitionsSubset):
         return f"PartitionKeysTimeWindowPartitionsSubset({self.get_partition_key_ranges(self.partitions_def)})"
 
     def to_serializable_subset(self) -> "TimeWindowPartitionsSubset":
-        from dagster._core.remote_representation.external_data import (
-            external_time_window_partitions_definition_from_def,
-        )
+        from dagster._core.remote_representation.external_data import TimeWindowPartitionsSnap
 
         # in cases where we're dealing with (e.g.) HourlyPartitionsDefinition, we need to convert
         # this partitions definition into a raw TimeWindowPartitionsDefinition to make it
         # serializable. to do this, we just convert it to its external representation and back.
         partitions_def = self.partitions_def
         if type(self.partitions_def) != TimeWindowPartitionsSubset:
-            partitions_def = external_time_window_partitions_definition_from_def(
+            partitions_def = TimeWindowPartitionsSnap.from_def(
                 partitions_def
             ).get_partitions_definition()
         return TimeWindowPartitionsSubset(
@@ -2472,9 +2488,7 @@ class TimeWindowPartitionsSubset(
         )
 
     def to_serializable_subset(self) -> "TimeWindowPartitionsSubset":
-        from dagster._core.remote_representation.external_data import (
-            external_time_window_partitions_definition_from_def,
-        )
+        from dagster._core.remote_representation.external_data import TimeWindowPartitionsSnap
 
         # in cases where we're dealing with (e.g.) HourlyPartitionsDefinition, we need to convert
         # this partitions definition into a raw TimeWindowPartitionsDefinition to make it
@@ -2483,7 +2497,7 @@ class TimeWindowPartitionsSubset(
         # and so this conversion is rarely necessary.
         partitions_def = self.partitions_def
         if type(self.partitions_def) != TimeWindowPartitionsSubset:
-            partitions_def = external_time_window_partitions_definition_from_def(
+            partitions_def = TimeWindowPartitionsSnap.from_def(
                 partitions_def
             ).get_partitions_definition()
             return self.with_partitions_def(partitions_def)
@@ -2626,7 +2640,7 @@ def fetch_flattened_time_window_ranges(
 def has_one_dimension_time_window_partitioning(
     partitions_def: Optional[PartitionsDefinition],
 ) -> bool:
-    from .multi_dimensional_partitions import MultiPartitionsDefinition
+    from dagster._core.definitions.multi_dimensional_partitions import MultiPartitionsDefinition
 
     if isinstance(partitions_def, TimeWindowPartitionsDefinition):
         return True
@@ -2648,7 +2662,7 @@ def get_time_partitions_def(
     """For a given PartitionsDefinition, return the associated TimeWindowPartitionsDefinition if it
     exists.
     """
-    from .multi_dimensional_partitions import MultiPartitionsDefinition
+    from dagster._core.definitions.multi_dimensional_partitions import MultiPartitionsDefinition
 
     if partitions_def is None:
         return None
@@ -2667,7 +2681,7 @@ def get_time_partitions_def(
 def get_time_partition_key(
     partitions_def: Optional[PartitionsDefinition], partition_key: Optional[str]
 ) -> str:
-    from .multi_dimensional_partitions import MultiPartitionsDefinition
+    from dagster._core.definitions.multi_dimensional_partitions import MultiPartitionsDefinition
 
     if partitions_def is None or partition_key is None:
         check.failed(

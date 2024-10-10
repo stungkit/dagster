@@ -1,4 +1,3 @@
-import {gql, useQuery} from '@apollo/client';
 // eslint-disable-next-line no-restricted-imports
 import {BreadcrumbProps} from '@blueprintjs/core';
 import {Alert, Box, ErrorBoundary, NonIdealState, Spinner, Tag} from '@dagster-io/ui-components';
@@ -16,14 +15,15 @@ import {AssetNodeOverview, AssetNodeOverviewNonSDA} from './AssetNodeOverview';
 import {AssetPartitions} from './AssetPartitions';
 import {AssetPlotsPage} from './AssetPlotsPage';
 import {AssetTabs} from './AssetTabs';
+import {useAllAssets} from './AssetsCatalogTable';
 import {AssetAutomaterializePolicyPage} from './AutoMaterializePolicyPage/AssetAutomaterializePolicyPage';
 import {ChangedReasonsTag} from './ChangedReasons';
 import {LaunchAssetExecutionButton} from './LaunchAssetExecutionButton';
-import {LaunchAssetObservationButton} from './LaunchAssetObservationButton';
 import {UNDERLYING_OPS_ASSET_NODE_FRAGMENT} from './UnderlyingOpsOrGraph';
 import {AssetChecks} from './asset-checks/AssetChecks';
 import {assetDetailsPathForKey} from './assetDetailsPathForKey';
 import {AssetKey, AssetViewParams} from './types';
+import {AssetTableDefinitionFragment} from './types/AssetTableFragment.types';
 import {
   AssetViewDefinitionNodeFragment,
   AssetViewDefinitionQuery,
@@ -33,6 +33,7 @@ import {useDeleteDynamicPartitionsDialog} from './useDeleteDynamicPartitionsDial
 import {healthRefreshHintFromLiveData} from './usePartitionHealthData';
 import {useReportEventsModal} from './useReportEventsModal';
 import {useWipeModal} from './useWipeModal';
+import {gql, useQuery} from '../apollo-client';
 import {currentPageAtom} from '../app/analytics';
 import {Timestamp} from '../app/time/Timestamp';
 import {AssetLiveDataRefreshButton, useAssetLiveData} from '../asset-data/AssetLiveDataProvider';
@@ -46,7 +47,7 @@ import {
 import {useAssetGraphData} from '../asset-graph/useAssetGraphData';
 import {StaleReasonsTag} from '../assets/Stale';
 import {useQueryPersistedState} from '../hooks/useQueryPersistedState';
-import {useBlockTraceOnQueryResult} from '../performance/TraceContext';
+import {IndeterminateLoadingBar} from '../ui/IndeterminateLoadingBar';
 import {buildRepoAddress} from '../workspace/buildRepoAddress';
 
 interface Props {
@@ -61,8 +62,10 @@ export const AssetView = ({assetKey, headerBreadcrumbs, writeAssetVisit, current
   const {useTabBuilder, renderFeatureView} = useContext(AssetFeatureContext);
 
   // Load the asset definition
-  const {definition, definitionQueryResult, lastMaterialization} =
+  const {cachedDefinition, definition, definitionQueryResult, lastMaterialization} =
     useAssetViewAssetDefinition(assetKey);
+
+  const cachedOrLiveDefinition = definition ?? cachedDefinition;
 
   useEffect(() => {
     // If the asset exists, add it to the recently visited list
@@ -75,7 +78,7 @@ export const AssetView = ({assetKey, headerBreadcrumbs, writeAssetVisit, current
     }
   }, [definitionQueryResult, writeAssetVisit, assetKey.path]);
 
-  const tabList = useTabBuilder({definition, params});
+  const tabList = useTabBuilder({definition: cachedOrLiveDefinition, params});
 
   const defaultTab = 'overview';
   const selectedTab = params.view || defaultTab;
@@ -104,10 +107,7 @@ export const AssetView = ({assetKey, headerBreadcrumbs, writeAssetVisit, current
     ? healthRefreshHintFromLiveData(liveData)
     : lastMaterialization?.timestamp;
 
-  const isLoading =
-    definitionQueryResult.loading &&
-    !definitionQueryResult.previousData &&
-    !definitionQueryResult.data;
+  const isLoading = !definitionQueryResult.previousData && !definitionQueryResult.data;
 
   const renderOverviewTab = () => {
     if (!definition && !isLoading) {
@@ -119,6 +119,7 @@ export const AssetView = ({assetKey, headerBreadcrumbs, writeAssetVisit, current
       <AssetNodeOverview
         assetKey={assetKey}
         assetNode={definition}
+        cachedAssetNode={cachedDefinition}
         upstream={upstream}
         downstream={downstream}
         liveData={liveData}
@@ -165,7 +166,10 @@ export const AssetView = ({assetKey, headerBreadcrumbs, writeAssetVisit, current
   };
 
   const renderPartitionsTab = () => {
-    if (!definition?.isMaterializable) {
+    // We don't render <AssetLoadingDefinitionState /> here like the other tabs because
+    // AssetPartitions makes graphql requests and we want to avoid a request waterfall.
+    // Instead AssetPartitions will render the AssetLoadingDefinitionState itself.
+    if (!isLoading && !definition?.isMaterializable) {
       return <Redirect to={assetDetailsPathForKey(assetKey, {view: 'events'})} />;
     }
 
@@ -274,7 +278,12 @@ export const AssetView = ({assetKey, headerBreadcrumbs, writeAssetVisit, current
   }, [path, selectedTab, setCurrentPage]);
 
   const wipe = useWipeModal(
-    definition ? {assetKey: definition.assetKey, repository: definition.repository} : null,
+    definition && !definition.isObservable
+      ? {
+          assetKey: definition.assetKey,
+          repository: definition.repository,
+        }
+      : null,
     refresh,
   );
 
@@ -287,8 +296,13 @@ export const AssetView = ({assetKey, headerBreadcrumbs, writeAssetVisit, current
   );
 
   const reportEvents = useReportEventsModal(
-    definition && repoAddress
-      ? {assetKey: definition.assetKey, isPartitioned: definition.isPartitioned, repoAddress}
+    definition && !definition.isObservable && repoAddress
+      ? {
+          assetKey: definition.assetKey,
+          isPartitioned: definition.isPartitioned,
+          hasReportRunlessAssetEventPermission: definition.hasReportRunlessAssetEventPermission,
+          repoAddress,
+        }
       : null,
     refresh,
   );
@@ -309,29 +323,27 @@ export const AssetView = ({assetKey, headerBreadcrumbs, writeAssetVisit, current
         headerBreadcrumbs={headerBreadcrumbs}
         tags={
           <AssetViewPageHeaderTags
-            definition={definition}
+            definition={cachedOrLiveDefinition}
             liveData={liveData}
             onShowUpstream={() => setParams({...params, view: 'lineage', lineageScope: 'upstream'})}
           />
         }
         tabs={
-          <Box flex={{direction: 'row', justifyContent: 'space-between', alignItems: 'flex-end'}}>
-            <AssetTabs selectedTab={selectedTab} tabs={tabList} />
-            <Box padding={{bottom: 8}}>
-              <AssetLiveDataRefreshButton />
+          <div>
+            <IndeterminateLoadingBar loading={isLoading} />
+            <Box flex={{direction: 'row', justifyContent: 'space-between', alignItems: 'flex-end'}}>
+              <AssetTabs selectedTab={selectedTab} tabs={tabList} />
+              <Box padding={{bottom: 8}}>
+                <AssetLiveDataRefreshButton />
+              </Box>
             </Box>
-          </Box>
+          </div>
         }
         right={
           <Box style={{margin: '-4px 0'}} flex={{direction: 'row', gap: 8}}>
-            {definition && definition.isObservable ? (
-              <LaunchAssetObservationButton
-                primary
-                scope={{all: [definition], skipAllTerm: true}}
-              />
-            ) : definition && definition.jobNames.length > 0 && upstream ? (
+            {cachedOrLiveDefinition && cachedOrLiveDefinition.jobNames.length > 0 && upstream ? (
               <LaunchAssetExecutionButton
-                scope={{all: [definition]}}
+                scope={{all: [cachedOrLiveDefinition]}}
                 showChangedAndMissingOption={false}
                 additionalDropdownOptions={[
                   ...reportEvents.dropdownOptions,
@@ -431,6 +443,13 @@ function useNeighborsFromGraph(graphData: GraphData | null, assetKey: AssetKey) 
 }
 
 const useAssetViewAssetDefinition = (assetKey: AssetKey) => {
+  const {assets} = useAllAssets();
+  const cachedDefinition = useMemo(
+    () =>
+      assets?.find((asset) => tokenForAssetKey(asset.key) === tokenForAssetKey(assetKey))
+        ?.definition,
+    [assetKey, assets],
+  );
   const result = useQuery<AssetViewDefinitionQuery, AssetViewDefinitionQueryVariables>(
     ASSET_VIEW_DEFINITION_QUERY,
     {
@@ -439,7 +458,6 @@ const useAssetViewAssetDefinition = (assetKey: AssetKey) => {
     },
   );
 
-  useBlockTraceOnQueryResult(result, 'AssetViewDefinitionQuery');
   const {assetOrError} = result.data || result.previousData || {};
   const asset = assetOrError && assetOrError.__typename === 'Asset' ? assetOrError : null;
   if (!asset) {
@@ -447,6 +465,7 @@ const useAssetViewAssetDefinition = (assetKey: AssetKey) => {
       definitionQueryResult: result,
       definition: null,
       lastMaterialization: null,
+      cachedDefinition,
     };
   }
 
@@ -454,6 +473,7 @@ const useAssetViewAssetDefinition = (assetKey: AssetKey) => {
     definitionQueryResult: result,
     definition: asset.definition,
     lastMaterialization: asset.assetMaterializations ? asset.assetMaterializations[0] : null,
+    cachedDefinition,
   };
 };
 
@@ -490,6 +510,7 @@ export const ASSET_VIEW_DEFINITION_QUERY = gql`
     partitionKeysByDimension {
       name
     }
+    hasReportRunlessAssetEventPermission
     repository {
       id
       name
@@ -548,7 +569,7 @@ const AssetViewPageHeaderTags = ({
   liveData,
   onShowUpstream,
 }: {
-  definition: AssetViewDefinitionNodeFragment | null;
+  definition: AssetViewDefinitionNodeFragment | AssetTableDefinitionFragment | null | undefined;
   liveData?: LiveDataForNodeWithStaleData;
   onShowUpstream: () => void;
 }) => {

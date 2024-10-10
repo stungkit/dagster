@@ -1,4 +1,4 @@
-import {gql} from '@apollo/client';
+import {gql} from '../apollo-client';
 
 export const TABLE_SCHEMA_FRAGMENT = gql`
   fragment TableSchemaFragment on TableSchema {
@@ -8,6 +8,10 @@ export const TABLE_SCHEMA_FRAGMENT = gql`
       type
       constraints {
         ...ConstraintsForTableColumn
+      }
+      tags {
+        key
+        value
       }
     }
     constraints {

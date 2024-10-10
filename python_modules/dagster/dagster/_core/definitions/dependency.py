@@ -26,25 +26,29 @@ from typing_extensions import TypeAlias, TypeVar
 
 import dagster._check as check
 from dagster._annotations import PublicAttr, public
+from dagster._core.definitions.hook_definition import HookDefinition
+from dagster._core.definitions.input import (
+    FanInInputPointer,
+    InputDefinition,
+    InputMapping,
+    InputPointer,
+)
+from dagster._core.definitions.output import OutputDefinition
 from dagster._core.definitions.policy import RetryPolicy
+from dagster._core.definitions.utils import DEFAULT_OUTPUT, struct_to_string
 from dagster._core.errors import DagsterInvalidDefinitionError
 from dagster._record import record
 from dagster._serdes.serdes import whitelist_for_serdes
 from dagster._utils import hash_collection
-
-from .hook_definition import HookDefinition
-from .input import FanInInputPointer, InputDefinition, InputMapping, InputPointer
-from .output import OutputDefinition
-from .utils import DEFAULT_OUTPUT, normalize_tags, struct_to_string
+from dagster._utils.tags import normalize_tags
 
 if TYPE_CHECKING:
+    from dagster._core.definitions.asset_layer import AssetLayer
+    from dagster._core.definitions.composition import MappedInputPlaceholder
+    from dagster._core.definitions.graph_definition import GraphDefinition
+    from dagster._core.definitions.node_definition import NodeDefinition
     from dagster._core.definitions.op_definition import OpDefinition
-
-    from .asset_layer import AssetLayer
-    from .composition import MappedInputPlaceholder
-    from .graph_definition import GraphDefinition
-    from .node_definition import NodeDefinition
-    from .resource_requirement import ResourceRequirement
+    from dagster._core.definitions.resource_requirement import ResourceRequirement
 
 T_DependencyKey = TypeVar("T_DependencyKey", str, "NodeInvocation")
 DependencyMapping: TypeAlias = Mapping[T_DependencyKey, Mapping[str, "IDependencyDefinition"]]
@@ -134,8 +138,8 @@ class Node(ABC):
         hook_defs: Optional[AbstractSet[HookDefinition]] = None,
         retry_policy: Optional[RetryPolicy] = None,
     ):
-        from .graph_definition import GraphDefinition
-        from .node_definition import NodeDefinition
+        from dagster._core.definitions.graph_definition import GraphDefinition
+        from dagster._core.definitions.node_definition import NodeDefinition
 
         self.name = check.str_param(name, "name")
         self.definition = check.inst_param(definition, "definition", NodeDefinition)
@@ -144,7 +148,7 @@ class Node(ABC):
             "graph_definition",
             GraphDefinition,
         )
-        self._additional_tags = normalize_tags(tags).tags
+        self._additional_tags = normalize_tags(tags)
         self._hook_defs = check.opt_set_param(hook_defs, "hook_defs", of_type=HookDefinition)
         self._retry_policy = check.opt_inst_param(retry_policy, "retry_policy", RetryPolicy)
 
@@ -263,7 +267,7 @@ class GraphNode(Node):
         hook_defs: Optional[AbstractSet[HookDefinition]] = None,
         retry_policy: Optional[RetryPolicy] = None,
     ):
-        from .graph_definition import GraphDefinition
+        from dagster._core.definitions.graph_definition import GraphDefinition
 
         check.inst_param(definition, "definition", GraphDefinition)
         super().__init__(name, definition, graph_definition, tags, hook_defs, retry_policy)
@@ -299,7 +303,7 @@ class OpNode(Node):
         hook_defs: Optional[AbstractSet[HookDefinition]] = None,
         retry_policy: Optional[RetryPolicy] = None,
     ):
-        from .op_definition import OpDefinition
+        from dagster._core.definitions.op_definition import OpDefinition
 
         check.inst_param(definition, "definition", OpDefinition)
         super().__init__(name, definition, graph_definition, tags, hook_defs, retry_policy)
@@ -310,7 +314,7 @@ class OpNode(Node):
         parent_handle: Optional["NodeHandle"] = None,
         asset_layer: Optional["AssetLayer"] = None,
     ) -> Iterator["ResourceRequirement"]:
-        from .resource_requirement import InputManagerRequirement
+        from dagster._core.definitions.resource_requirement import InputManagerRequirement
 
         cur_node_handle = NodeHandle(self.name, parent_handle)
 
@@ -753,7 +757,7 @@ class MultiDependencyDefinition(
         cls,
         dependencies: Sequence[Union[DependencyDefinition, Type["MappedInputPlaceholder"]]],
     ):
-        from .composition import MappedInputPlaceholder
+        from dagster._core.definitions.composition import MappedInputPlaceholder
 
         deps = check.sequence_param(dependencies, "dependencies")
         seen = {}
@@ -854,7 +858,7 @@ def _create_handle_dict(
     node_dict: Mapping[str, Node],
     dep_dict: DependencyMapping[str],
 ) -> InputToOutputMap:
-    from .composition import MappedInputPlaceholder
+    from dagster._core.definitions.composition import MappedInputPlaceholder
 
     check.mapping_param(node_dict, "node_dict", key_type=str, value_type=Node)
     check.two_dim_mapping_param(dep_dict, "dep_dict", value_type=IDependencyDefinition)

@@ -1,29 +1,31 @@
 import time
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 import dagster._check as check
 import graphene
 from dagster import DefaultScheduleStatus
-from dagster._core.remote_representation import ExternalSchedule
-from dagster._core.remote_representation.external import ExternalRepository
+from dagster._core.remote_representation import RemoteSchedule
+from dagster._core.remote_representation.external import RemoteRepository
 from dagster._core.scheduler.instigation import InstigatorState, InstigatorStatus
 from dagster._time import get_current_timestamp
 
+from dagster_graphql.implementation.events import iterate_metadata_entries
 from dagster_graphql.implementation.loader import RepositoryScopedBatchLoader
 from dagster_graphql.schema.asset_selections import GrapheneAssetSelection
-
-from ..errors import (
+from dagster_graphql.schema.errors import (
     GraphenePythonError,
     GrapheneRepositoryNotFoundError,
     GrapheneScheduleNotFoundError,
 )
-from ..instigation import (
+from dagster_graphql.schema.instigation import (
     GrapheneDryRunInstigationTick,
     GrapheneDryRunInstigationTicks,
     GrapheneInstigationState,
     GrapheneInstigationStatus,
 )
-from ..util import ResolveInfo, non_null_list
+from dagster_graphql.schema.metadata import GrapheneMetadataEntry
+from dagster_graphql.schema.tags import GrapheneDefinitionTag
+from dagster_graphql.schema.util import ResolveInfo, non_null_list
 
 
 class GrapheneSchedule(graphene.ObjectType):
@@ -55,19 +57,21 @@ class GrapheneSchedule(graphene.ObjectType):
         lower_limit=graphene.Int(),
     )
     assetSelection = graphene.Field(GrapheneAssetSelection)
+    tags = non_null_list(GrapheneDefinitionTag)
+    metadataEntries = non_null_list(GrapheneMetadataEntry)
 
     class Meta:
         name = "Schedule"
 
     def __init__(
         self,
-        external_schedule: ExternalSchedule,
-        external_repository: ExternalRepository,
+        external_schedule: RemoteSchedule,
+        external_repository: RemoteRepository,
         schedule_state: Optional[InstigatorState],
         batch_loader: Optional[RepositoryScopedBatchLoader] = None,
     ):
         self._external_schedule = check.inst_param(
-            external_schedule, "external_schedule", ExternalSchedule
+            external_schedule, "external_schedule", RemoteSchedule
         )
         self._external_repository = external_repository
 
@@ -123,7 +127,7 @@ class GrapheneSchedule(graphene.ObjectType):
         return GrapheneInstigationState(self._schedule_state, self._batch_loader)
 
     def resolve_partition_set(self, graphene_info: ResolveInfo):
-        from ..partition_sets import GraphenePartitionSet
+        from dagster_graphql.schema.partition_sets import GraphenePartitionSet
 
         if self._external_schedule.partition_set_name is None:
             return None
@@ -131,7 +135,7 @@ class GrapheneSchedule(graphene.ObjectType):
         repository = graphene_info.context.get_code_location(
             self._external_schedule.handle.location_name
         ).get_repository(self._external_schedule.handle.repository_name)
-        external_partition_set = repository.get_external_partition_set(
+        external_partition_set = repository.get_partition_set(
             self._external_schedule.partition_set_name
         )
 
@@ -222,6 +226,15 @@ class GrapheneSchedule(graphene.ObjectType):
         ]
 
         return tick_times
+
+    def resolve_tags(self, _graphene_info: ResolveInfo) -> Sequence[GrapheneDefinitionTag]:
+        return [
+            GrapheneDefinitionTag(key, value)
+            for key, value in (self._external_schedule.tags or {}).items()
+        ]
+
+    def resolve_metadataEntries(self, _graphene_info: ResolveInfo) -> List[GrapheneMetadataEntry]:
+        return list(iterate_metadata_entries(self._external_schedule.metadata))
 
 
 class GrapheneScheduleOrError(graphene.Union):

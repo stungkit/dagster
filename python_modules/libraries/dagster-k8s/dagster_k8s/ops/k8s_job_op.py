@@ -19,16 +19,16 @@ from dagster._annotations import experimental
 from dagster._core.errors import DagsterExecutionInterruptedError
 from dagster._utils.merger import merge_dicts
 
-from ..client import DEFAULT_JOB_POD_COUNT, DagsterKubernetesClient, k8s_api_retry
-from ..container_context import K8sContainerContext
-from ..job import (
+from dagster_k8s.client import DEFAULT_JOB_POD_COUNT, DagsterKubernetesClient, k8s_api_retry
+from dagster_k8s.container_context import K8sContainerContext
+from dagster_k8s.job import (
     DagsterK8sJobConfig,
     K8sConfigMergeBehavior,
     UserDefinedDagsterK8sConfig,
     construct_dagster_k8s_job,
     get_k8s_job_name,
 )
-from ..launcher import K8sRunLauncher
+from dagster_k8s.launcher import K8sRunLauncher
 
 K8S_JOB_OP_CONFIG = merge_dicts(
     DagsterK8sJobConfig.config_type_container(),
@@ -163,6 +163,8 @@ def execute_k8s_job(
     job_spec_config: Optional[Dict[str, Any]] = None,
     k8s_job_name: Optional[str] = None,
     merge_behavior: K8sConfigMergeBehavior = K8sConfigMergeBehavior.DEEP,
+    delete_failed_k8s_jobs: Optional[bool] = True,
+    _kubeconfig_file_context: Optional[str] = None,
 ):
     """This function is a utility for executing a Kubernetes job from within a Dagster op.
 
@@ -238,6 +240,11 @@ def execute_k8s_job(
             are recursively merged, appending list fields together and merging dictionary fields.
             Setting it to SHALLOW will make the dictionaries shallowly merged - any shared values
             in the dictionaries will be replaced by the values set on this op.
+        delete_failed_k8s_jobs (bool): Whether to immediately delete failed Kubernetes jobs. If False,
+            failed jobs will remain accessible through the Kubernetes API until deleted by a user or cleaned up by the
+            .spec.ttlSecondsAfterFinished parameter of the job.
+            (https://kubernetes.io/docs/concepts/workloads/controllers/ttlafterfinished/).
+            Defaults to True.
     """
     run_container_context = K8sContainerContext.create_for_run(
         context.dagster_run,
@@ -320,7 +327,7 @@ def execute_k8s_job(
     if load_incluster_config:
         kubernetes.config.load_incluster_config()
     else:
-        kubernetes.config.load_kube_config(kubeconfig_file)
+        kubernetes.config.load_kube_config(kubeconfig_file, context=_kubeconfig_file_context)
 
     # changing this to be able to be passed in will allow for unit testing
     api_client = DagsterKubernetesClient.production_client()
@@ -409,10 +416,11 @@ def execute_k8s_job(
             num_pods_to_wait_for=num_pods_to_wait_for,
         )
     except (DagsterExecutionInterruptedError, Exception) as e:
-        context.log.info(
-            f"Deleting Kubernetes job {job_name} in namespace {namespace} due to exception"
-        )
-        api_client.delete_job(job_name=job_name, namespace=namespace)
+        if delete_failed_k8s_jobs:
+            context.log.info(
+                f"Deleting Kubernetes job {job_name} in namespace {namespace} due to exception"
+            )
+            api_client.delete_job(job_name=job_name, namespace=namespace)
         raise e
 
 

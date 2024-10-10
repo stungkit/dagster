@@ -8,6 +8,7 @@ from dagster import (
     DagsterInvariantViolationError,
     __version__ as dagster_version,
 )
+from dagster._cli.utils import get_instance_for_cli
 from dagster._cli.workspace.cli_target import (
     get_code_location_from_kwargs,
     get_external_repository_from_code_location,
@@ -16,7 +17,7 @@ from dagster._cli.workspace.cli_target import (
 )
 from dagster._core.definitions.run_request import InstigatorType
 from dagster._core.instance import DagsterInstance
-from dagster._core.remote_representation import ExternalRepository
+from dagster._core.remote_representation import RemoteRepository
 from dagster._core.scheduler.instigation import (
     InstigatorState,
     InstigatorStatus,
@@ -24,8 +25,6 @@ from dagster._core.scheduler.instigation import (
 )
 from dagster._utils.error import serializable_error_info_from_exc_info
 from dagster._utils.yaml_utils import dump_run_config_yaml
-
-from .utils import get_instance_for_cli
 
 
 @click.group(name="sensor")
@@ -37,8 +36,8 @@ def print_changes(external_repository, instance, print_fn=print, preview=False):
     sensor_states = instance.all_instigator_state(
         external_repository.get_origin_id(), external_repository.selector_id, InstigatorType.SENSOR
     )
-    external_sensors = external_repository.get_external_sensors()
-    external_sensors_dict = {s.get_external_origin_id(): s for s in external_sensors}
+    external_sensors = external_repository.get_sensors()
+    external_sensors_dict = {s.get_remote_origin_id(): s for s in external_sensors}
     sensor_states_dict = {s.instigator_origin_id: s for s in sensor_states}
 
     external_sensor_origin_ids = set(external_sensors_dict.keys())
@@ -77,13 +76,13 @@ def print_changes(external_repository, instance, print_fn=print, preview=False):
         )
 
 
-def check_repo_and_scheduler(repository: ExternalRepository, instance: DagsterInstance) -> None:
-    check.inst_param(repository, "repository", ExternalRepository)
+def check_repo_and_scheduler(repository: RemoteRepository, instance: DagsterInstance) -> None:
+    check.inst_param(repository, "repository", RemoteRepository)
     check.inst_param(instance, "instance", DagsterInstance)
 
     repository_name = repository.name
 
-    if not repository.get_external_sensors():
+    if not repository.get_sensors():
         raise click.UsageError(f"There are no sensors defined for repository {repository_name}.")
 
     if not os.getenv("DAGSTER_HOME"):
@@ -137,11 +136,11 @@ def execute_list_command(running_filter, stopped_filter, name_filter, cli_args, 
                 print_fn(title)
                 print_fn("*" * len(title))
 
-            repo_sensors = external_repo.get_external_sensors()
+            repo_sensors = external_repo.get_sensors()
             stored_sensors_by_origin_id = {
                 stored_sensor_state.instigator_origin_id: stored_sensor_state
                 for stored_sensor_state in instance.all_instigator_state(
-                    external_repo.get_external_origin_id(),
+                    external_repo.get_remote_origin_id(),
                     external_repo.selector_id,
                     instigator_type=InstigatorType.SENSOR,
                 )
@@ -151,7 +150,7 @@ def execute_list_command(running_filter, stopped_filter, name_filter, cli_args, 
 
             for external_sensor in repo_sensors:
                 sensor_state = external_sensor.get_current_instigator_state(
-                    stored_sensors_by_origin_id.get(external_sensor.get_external_origin_id())
+                    stored_sensors_by_origin_id.get(external_sensor.get_remote_origin_id())
                 )
 
                 if running_filter and not sensor_state.is_running:
@@ -193,14 +192,14 @@ def execute_start_command(sensor_name, all_flag, cli_args, print_fn):
 
             if all_flag:
                 try:
-                    for external_sensor in external_repo.get_external_sensors():
+                    for external_sensor in external_repo.get_sensors():
                         instance.start_sensor(external_sensor)
                     print_fn(f"Started all sensors for repository {repository_name}")
                 except DagsterInvariantViolationError as ex:
                     raise click.UsageError(ex)
             else:
                 try:
-                    external_sensor = external_repo.get_external_sensor(sensor_name)
+                    external_sensor = external_repo.get_sensor(sensor_name)
                     instance.start_sensor(external_sensor)
                 except DagsterInvariantViolationError as ex:
                     raise click.UsageError(ex)
@@ -223,9 +222,9 @@ def execute_stop_command(sensor_name, cli_args, print_fn):
         ) as external_repo:
             check_repo_and_scheduler(external_repo, instance)
             try:
-                external_sensor = external_repo.get_external_sensor(sensor_name)
+                external_sensor = external_repo.get_sensor(sensor_name)
                 instance.stop_sensor(
-                    external_sensor.get_external_origin_id(),
+                    external_sensor.get_remote_origin_id(),
                     external_sensor.selector_id,
                     external_sensor,
                 )
@@ -274,7 +273,7 @@ def execute_preview_command(
                     code_location, cli_args.get("repository")
                 )
                 check_repo_and_scheduler(external_repo, instance)
-                external_sensor = external_repo.get_external_sensor(sensor_name)
+                external_sensor = external_repo.get_sensor(sensor_name)
                 try:
                     sensor_runtime_data = code_location.get_external_sensor_execution_data(
                         instance,
@@ -346,14 +345,14 @@ def execute_cursor_command(sensor_name, cli_args, print_fn):
                 code_location, cli_args.get("repository")
             )
             check_repo_and_scheduler(external_repo, instance)
-            external_sensor = external_repo.get_external_sensor(sensor_name)
+            external_sensor = external_repo.get_sensor(sensor_name)
             job_state = instance.get_instigator_state(
-                external_sensor.get_external_origin_id(), external_sensor.selector_id
+                external_sensor.get_remote_origin_id(), external_sensor.selector_id
             )
             if not job_state:
                 instance.add_instigator_state(
                     InstigatorState(
-                        external_sensor.get_external_origin(),
+                        external_sensor.get_remote_origin(),
                         InstigatorType.SENSOR,
                         InstigatorStatus.STOPPED,
                         SensorInstigatorData(

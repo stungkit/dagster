@@ -1,7 +1,0 @@
-tasks: 
-  first_task: 
-    migrated: True
-  second_task: 
-    migrated: False
-  third_task: 
-    migrated: True

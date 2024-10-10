@@ -1,4 +1,3 @@
-import {gql, useQuery} from '@apollo/client';
 import {Alert, ButtonLink, Colors, Group, Mono} from '@dagster-io/ui-components';
 import {History} from 'history';
 import * as React from 'react';
@@ -9,11 +8,12 @@ import {
   DaemonNotRunningAlertQueryVariables,
   UsingDefaultLauncherAlertInstanceFragment,
 } from './types/BackfillMessaging.types';
+import {gql, useQuery} from '../apollo-client';
 import {showCustomAlert} from '../app/CustomAlertProvider';
 import {showSharedToaster} from '../app/DomUtils';
 import {PythonErrorInfo} from '../app/PythonErrorInfo';
 import {LaunchPartitionBackfillMutation} from '../instance/backfill/types/BackfillUtils.types';
-import {runsPathWithFilters} from '../runs/RunsFilterInput';
+import {getBackfillPath} from '../runs/RunsFeedUtils';
 
 const DEFAULT_RUN_LAUNCHER_NAME = 'DefaultRunLauncher';
 
@@ -72,14 +72,7 @@ export async function showBackfillSuccessToast(
   backfillId: string,
   isAssetBackfill: boolean,
 ) {
-  const url = isAssetBackfill
-    ? `/overview/backfills/${backfillId}`
-    : runsPathWithFilters([
-        {
-          token: 'tag',
-          value: `dagster/backfill=${backfillId}`,
-        },
-      ]);
+  const url = getBackfillPath(backfillId, isAssetBackfill);
   const [pathname, search] = url.split('?');
   await showSharedToaster({
     intent: 'success',
@@ -126,6 +119,7 @@ export function isBackfillDaemonHealthy(instance: DaemonNotRunningAlertInstanceF
 export function useIsBackfillDaemonHealthy() {
   const queryData = useQuery<DaemonNotRunningAlertQuery, DaemonNotRunningAlertQueryVariables>(
     DAEMON_NOT_RUNNING_ALERT_QUERY,
+    {blocking: false},
   );
   return queryData.data ? isBackfillDaemonHealthy(queryData.data.instance) : true;
 }

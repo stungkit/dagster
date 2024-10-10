@@ -1,9 +1,12 @@
 import enum
 import itertools
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 
 import graphene
-from dagster._core.definitions.asset_subset import AssetSubset
+from dagster._core.asset_graph_view.serializable_entity_subset import SerializableEntitySubset
+from dagster._core.definitions.declarative_automation.automation_condition import (
+    AutomationCondition,
+)
 from dagster._core.definitions.declarative_automation.serialized_objects import (
     AutomationConditionEvaluation,
 )
@@ -11,13 +14,12 @@ from dagster._core.definitions.partition import PartitionsDefinition
 from dagster._core.scheduler.instigation import AutoMaterializeAssetEvaluationRecord
 
 from dagster_graphql.implementation.events import iterate_metadata_entries
+from dagster_graphql.schema.asset_key import GrapheneAssetKey
 from dagster_graphql.schema.auto_materialize_asset_evaluations import (
     GrapheneAutoMaterializeAssetEvaluationNeedsMigrationError,
 )
 from dagster_graphql.schema.metadata import GrapheneMetadataEntry
-
-from .asset_key import GrapheneAssetKey
-from .util import ResolveInfo, non_null_list
+from dagster_graphql.schema.util import ResolveInfo, non_null_list
 
 
 class AssetConditionEvaluationStatus(enum.Enum):
@@ -48,7 +50,7 @@ class GrapheneUnpartitionedAssetConditionEvaluationNode(graphene.ObjectType):
         self._evaluation = evaluation
         if evaluation.true_subset.size > 0:
             status = AssetConditionEvaluationStatus.TRUE
-        elif isinstance(evaluation.candidate_subset, AssetSubset) and (
+        elif isinstance(evaluation.candidate_subset, SerializableEntitySubset) and (
             evaluation.candidate_subset.size > 0
         ):
             status = AssetConditionEvaluationStatus.FALSE
@@ -99,7 +101,7 @@ class GraphenePartitionedAssetConditionEvaluationNode(graphene.ObjectType):
             endTimestamp=evaluation.end_timestamp,
             numTrue=evaluation.true_subset.size,
             numCandidates=evaluation.candidate_subset.size
-            if isinstance(evaluation.candidate_subset, AssetSubset)
+            if isinstance(evaluation.candidate_subset, SerializableEntitySubset)
             else None,
             childUniqueIds=[
                 child.condition_snapshot.unique_id for child in evaluation.child_evaluations
@@ -132,7 +134,7 @@ class GrapheneSpecificPartitionAssetConditionEvaluationNode(graphene.ObjectType)
         elif partition_key in evaluation.true_subset.subset_value:
             status = AssetConditionEvaluationStatus.TRUE
         elif (
-            not isinstance(evaluation.candidate_subset, AssetSubset)
+            not isinstance(evaluation.candidate_subset, SerializableEntitySubset)
             or partition_key in evaluation.candidate_subset.subset_value
         ):
             status = AssetConditionEvaluationStatus.FALSE
@@ -231,13 +233,13 @@ class GrapheneAutomationConditionEvaluationNode(graphene.ObjectType):
         self._evaluation = evaluation
         super().__init__(
             uniqueId=evaluation.condition_snapshot.unique_id,
-            expandedLabel=_get_expanded_label(evaluation),
+            expandedLabel=get_expanded_label(evaluation),
             userLabel=evaluation.condition_snapshot.label,
             startTimestamp=evaluation.start_timestamp,
             endTimestamp=evaluation.end_timestamp,
             numTrue=evaluation.true_subset.size,
             numCandidates=evaluation.candidate_subset.size
-            if isinstance(evaluation.candidate_subset, AssetSubset)
+            if isinstance(evaluation.candidate_subset, SerializableEntitySubset)
             else None,
             isPartitioned=evaluation.true_subset.is_partitioned,
             childUniqueIds=[
@@ -274,7 +276,7 @@ class GrapheneAssetConditionEvaluationRecord(graphene.ObjectType):
         record: AutoMaterializeAssetEvaluationRecord,
         partitions_def: Optional[PartitionsDefinition],
     ):
-        evaluation_with_run_ids = record.get_evaluation_with_run_ids(partitions_def)
+        evaluation_with_run_ids = record.get_evaluation_with_run_ids()
         root_evaluation = evaluation_with_run_ids.evaluation
 
         flattened_evaluations = _flatten_evaluation(evaluation_with_run_ids.evaluation)
@@ -284,7 +286,7 @@ class GrapheneAssetConditionEvaluationRecord(graphene.ObjectType):
             evaluationId=record.evaluation_id,
             timestamp=record.timestamp,
             runIds=evaluation_with_run_ids.run_ids,
-            assetKey=GrapheneAssetKey(path=record.asset_key.path),
+            assetKey=GrapheneAssetKey(path=record.key.path),
             numRequested=root_evaluation.true_subset.size,
             startTimestamp=root_evaluation.start_timestamp,
             endTimestamp=root_evaluation.end_timestamp,
@@ -326,16 +328,29 @@ def _flatten_evaluation(
     return list(itertools.chain([e], *(_flatten_evaluation(ce) for ce in e.child_evaluations)))
 
 
-def _get_expanded_label(
-    evaluation: AutomationConditionEvaluation, use_label=False
+def get_expanded_label(
+    item: Union[AutomationConditionEvaluation, AutomationCondition], use_label=False
 ) -> Sequence[str]:
-    if use_label and evaluation.condition_snapshot.label is not None:
-        return [evaluation.condition_snapshot.label]
-    node_text = evaluation.condition_snapshot.name or evaluation.condition_snapshot.description
-    child_labels = [
-        f'({" ".join(_get_expanded_label(ce, use_label=True))})'
-        for ce in evaluation.child_evaluations
-    ]
+    if isinstance(item, AutomationCondition):
+        label, name, description, children = (
+            item.get_label(),
+            item.name,
+            item.description,
+            item.children,
+        )
+    else:
+        snapshot = item.condition_snapshot
+        label, name, description, children = (
+            snapshot.label,
+            snapshot.name,
+            snapshot.description,
+            item.child_evaluations,
+        )
+
+    if use_label and label is not None:
+        return [label]
+    node_text = name or description
+    child_labels = [f'({" ".join(get_expanded_label(c, use_label=True))})' for c in children]
     if len(child_labels) == 0:
         return [node_text]
     elif len(child_labels) == 1:

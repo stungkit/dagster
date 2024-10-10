@@ -1,5 +1,4 @@
-import {gql} from '@apollo/client';
-
+import {gql} from '../../apollo-client';
 import {PYTHON_ERROR_FRAGMENT} from '../../app/PythonErrorFragment';
 
 export const RESUME_BACKFILL_MUTATION = gql`
@@ -25,6 +24,9 @@ export const LAUNCH_PARTITION_BACKFILL_MUTATION = gql`
         backfillId
       }
       ... on PartitionSetNotFoundError {
+        message
+      }
+      ... on PartitionKeysNotFoundError {
         message
       }
       ... on InvalidStepError {

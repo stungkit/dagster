@@ -17,48 +17,50 @@ from typing import (
 import dagster._check as check
 from dagster._annotations import deprecated_param, experimental_param
 from dagster._config.config_schema import UserConfigSchema
+from dagster._core.definitions.asset_check_spec import AssetCheckSpec
 from dagster._core.definitions.asset_dep import AssetDep, CoercibleToAssetDep
+from dagster._core.definitions.asset_in import AssetIn
+from dagster._core.definitions.asset_out import AssetOut
+from dagster._core.definitions.asset_spec import AssetExecutionType, AssetSpec
+from dagster._core.definitions.assets import AssetsDefinition
 from dagster._core.definitions.auto_materialize_policy import AutoMaterializePolicy
+from dagster._core.definitions.backfill_policy import BackfillPolicy, BackfillPolicyType
 from dagster._core.definitions.config import ConfigMapping
 from dagster._core.definitions.declarative_automation.automation_condition import (
     AutomationCondition,
 )
 from dagster._core.definitions.decorators.decorator_assets_definition_builder import (
     DecoratorAssetsDefinitionBuilder,
-    validate_and_assign_output_names_to_check_specs,
-)
-from dagster._core.definitions.freshness_policy import FreshnessPolicy
-from dagster._core.definitions.metadata import ArbitraryMetadataMapping, RawMetadataMapping
-from dagster._core.errors import DagsterInvalidDefinitionError, DagsterInvariantViolationError
-from dagster._core.types.dagster_type import DagsterType
-from dagster._utils.warnings import disable_dagster_warnings
-
-from ..asset_check_spec import AssetCheckSpec
-from ..asset_in import AssetIn
-from ..asset_out import AssetOut
-from ..asset_spec import AssetExecutionType, AssetSpec
-from ..assets import AssetsDefinition
-from ..backfill_policy import BackfillPolicy, BackfillPolicyType
-from ..decorators.graph_decorator import graph
-from ..events import AssetKey, CoercibleToAssetKey, CoercibleToAssetKeyPrefix
-from ..input import GraphIn
-from ..output import GraphOut
-from ..partition import PartitionsDefinition
-from ..policy import RetryPolicy
-from ..resource_definition import ResourceDefinition
-from ..utils import (
-    DEFAULT_IO_MANAGER_KEY,
-    DEFAULT_OUTPUT,
-    NoValueSentinel,
-    resolve_automation_condition,
-    validate_tags_strict,
-)
-from .decorator_assets_definition_builder import (
     DecoratorAssetsDefinitionBuilderArgs,
     build_named_ins,
     build_named_outs,
     create_check_specs_by_output_name,
+    validate_and_assign_output_names_to_check_specs,
 )
+from dagster._core.definitions.decorators.graph_decorator import graph
+from dagster._core.definitions.events import (
+    AssetKey,
+    CoercibleToAssetKey,
+    CoercibleToAssetKeyPrefix,
+)
+from dagster._core.definitions.freshness_policy import FreshnessPolicy
+from dagster._core.definitions.input import GraphIn
+from dagster._core.definitions.metadata import ArbitraryMetadataMapping, RawMetadataMapping
+from dagster._core.definitions.output import GraphOut
+from dagster._core.definitions.partition import PartitionsDefinition
+from dagster._core.definitions.policy import RetryPolicy
+from dagster._core.definitions.resource_definition import ResourceDefinition
+from dagster._core.definitions.utils import (
+    DEFAULT_IO_MANAGER_KEY,
+    DEFAULT_OUTPUT,
+    NoValueSentinel,
+    resolve_automation_condition,
+)
+from dagster._core.errors import DagsterInvalidDefinitionError, DagsterInvariantViolationError
+from dagster._core.storage.tags import KIND_PREFIX
+from dagster._core.types.dagster_type import DagsterType
+from dagster._utils.tags import normalize_tags
+from dagster._utils.warnings import disable_dagster_warnings
 
 
 @overload
@@ -99,6 +101,7 @@ def asset(
     non_argument_deps: Optional[Union[Set[AssetKey], Set[str]]] = ...,
     check_specs: Optional[Sequence[AssetCheckSpec]] = ...,
     owners: Optional[Sequence[str]] = ...,
+    kinds: Optional[AbstractSet[str]] = ...,
 ) -> Callable[[Callable[..., Any]], AssetsDefinition]: ...
 
 
@@ -108,6 +111,7 @@ def asset(
 @experimental_param(param="backfill_policy")
 @experimental_param(param="owners")
 @experimental_param(param="tags")
+@experimental_param(param="kinds")
 @deprecated_param(
     param="non_argument_deps", breaking_version="2.0.0", additional_warn_text="use `deps` instead."
 )
@@ -146,6 +150,7 @@ def asset(
     non_argument_deps: Optional[Union[Set[AssetKey], Set[str]]] = None,
     check_specs: Optional[Sequence[AssetCheckSpec]] = None,
     owners: Optional[Sequence[str]] = None,
+    kinds: Optional[AbstractSet[str]] = None,
     # TODO: FOU-243
     auto_materialize_policy: Optional[AutoMaterializePolicy] = None,
 ) -> Union[AssetsDefinition, Callable[[Callable[..., Any]], AssetsDefinition]]:
@@ -227,6 +232,8 @@ def asset(
         owners (Optional[Sequence[str]]): A list of strings representing owners of the asset. Each
             string can be a user's email address, or a team name prefixed with `team:`,
             e.g. `team:finops`.
+        kinds (Optional[Set[str]]): A list of strings representing the kinds of the asset. These
+            will be made visible in the Dagster UI.
 
     Examples:
         .. code-block:: python
@@ -242,13 +249,22 @@ def asset(
     )
     resource_defs = dict(check.opt_mapping_param(resource_defs, "resource_defs"))
 
+    if compute_kind and kinds:
+        raise DagsterInvalidDefinitionError(
+            "Cannot specify compute_kind and kinds on the @asset decorator."
+        )
+    tags_with_kinds = {
+        **(normalize_tags(tags, strict=True)),
+        **{f"{KIND_PREFIX}{kind}": "" for kind in kinds or []},
+    }
+
     args = AssetDecoratorArgs(
         name=name,
         key_prefix=key_prefix,
         ins=ins or {},
         deps=upstream_asset_deps or [],
         metadata=metadata,
-        tags=tags,
+        tags=tags_with_kinds,
         description=description,
         config_schema=config_schema,
         required_resource_keys=required_resource_keys,
@@ -453,7 +469,7 @@ def create_assets_def_from_fn_and_decorator_args(
                     automation_condition=args.automation_condition,
                     backfill_policy=args.backfill_policy,
                     owners=args.owners,
-                    tags=validate_tags_strict(args.tags),
+                    tags=normalize_tags(args.tags or {}, strict=True),
                 )
             },
             upstream_asset_deps=args.deps,

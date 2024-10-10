@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import Mapping, NamedTuple, Optional, Sequence, Union
 
@@ -7,35 +8,67 @@ from dagster._core.definitions.asset_graph_subset import AssetGraphSubset
 from dagster._core.definitions.base_asset_graph import BaseAssetGraph
 from dagster._core.definitions.partition import PartitionsSubset
 from dagster._core.definitions.run_request import RunRequest
+from dagster._core.definitions.selector import PartitionsByAssetSelector
 from dagster._core.definitions.utils import check_valid_title
 from dagster._core.errors import DagsterDefinitionChangedDeserializationError
-from dagster._core.execution.bulk_actions import BulkActionType
-from dagster._core.instance import DynamicPartitionsStore
-from dagster._core.remote_representation.origin import RemotePartitionSetOrigin
-from dagster._core.storage.tags import USER_TAG
-from dagster._core.workspace.workspace import IWorkspace
-from dagster._serdes import whitelist_for_serdes
-from dagster._utils.error import SerializableErrorInfo
-
-from ..definitions.selector import PartitionsByAssetSelector
-from .asset_backfill import (
+from dagster._core.execution.asset_backfill import (
     AssetBackfillData,
     PartitionedAssetBackfillStatus,
     UnpartitionedAssetBackfillStatus,
 )
+from dagster._core.execution.bulk_actions import BulkActionType
+from dagster._core.instance import DynamicPartitionsStore
+from dagster._core.remote_representation.external_data import job_name_for_partition_set_snap_name
+from dagster._core.remote_representation.origin import RemotePartitionSetOrigin
+from dagster._core.storage.tags import USER_TAG
+from dagster._core.workspace.context import BaseWorkspaceRequestContext
+from dagster._record import record
+from dagster._serdes import whitelist_for_serdes
+from dagster._utils.error import SerializableErrorInfo
 
 
 @whitelist_for_serdes
 class BulkActionStatus(Enum):
     REQUESTED = "REQUESTED"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
+    COMPLETED = "COMPLETED"  # deprecated. Use COMPLETED_SUCCESS or COMPLETED_FAILED instead
+    FAILED = "FAILED"  # denotes when there is a daemon failure, or some other issue processing the backfill
     CANCELING = "CANCELING"
     CANCELED = "CANCELED"
+    COMPLETED_SUCCESS = "COMPLETED_SUCCESS"
+    COMPLETED_FAILED = "COMPLETED_FAILED"  # denotes that the backfill daemon completed successfully, but some runs failed
 
     @staticmethod
     def from_graphql_input(graphql_str):
         return BulkActionStatus(graphql_str)
+
+
+@record
+class BulkActionsFilter:
+    """Filters to use when querying for bulk actions (i.e. backfills) from the BulkActionsTable.
+
+    Each field of the BulkActionsFilter represents a logical AND with each other. For
+    example, if you specify status and created_before, then you will receive only bulk actions
+    with the specified states AND the created before created_before. If left blank, then
+    all values will be permitted for that field.
+
+    Args:
+        statuses (Optional[Sequence[BulkActionStatus]]): A list of statuses to filter by.
+        created_before (Optional[DateTime]): Filter by bulk actions that were created before this datetime. Note that the
+            create_time for each bulk action is stored in UTC.
+        created_after (Optional[DateTime]): Filter by bulk actions that were created after this datetime. Note that the
+            create_time for each bulk action is stored in UTC.
+        tags (Optional[Dict[str, Union[str, List[str]]]]): A dictionary of tags to query by. All tags specified
+            here must be present for a given bulk action to pass the filter.
+        job_name (Optional[str]): Name of the job to query for. If blank, all job_names will be accepted.
+        backfill_ids (Optional[Sequence[str]]): A list of backfill_ids to filter by. If blank, all backfill_ids will be included
+    """
+
+    statuses: Optional[Sequence[BulkActionStatus]] = None
+    created_before: Optional[datetime] = None
+    created_after: Optional[datetime] = None
+    tags: Optional[Mapping[str, Union[str, Sequence[str]]]] = None
+    job_name: Optional[str] = None
+    backfill_ids: Optional[Sequence[str]] = None
 
 
 @whitelist_for_serdes
@@ -175,6 +208,16 @@ class PartitionBackfill(
         return self.partition_set_origin.partition_set_name
 
     @property
+    def job_name(self) -> Optional[str]:
+        if self.is_asset_backfill:
+            return None
+        return (
+            job_name_for_partition_set_snap_name(self.partition_set_name)
+            if self.partition_set_name
+            else None
+        )
+
+    @property
     def log_storage_prefix(self) -> Sequence[str]:
         return ["backfill", self.backfill_id]
 
@@ -184,7 +227,7 @@ class PartitionBackfill(
             return self.tags.get(USER_TAG)
         return None
 
-    def is_valid_serialization(self, workspace: IWorkspace) -> bool:
+    def is_valid_serialization(self, workspace: BaseWorkspaceRequestContext) -> bool:
         if self.is_asset_backfill:
             if self.serialized_asset_backfill_data:
                 return AssetBackfillData.is_valid_serialization(
@@ -197,7 +240,7 @@ class PartitionBackfill(
             return True
 
     def get_backfill_status_per_asset_key(
-        self, workspace: IWorkspace
+        self, workspace: BaseWorkspaceRequestContext
     ) -> Sequence[Union[PartitionedAssetBackfillStatus, UnpartitionedAssetBackfillStatus]]:
         """Returns a sequence of backfill statuses for each targeted asset key in the asset graph,
         in topological order.
@@ -217,7 +260,7 @@ class PartitionBackfill(
             return []
 
     def get_target_partitions_subset(
-        self, workspace: IWorkspace, asset_key: AssetKey
+        self, workspace: BaseWorkspaceRequestContext, asset_key: AssetKey
     ) -> Optional[PartitionsSubset]:
         if not self.is_valid_serialization(workspace):
             return None
@@ -234,7 +277,7 @@ class PartitionBackfill(
             return None
 
     def get_target_root_partitions_subset(
-        self, workspace: IWorkspace
+        self, workspace: BaseWorkspaceRequestContext
     ) -> Optional[PartitionsSubset]:
         if not self.is_valid_serialization(workspace):
             return None
@@ -250,7 +293,7 @@ class PartitionBackfill(
         else:
             return None
 
-    def get_num_partitions(self, workspace: IWorkspace) -> Optional[int]:
+    def get_num_partitions(self, workspace: BaseWorkspaceRequestContext) -> Optional[int]:
         if not self.is_valid_serialization(workspace):
             return 0
 
@@ -268,7 +311,9 @@ class PartitionBackfill(
 
             return len(self.partition_names)
 
-    def get_partition_names(self, workspace: IWorkspace) -> Optional[Sequence[str]]:
+    def get_partition_names(
+        self, workspace: BaseWorkspaceRequestContext
+    ) -> Optional[Sequence[str]]:
         if not self.is_valid_serialization(workspace):
             return []
 

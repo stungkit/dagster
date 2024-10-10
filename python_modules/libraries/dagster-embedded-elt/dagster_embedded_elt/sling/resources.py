@@ -17,11 +17,13 @@ from dagster import (
     AssetMaterialization,
     ConfigurableResource,
     EnvVar,
+    MaterializeResult,
     OpExecutionContext,
     PermissiveConfig,
     get_dagster_logger,
 )
 from dagster._annotations import public
+from dagster._core.definitions.metadata import TableMetadataSet
 from dagster._utils.env import environ
 from pydantic import Field
 
@@ -32,7 +34,7 @@ from dagster_embedded_elt.sling.asset_decorator import (
     streams_with_default_dagster_meta,
 )
 from dagster_embedded_elt.sling.dagster_sling_translator import DagsterSlingTranslator
-from dagster_embedded_elt.sling.sling_event_iterator import SlingEventIterator
+from dagster_embedded_elt.sling.sling_event_iterator import SlingEventIterator, SlingEventType
 from dagster_embedded_elt.sling.sling_replication import SlingReplicationParam, validate_replication
 
 logger = get_dagster_logger()
@@ -275,6 +277,25 @@ class SlingResource(ConfigurableResource):
         )
         return self._parse_json_table_output(json.loads(output.strip()))
 
+    def get_row_count_for_table(self, target_name: str, table_name: str) -> int:
+        """Queries the target connection to get the row count for a given table.
+
+        Args:
+            target_name (str): The name of the target connection to use.
+            table_name (str): The name of the table to fetch the row count for.
+
+        Returns:
+            int: The number of rows in the table.
+        """
+        select_stmt: str = f"select count(*) as ct from {table_name}"
+        output = self.run_sling_cli(
+            ["conns", "exec", target_name, select_stmt],
+            force_json=True,
+        )
+        return int(
+            next(iter(self._parse_json_table_output(json.loads(output.strip()))[0].values()))
+        )
+
     def run_sling_cli(self, args: Sequence[str], force_json: bool = False) -> str:
         """Runs the Sling CLI with the given arguments and returns the output.
 
@@ -294,7 +315,7 @@ class SlingResource(ConfigurableResource):
         replication_config: Optional[SlingReplicationParam] = None,
         dagster_sling_translator: Optional[DagsterSlingTranslator] = None,
         debug: bool = False,
-    ) -> SlingEventIterator[AssetMaterialization]:
+    ) -> SlingEventIterator[SlingEventType]:
         """Runs a Sling replication from the given replication config.
 
         Args:
@@ -304,7 +325,7 @@ class SlingResource(ConfigurableResource):
             debug: Whether to run the replication in debug mode.
 
         Returns:
-            Generator[Union[MaterializeResult, AssetMaterialization], None, None]: A generator of MaterializeResult or AssetMaterialization
+            SlingEventIterator[MaterializeResult]: A generator of MaterializeResult
         """
         if not (replication_config or dagster_sling_translator):
             metadata_by_key = context.assets_def.metadata_by_key
@@ -333,14 +354,17 @@ class SlingResource(ConfigurableResource):
         replication_config: Dict[str, Any],
         dagster_sling_translator: DagsterSlingTranslator,
         debug: bool,
-    ) -> Iterator[AssetMaterialization]:
+    ) -> Iterator[SlingEventType]:
         # if translator has not been defined on metadata _or_ through param, then use the default constructor
 
         # convert to dict to enable updating the index
         context_streams = self._get_replication_streams_for_context(context)
         if context_streams:
             replication_config.update({"streams": context_streams})
-        stream_definition = get_streams_from_replication(replication_config)
+        stream_definitions = get_streams_from_replication(replication_config)
+
+        # extract the destination name from the replication config
+        destination_name = replication_config.get("target")
 
         with self._setup_config():
             uid = uuid.uuid4()
@@ -376,12 +400,27 @@ class SlingResource(ConfigurableResource):
 
             # TODO: In the future, it'd be nice to yield these materializations as they come in
             # rather than waiting until the end of the replication
-            for stream in stream_definition:
-                output_name = dagster_sling_translator.get_asset_key(stream)
-                yield AssetMaterialization(
-                    asset_key=output_name,
-                    metadata={"elapsed_time": end_time - start_time, "stream_name": stream["name"]},
-                )
+            for stream in stream_definitions:
+                asset_key = dagster_sling_translator.get_asset_key(stream)
+
+                object_key = stream.get("config", {}).get("object")
+                destination_stream_name = object_key or stream["name"]
+                relation_identifier = None
+                if destination_name and destination_stream_name:
+                    relation_identifier = ".".join([destination_name, destination_stream_name])
+
+                metadata = {
+                    "elapsed_time": end_time - start_time,
+                    "stream_name": stream["name"],
+                    **TableMetadataSet(
+                        relation_identifier=relation_identifier,
+                    ),
+                }
+
+                if context.has_assets_def:
+                    yield MaterializeResult(asset_key=asset_key, metadata=metadata)
+                else:
+                    yield AssetMaterialization(asset_key=asset_key, metadata=metadata)
 
     def stream_raw_logs(self) -> Generator[str, None, None]:
         """Returns a generator of raw logs from the Sling CLI."""

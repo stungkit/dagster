@@ -3,23 +3,22 @@ from typing import List
 import dagster._check as check
 import graphene
 from dagster._core.definitions.selector import ResourceSelector
-from dagster._core.remote_representation.external import ExternalResource
+from dagster._core.remote_representation.external import RemoteResource
 from dagster._core.remote_representation.external_data import (
-    ExternalResourceConfigEnvVar,
-    ExternalResourceValue,
     NestedResourceType,
+    ResourceConfigEnvVarSnap,
     ResourceJobUsageEntry,
+    ResourceValueSnap,
 )
 
 from dagster_graphql.schema.asset_key import GrapheneAssetKey
+from dagster_graphql.schema.config_types import GrapheneConfigTypeField
 from dagster_graphql.schema.errors import (
     GraphenePythonError,
     GrapheneRepositoryNotFoundError,
     GrapheneResourceNotFoundError,
 )
 from dagster_graphql.schema.util import ResolveInfo, non_null_list
-
-from .config_types import GrapheneConfigTypeField
 
 
 class GrapheneConfiguredValueType(graphene.Enum):
@@ -38,11 +37,11 @@ class GrapheneConfiguredValue(graphene.ObjectType):
     class Meta:
         name = "ConfiguredValue"
 
-    def __init__(self, key: str, external_resource_value: ExternalResourceValue):
+    def __init__(self, key: str, external_resource_value: ResourceValueSnap):
         super().__init__()
 
         self.key = key
-        if isinstance(external_resource_value, ExternalResourceConfigEnvVar):
+        if isinstance(external_resource_value, ResourceConfigEnvVarSnap):
             self.type = GrapheneConfiguredValueType.ENV_VAR
             self.value = external_resource_value.name
         else:
@@ -121,9 +120,7 @@ class GrapheneResourceDetails(graphene.ObjectType):
     class Meta:
         name = "ResourceDetails"
 
-    def __init__(
-        self, location_name: str, repository_name: str, external_resource: ExternalResource
-    ):
+    def __init__(self, location_name: str, repository_name: str, external_resource: RemoteResource):
         super().__init__()
 
         self.id = f"{location_name}-{repository_name}-{external_resource.name}"
@@ -132,7 +129,7 @@ class GrapheneResourceDetails(graphene.ObjectType):
         self._repository_name = check.str_param(repository_name, "repository_name")
 
         self._external_resource = check.inst_param(
-            external_resource, "external_resource", ExternalResource
+            external_resource, "external_resource", RemoteResource
         )
         self.name = external_resource.name
         self.description = external_resource.description

@@ -338,7 +338,6 @@ export type AssetConnection = {
 export type AssetDependency = {
   __typename: 'AssetDependency';
   asset: AssetNode;
-  inputName: Scalars['String']['output'];
   partitionMapping: Maybe<PartitionMapping>;
 };
 
@@ -423,6 +422,7 @@ export type AssetNode = {
   assetObservations: Array<ObservationEvent>;
   assetPartitionStatuses: AssetPartitionStatuses;
   autoMaterializePolicy: Maybe<AutoMaterializePolicy>;
+  automationCondition: Maybe<AutomationCondition>;
   backfillPolicy: Maybe<BackfillPolicy>;
   changedReasons: Array<ChangeReason>;
   computeKind: Maybe<Scalars['String']['output']>;
@@ -441,6 +441,7 @@ export type AssetNode = {
   groupName: Scalars['String']['output'];
   hasAssetChecks: Scalars['Boolean']['output'];
   hasMaterializePermission: Scalars['Boolean']['output'];
+  hasReportRunlessAssetEventPermission: Scalars['Boolean']['output'];
   id: Scalars['ID']['output'];
   isExecutable: Scalars['Boolean']['output'];
   isMaterializable: Scalars['Boolean']['output'];
@@ -448,6 +449,7 @@ export type AssetNode = {
   isPartitioned: Scalars['Boolean']['output'];
   jobNames: Array<Scalars['String']['output']>;
   jobs: Array<Pipeline>;
+  kinds: Array<Scalars['String']['output']>;
   latestMaterializationByPartition: Array<Maybe<MaterializationEvent>>;
   latestRunForPartition: Maybe<Run>;
   metadataEntries: Array<
@@ -684,6 +686,12 @@ export type AutoMaterializeRuleWithRuleEvaluations = {
   ruleEvaluations: Array<AutoMaterializeRuleEvaluation>;
 };
 
+export type AutomationCondition = {
+  __typename: 'AutomationCondition';
+  expandedLabel: Array<Scalars['String']['output']>;
+  label: Maybe<Scalars['String']['output']>;
+};
+
 export type AutomationConditionEvaluationNode = {
   __typename: 'AutomationConditionEvaluationNode';
   childUniqueIds: Array<Scalars['String']['output']>;
@@ -726,9 +734,17 @@ export enum BulkActionStatus {
   CANCELED = 'CANCELED',
   CANCELING = 'CANCELING',
   COMPLETED = 'COMPLETED',
+  COMPLETED_FAILED = 'COMPLETED_FAILED',
+  COMPLETED_SUCCESS = 'COMPLETED_SUCCESS',
   FAILED = 'FAILED',
   REQUESTED = 'REQUESTED',
 }
+
+export type BulkActionsFilter = {
+  createdAfter?: InputMaybe<Scalars['Float']['input']>;
+  createdBefore?: InputMaybe<Scalars['Float']['input']>;
+  statuses?: InputMaybe<Array<BulkActionStatus>>;
+};
 
 export type CancelBackfillResult = CancelBackfillSuccess | PythonError | UnauthorizedError;
 
@@ -2079,6 +2095,7 @@ export type Job = IPipelineSnapshot &
     pipelineSnapshotId: Scalars['String']['output'];
     presets: Array<PipelinePreset>;
     repository: Repository;
+    runTags: Array<PipelineTag>;
     runs: Array<Run>;
     schedules: Array<Schedule>;
     sensors: Array<Sensor>;
@@ -2175,6 +2192,7 @@ export type LaunchBackfillResult =
   | InvalidSubsetError
   | LaunchBackfillSuccess
   | NoModeProvidedError
+  | PartitionKeysNotFoundError
   | PartitionSetNotFoundError
   | PipelineNotFoundError
   | PresetNotFoundError
@@ -3145,6 +3163,12 @@ export type PartitionKeys = {
   partitionKeys: Array<Scalars['String']['output']>;
 };
 
+export type PartitionKeysNotFoundError = Error & {
+  __typename: 'PartitionKeysNotFoundError';
+  message: Scalars['String']['output'];
+  partitionKeys: Array<Scalars['String']['output']>;
+};
+
 export type PartitionKeysOrError = PartitionKeys | PartitionSubsetDeserializationError;
 
 export type PartitionMapping = {
@@ -3310,7 +3334,8 @@ export type PartitionsByAssetSelector = {
 export type PartitionsOrError = Partitions | PythonError;
 
 export type PartitionsSelector = {
-  range: PartitionRangeSelector;
+  range?: InputMaybe<PartitionRangeSelector>;
+  ranges?: InputMaybe<Array<PartitionRangeSelector>>;
 };
 
 export type PathMetadataEntry = MetadataEntry & {
@@ -3375,6 +3400,7 @@ export type Pipeline = IPipelineSnapshot &
     pipelineSnapshotId: Scalars['String']['output'];
     presets: Array<PipelinePreset>;
     repository: Repository;
+    runTags: Array<PipelineTag>;
     runs: Array<Run>;
     schedules: Array<Schedule>;
     sensors: Array<Sensor>;
@@ -3608,6 +3634,7 @@ export type PipelineSnapshot = IPipelineSnapshot &
     name: Scalars['String']['output'];
     parentSnapshotId: Maybe<Scalars['String']['output']>;
     pipelineSnapshotId: Scalars['String']['output'];
+    runTags: Array<PipelineTag>;
     runs: Array<Run>;
     schedules: Array<Schedule>;
     sensors: Array<Sensor>;
@@ -3729,6 +3756,7 @@ export type Query = {
   runOrError: RunOrError;
   runTagKeysOrError: Maybe<RunTagKeysOrError>;
   runTagsOrError: Maybe<RunTagsOrError>;
+  runsFeedCountOrError: RunsFeedCountOrError;
   runsFeedOrError: RunsFeedConnectionOrError;
   runsOrError: RunsOrError;
   scheduleOrError: ScheduleOrError;
@@ -3877,6 +3905,7 @@ export type QueryPartitionBackfillOrErrorArgs = {
 
 export type QueryPartitionBackfillsOrErrorArgs = {
   cursor?: InputMaybe<Scalars['String']['input']>;
+  filters?: InputMaybe<BulkActionsFilter>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<BulkActionStatus>;
 };
@@ -3943,8 +3972,15 @@ export type QueryRunTagsOrErrorArgs = {
   valuePrefix?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type QueryRunsFeedCountOrErrorArgs = {
+  filter?: InputMaybe<RunsFilter>;
+  includeRunsFromBackfills?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 export type QueryRunsFeedOrErrorArgs = {
   cursor?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<RunsFilter>;
+  includeRunsFromBackfills?: InputMaybe<Scalars['Boolean']['input']>;
   limit: Scalars['Int']['input'];
 };
 
@@ -4392,6 +4428,7 @@ export type Run = PipelineRun &
   RunsFeedEntry & {
     __typename: 'Run';
     assetCheckSelection: Maybe<Array<AssetCheckhandle>>;
+    assetChecks: Maybe<Array<AssetCheckhandle>>;
     assetMaterializations: Array<MaterializationEvent>;
     assetSelection: Maybe<Array<AssetKey>>;
     assets: Array<Asset>;
@@ -4404,6 +4441,7 @@ export type Run = PipelineRun &
     hasConcurrencyKeySlots: Scalars['Boolean']['output'];
     hasDeletePermission: Scalars['Boolean']['output'];
     hasReExecutePermission: Scalars['Boolean']['output'];
+    hasRunMetricsEnabled: Scalars['Boolean']['output'];
     hasTerminatePermission: Scalars['Boolean']['output'];
     hasUnconstrainedRootNodes: Scalars['Boolean']['output'];
     id: Scalars['ID']['output'];
@@ -4738,6 +4776,13 @@ export type RunsFeedConnection = {
 
 export type RunsFeedConnectionOrError = PythonError | RunsFeedConnection;
 
+export type RunsFeedCount = {
+  __typename: 'RunsFeedCount';
+  count: Scalars['Int']['output'];
+};
+
+export type RunsFeedCountOrError = PythonError | RunsFeedCount;
+
 export type RunsFeedEntry = {
   assetCheckSelection: Maybe<Array<AssetCheckhandle>>;
   assetSelection: Maybe<Array<AssetKey>>;
@@ -4820,6 +4865,27 @@ export type Schedule = {
   futureTick: DryRunInstigationTick;
   futureTicks: DryRunInstigationTicks;
   id: Scalars['ID']['output'];
+  metadataEntries: Array<
+    | AssetMetadataEntry
+    | BoolMetadataEntry
+    | CodeReferencesMetadataEntry
+    | FloatMetadataEntry
+    | IntMetadataEntry
+    | JobMetadataEntry
+    | JsonMetadataEntry
+    | MarkdownMetadataEntry
+    | NotebookMetadataEntry
+    | NullMetadataEntry
+    | PathMetadataEntry
+    | PipelineRunMetadataEntry
+    | PythonArtifactMetadataEntry
+    | TableColumnLineageMetadataEntry
+    | TableMetadataEntry
+    | TableSchemaMetadataEntry
+    | TextMetadataEntry
+    | TimestampMetadataEntry
+    | UrlMetadataEntry
+  >;
   mode: Scalars['String']['output'];
   name: Scalars['String']['output'];
   partitionSet: Maybe<PartitionSet>;
@@ -4827,6 +4893,7 @@ export type Schedule = {
   potentialTickTimestamps: Array<Scalars['Float']['output']>;
   scheduleState: InstigationState;
   solidSelection: Maybe<Array<Maybe<Scalars['String']['output']>>>;
+  tags: Array<DefinitionTag>;
 };
 
 export type ScheduleFutureTickArgs = {
@@ -4937,11 +5004,33 @@ export type Sensor = {
   id: Scalars['ID']['output'];
   jobOriginId: Scalars['String']['output'];
   metadata: SensorMetadata;
+  metadataEntries: Array<
+    | AssetMetadataEntry
+    | BoolMetadataEntry
+    | CodeReferencesMetadataEntry
+    | FloatMetadataEntry
+    | IntMetadataEntry
+    | JobMetadataEntry
+    | JsonMetadataEntry
+    | MarkdownMetadataEntry
+    | NotebookMetadataEntry
+    | NullMetadataEntry
+    | PathMetadataEntry
+    | PipelineRunMetadataEntry
+    | PythonArtifactMetadataEntry
+    | TableColumnLineageMetadataEntry
+    | TableMetadataEntry
+    | TableSchemaMetadataEntry
+    | TextMetadataEntry
+    | TimestampMetadataEntry
+    | UrlMetadataEntry
+  >;
   minIntervalSeconds: Scalars['Int']['output'];
   name: Scalars['String']['output'];
   nextTick: Maybe<DryRunInstigationTick>;
   sensorState: InstigationState;
   sensorType: SensorType;
+  tags: Array<DefinitionTag>;
   targets: Maybe<Array<Target>>;
 };
 
@@ -5301,6 +5390,7 @@ export type TableColumn = {
   constraints: TableColumnConstraints;
   description: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
+  tags: Array<DefinitionTag>;
   type: Scalars['String']['output'];
 };
 
@@ -5592,6 +5682,7 @@ export type WorkspaceLocationEntry = {
   name: Scalars['String']['output'];
   permissions: Array<Permission>;
   updatedTimestamp: Scalars['Float']['output'];
+  versionKey: Scalars['String']['output'];
 };
 
 export type WorkspaceLocationEntryOrError = PythonError | WorkspaceLocationEntry;
@@ -5610,6 +5701,7 @@ export type WorkspaceLocationStatusEntry = {
   name: Scalars['String']['output'];
   permissions: Array<Permission>;
   updateTimestamp: Scalars['Float']['output'];
+  versionKey: Scalars['String']['output'];
 };
 
 export type WorkspaceOrError = PythonError | Workspace;
@@ -6195,8 +6287,6 @@ export const buildAssetDependency = (
         : relationshipsToOmit.has('AssetNode')
         ? ({} as AssetNode)
         : buildAssetNode({}, relationshipsToOmit),
-    inputName:
-      overrides && overrides.hasOwnProperty('inputName') ? overrides.inputName! : 'aspernatur',
     partitionMapping:
       overrides && overrides.hasOwnProperty('partitionMapping')
         ? overrides.partitionMapping!
@@ -6439,6 +6529,12 @@ export const buildAssetNode = (
         : relationshipsToOmit.has('AutoMaterializePolicy')
         ? ({} as AutoMaterializePolicy)
         : buildAutoMaterializePolicy({}, relationshipsToOmit),
+    automationCondition:
+      overrides && overrides.hasOwnProperty('automationCondition')
+        ? overrides.automationCondition!
+        : relationshipsToOmit.has('AutomationCondition')
+        ? ({} as AutomationCondition)
+        : buildAutomationCondition({}, relationshipsToOmit),
     backfillPolicy:
       overrides && overrides.hasOwnProperty('backfillPolicy')
         ? overrides.backfillPolicy!
@@ -6495,6 +6591,10 @@ export const buildAssetNode = (
       overrides && overrides.hasOwnProperty('hasMaterializePermission')
         ? overrides.hasMaterializePermission!
         : false,
+    hasReportRunlessAssetEventPermission:
+      overrides && overrides.hasOwnProperty('hasReportRunlessAssetEventPermission')
+        ? overrides.hasReportRunlessAssetEventPermission!
+        : false,
     id:
       overrides && overrides.hasOwnProperty('id')
         ? overrides.id!
@@ -6511,6 +6611,7 @@ export const buildAssetNode = (
       overrides && overrides.hasOwnProperty('isPartitioned') ? overrides.isPartitioned! : true,
     jobNames: overrides && overrides.hasOwnProperty('jobNames') ? overrides.jobNames! : [],
     jobs: overrides && overrides.hasOwnProperty('jobs') ? overrides.jobs! : [],
+    kinds: overrides && overrides.hasOwnProperty('kinds') ? overrides.kinds! : [],
     latestMaterializationByPartition:
       overrides && overrides.hasOwnProperty('latestMaterializationByPartition')
         ? overrides.latestMaterializationByPartition!
@@ -6889,6 +6990,20 @@ export const buildAutoMaterializeRuleWithRuleEvaluations = (
   };
 };
 
+export const buildAutomationCondition = (
+  overrides?: Partial<AutomationCondition>,
+  _relationshipsToOmit: Set<string> = new Set(),
+): {__typename: 'AutomationCondition'} & AutomationCondition => {
+  const relationshipsToOmit: Set<string> = new Set(_relationshipsToOmit);
+  relationshipsToOmit.add('AutomationCondition');
+  return {
+    __typename: 'AutomationCondition',
+    expandedLabel:
+      overrides && overrides.hasOwnProperty('expandedLabel') ? overrides.expandedLabel! : [],
+    label: overrides && overrides.hasOwnProperty('label') ? overrides.label! : 'eligendi',
+  };
+};
+
 export const buildAutomationConditionEvaluationNode = (
   overrides?: Partial<AutomationConditionEvaluationNode>,
   _relationshipsToOmit: Set<string> = new Set(),
@@ -6963,6 +7078,21 @@ export const buildBoolMetadataEntry = (
     description:
       overrides && overrides.hasOwnProperty('description') ? overrides.description! : 'illum',
     label: overrides && overrides.hasOwnProperty('label') ? overrides.label! : 'dolorum',
+  };
+};
+
+export const buildBulkActionsFilter = (
+  overrides?: Partial<BulkActionsFilter>,
+  _relationshipsToOmit: Set<string> = new Set(),
+): BulkActionsFilter => {
+  const relationshipsToOmit: Set<string> = new Set(_relationshipsToOmit);
+  relationshipsToOmit.add('BulkActionsFilter');
+  return {
+    createdAfter:
+      overrides && overrides.hasOwnProperty('createdAfter') ? overrides.createdAfter! : 6.09,
+    createdBefore:
+      overrides && overrides.hasOwnProperty('createdBefore') ? overrides.createdBefore! : 1.5,
+    statuses: overrides && overrides.hasOwnProperty('statuses') ? overrides.statuses! : [],
   };
 };
 
@@ -9113,6 +9243,7 @@ export const buildJob = (
         : relationshipsToOmit.has('Repository')
         ? ({} as Repository)
         : buildRepository({}, relationshipsToOmit),
+    runTags: overrides && overrides.hasOwnProperty('runTags') ? overrides.runTags! : [],
     runs: overrides && overrides.hasOwnProperty('runs') ? overrides.runs! : [],
     schedules: overrides && overrides.hasOwnProperty('schedules') ? overrides.schedules! : [],
     sensors: overrides && overrides.hasOwnProperty('sensors') ? overrides.sensors! : [],
@@ -10824,6 +10955,20 @@ export const buildPartitionKeys = (
   };
 };
 
+export const buildPartitionKeysNotFoundError = (
+  overrides?: Partial<PartitionKeysNotFoundError>,
+  _relationshipsToOmit: Set<string> = new Set(),
+): {__typename: 'PartitionKeysNotFoundError'} & PartitionKeysNotFoundError => {
+  const relationshipsToOmit: Set<string> = new Set(_relationshipsToOmit);
+  relationshipsToOmit.add('PartitionKeysNotFoundError');
+  return {
+    __typename: 'PartitionKeysNotFoundError',
+    message: overrides && overrides.hasOwnProperty('message') ? overrides.message! : 'minima',
+    partitionKeys:
+      overrides && overrides.hasOwnProperty('partitionKeys') ? overrides.partitionKeys! : [],
+  };
+};
+
 export const buildPartitionMapping = (
   overrides?: Partial<PartitionMapping>,
   _relationshipsToOmit: Set<string> = new Set(),
@@ -11185,6 +11330,7 @@ export const buildPartitionsSelector = (
         : relationshipsToOmit.has('PartitionRangeSelector')
         ? ({} as PartitionRangeSelector)
         : buildPartitionRangeSelector({}, relationshipsToOmit),
+    ranges: overrides && overrides.hasOwnProperty('ranges') ? overrides.ranges! : [],
   };
 };
 
@@ -11297,6 +11443,7 @@ export const buildPipeline = (
         : relationshipsToOmit.has('Repository')
         ? ({} as Repository)
         : buildRepository({}, relationshipsToOmit),
+    runTags: overrides && overrides.hasOwnProperty('runTags') ? overrides.runTags! : [],
     runs: overrides && overrides.hasOwnProperty('runs') ? overrides.runs! : [],
     schedules: overrides && overrides.hasOwnProperty('schedules') ? overrides.schedules! : [],
     sensors: overrides && overrides.hasOwnProperty('sensors') ? overrides.sensors! : [],
@@ -11705,6 +11852,7 @@ export const buildPipelineSnapshot = (
       overrides && overrides.hasOwnProperty('pipelineSnapshotId')
         ? overrides.pipelineSnapshotId!
         : 'labore',
+    runTags: overrides && overrides.hasOwnProperty('runTags') ? overrides.runTags! : [],
     runs: overrides && overrides.hasOwnProperty('runs') ? overrides.runs! : [],
     schedules: overrides && overrides.hasOwnProperty('schedules') ? overrides.schedules! : [],
     sensors: overrides && overrides.hasOwnProperty('sensors') ? overrides.sensors! : [],
@@ -12057,6 +12205,12 @@ export const buildQuery = (
     runTagsOrError:
       overrides && overrides.hasOwnProperty('runTagsOrError')
         ? overrides.runTagsOrError!
+        : relationshipsToOmit.has('PythonError')
+        ? ({} as PythonError)
+        : buildPythonError({}, relationshipsToOmit),
+    runsFeedCountOrError:
+      overrides && overrides.hasOwnProperty('runsFeedCountOrError')
+        ? overrides.runsFeedCountOrError!
         : relationshipsToOmit.has('PythonError')
         ? ({} as PythonError)
         : buildPythonError({}, relationshipsToOmit),
@@ -12804,6 +12958,7 @@ export const buildRun = (
       overrides && overrides.hasOwnProperty('assetCheckSelection')
         ? overrides.assetCheckSelection!
         : [],
+    assetChecks: overrides && overrides.hasOwnProperty('assetChecks') ? overrides.assetChecks! : [],
     assetMaterializations:
       overrides && overrides.hasOwnProperty('assetMaterializations')
         ? overrides.assetMaterializations!
@@ -12846,6 +13001,10 @@ export const buildRun = (
       overrides && overrides.hasOwnProperty('hasReExecutePermission')
         ? overrides.hasReExecutePermission!
         : true,
+    hasRunMetricsEnabled:
+      overrides && overrides.hasOwnProperty('hasRunMetricsEnabled')
+        ? overrides.hasRunMetricsEnabled!
+        : false,
     hasTerminatePermission:
       overrides && overrides.hasOwnProperty('hasTerminatePermission')
         ? overrides.hasTerminatePermission!
@@ -13460,6 +13619,18 @@ export const buildRunsFeedConnection = (
   };
 };
 
+export const buildRunsFeedCount = (
+  overrides?: Partial<RunsFeedCount>,
+  _relationshipsToOmit: Set<string> = new Set(),
+): {__typename: 'RunsFeedCount'} & RunsFeedCount => {
+  const relationshipsToOmit: Set<string> = new Set(_relationshipsToOmit);
+  relationshipsToOmit.add('RunsFeedCount');
+  return {
+    __typename: 'RunsFeedCount',
+    count: overrides && overrides.hasOwnProperty('count') ? overrides.count! : 1273,
+  };
+};
+
 export const buildRunsFeedEntry = (
   overrides?: Partial<RunsFeedEntry>,
   _relationshipsToOmit: Set<string> = new Set(),
@@ -13657,6 +13828,8 @@ export const buildSchedule = (
       overrides && overrides.hasOwnProperty('id')
         ? overrides.id!
         : '71db947a-c94a-4681-979f-7d72688947d9',
+    metadataEntries:
+      overrides && overrides.hasOwnProperty('metadataEntries') ? overrides.metadataEntries! : [],
     mode: overrides && overrides.hasOwnProperty('mode') ? overrides.mode! : 'in',
     name: overrides && overrides.hasOwnProperty('name') ? overrides.name! : 'ut',
     partitionSet:
@@ -13681,6 +13854,7 @@ export const buildSchedule = (
         : buildInstigationState({}, relationshipsToOmit),
     solidSelection:
       overrides && overrides.hasOwnProperty('solidSelection') ? overrides.solidSelection! : [],
+    tags: overrides && overrides.hasOwnProperty('tags') ? overrides.tags! : [],
   };
 };
 
@@ -13900,6 +14074,8 @@ export const buildSensor = (
         : relationshipsToOmit.has('SensorMetadata')
         ? ({} as SensorMetadata)
         : buildSensorMetadata({}, relationshipsToOmit),
+    metadataEntries:
+      overrides && overrides.hasOwnProperty('metadataEntries') ? overrides.metadataEntries! : [],
     minIntervalSeconds:
       overrides && overrides.hasOwnProperty('minIntervalSeconds')
         ? overrides.minIntervalSeconds!
@@ -13921,6 +14097,7 @@ export const buildSensor = (
       overrides && overrides.hasOwnProperty('sensorType')
         ? overrides.sensorType!
         : SensorType.ASSET,
+    tags: overrides && overrides.hasOwnProperty('tags') ? overrides.tags! : [],
     targets: overrides && overrides.hasOwnProperty('targets') ? overrides.targets! : [],
   };
 };
@@ -14517,6 +14694,7 @@ export const buildTableColumn = (
     description:
       overrides && overrides.hasOwnProperty('description') ? overrides.description! : 'illum',
     name: overrides && overrides.hasOwnProperty('name') ? overrides.name! : 'explicabo',
+    tags: overrides && overrides.hasOwnProperty('tags') ? overrides.tags! : [],
     type: overrides && overrides.hasOwnProperty('type') ? overrides.type! : 'a',
   };
 };
@@ -15135,6 +15313,8 @@ export const buildWorkspaceLocationEntry = (
       overrides && overrides.hasOwnProperty('updatedTimestamp')
         ? overrides.updatedTimestamp!
         : 2.68,
+    versionKey:
+      overrides && overrides.hasOwnProperty('versionKey') ? overrides.versionKey! : 'enim',
   };
 };
 
@@ -15170,6 +15350,7 @@ export const buildWorkspaceLocationStatusEntry = (
     permissions: overrides && overrides.hasOwnProperty('permissions') ? overrides.permissions! : [],
     updateTimestamp:
       overrides && overrides.hasOwnProperty('updateTimestamp') ? overrides.updateTimestamp! : 7.09,
+    versionKey: overrides && overrides.hasOwnProperty('versionKey') ? overrides.versionKey! : 'nam',
   };
 };
 

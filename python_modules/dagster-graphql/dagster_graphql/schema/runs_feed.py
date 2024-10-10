@@ -1,8 +1,8 @@
 import graphene
 
-from .asset_key import GrapheneAssetKey
-from .errors import GraphenePythonError
-from .util import non_null_list
+from dagster_graphql.schema.asset_key import GrapheneAssetKey
+from dagster_graphql.schema.errors import GraphenePythonError
+from dagster_graphql.schema.util import non_null_list
 
 
 class GrapheneRunsFeedEntry(graphene.Interface):
@@ -37,6 +37,17 @@ class GrapheneRunsFeedConnectionOrError(graphene.Union):
         name = "RunsFeedConnectionOrError"
 
 
-types = [
-    GrapheneRunsFeedConnectionOrError,
-]
+class GrapheneRunsFeedCount(graphene.ObjectType):
+    class Meta:
+        name = "RunsFeedCount"
+
+    count = graphene.NonNull(graphene.Int)
+
+
+class GrapheneRunsFeedCountOrError(graphene.Union):
+    class Meta:
+        types = (GrapheneRunsFeedCount, GraphenePythonError)
+        name = "RunsFeedCountOrError"
+
+
+types = [GrapheneRunsFeedConnectionOrError, GrapheneRunsFeedCountOrError]

@@ -1,4 +1,3 @@
-import {gql, useApolloClient, useQuery} from '@apollo/client';
 import {
   Body,
   Box,
@@ -21,6 +20,7 @@ import {
 } from '@dagster-io/ui-components';
 import uniqBy from 'lodash/uniqBy';
 import * as React from 'react';
+import {LaunchRootExecutionButton} from 'shared/launchpad/LaunchRootExecutionButton.oss';
 import styled from 'styled-components';
 import * as yaml from 'yaml';
 
@@ -28,7 +28,6 @@ import {ConfigEditorConfigPicker} from './ConfigEditorConfigPicker';
 import {ConfigEditorModePicker} from './ConfigEditorModePicker';
 import {fetchTagsAndConfigForAssetJob, fetchTagsAndConfigForJob} from './ConfigFetch';
 import {LaunchpadConfigExpansionButton} from './LaunchpadConfigExpansionButton';
-import {useLaunchPadHooks} from './LaunchpadHooksContext';
 import {LoadingOverlay} from './LoadingOverlay';
 import {OpSelector} from './OpSelector';
 import {RUN_PREVIEW_VALIDATION_FRAGMENT, RunPreview} from './RunPreview';
@@ -48,6 +47,7 @@ import {
   PreviewConfigQueryVariables,
 } from './types/LaunchpadSession.types';
 import {mergeYaml, sanitizeConfigYamlString} from './yamlUtils';
+import {gql, useApolloClient, useQuery} from '../apollo-client';
 import {showCustomAlert} from '../app/CustomAlertProvider';
 import {
   IExecutionSession,
@@ -70,7 +70,7 @@ import {
   PipelineSelector,
   RepositorySelector,
 } from '../graphql/types';
-import {useBlockTraceOnQueryResult, useBlockTraceUntilTrue} from '../performance/TraceContext';
+import {useBlockTraceUntilTrue} from '../performance/TraceContext';
 import {DagsterTag} from '../runs/RunTag';
 import {useCopyAction} from '../runs/RunTags';
 import {VirtualizedItemListForDialog} from '../ui/VirtualizedItemListForDialog';
@@ -221,7 +221,6 @@ const LaunchpadSession = (props: LaunchpadSessionProps) => {
   >(PIPELINE_EXECUTION_CONFIG_SCHEMA_QUERY, {
     variables: {selector: pipelineSelector, mode: currentSession?.mode},
   });
-  useBlockTraceOnQueryResult(configResult, 'PipelineExecutionConfigSchemaQuery');
 
   const configSchemaOrError = configResult?.data?.runConfigSchemaOrError;
 
@@ -582,8 +581,6 @@ const LaunchpadSession = (props: LaunchpadSessionProps) => {
       'This job is partitioned. Are you sure you want to launch' +
       ' a run without a partition specified?';
   }
-
-  const {LaunchRootExecutionButton} = useLaunchPadHooks();
 
   const copyAction = useCopyAction();
 

@@ -1,4 +1,3 @@
-import {useMutation} from '@apollo/client';
 import {Button, Group, Icon, Menu, MenuItem, Popover, Tooltip} from '@dagster-io/ui-components';
 import {useContext, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -8,10 +7,10 @@ import {DeletionDialog} from './DeletionDialog';
 import {QueuedRunCriteriaDialog} from './QueuedRunCriteriaDialog';
 import {RunConfigDialog} from './RunConfigDialog';
 import {doneStatuses} from './RunStatuses';
-import {DagsterTag} from './RunTag';
 import {RunsQueryRefetchContext} from './RunUtils';
 import {TerminationDialog} from './TerminationDialog';
 import {RunFragment} from './types/RunFragments.types';
+import {useMutation} from '../apollo-client';
 import {AppContext} from '../app/AppContext';
 import {showSharedToaster} from '../app/DomUtils';
 import {useCopyToClipboard} from '../app/browser';
@@ -35,7 +34,7 @@ type VisibleDialog =
 
 export const RunHeaderActions = ({run, isJob}: {run: RunFragment; isJob: boolean}) => {
   const {runConfigYaml} = run;
-  const runMetricsEnabled = run.tags.some((t) => t.key === DagsterTag.RunMetrics);
+  const runMetricsEnabled = run.hasRunMetricsEnabled;
 
   const [visibleDialog, setVisibleDialog] = useState<VisibleDialog>(null);
 

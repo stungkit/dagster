@@ -3,19 +3,16 @@ from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Set, Tu
 from dagster import _check as check
 from dagster._config.config_schema import UserConfigSchema
 from dagster._core.definitions.asset_check_spec import AssetCheckKey
+from dagster._core.definitions.asset_key import EntityKey
 from dagster._core.definitions.declarative_automation.serialized_objects import (
     AutomationConditionEvaluationWithRunIds,
 )
 from dagster._core.definitions.events import AssetKey
 from dagster._core.event_api import EventHandlerFn
 from dagster._core.storage.asset_check_execution_record import AssetCheckExecutionRecord
-from dagster._core.storage.event_log.base import AssetCheckSummaryRecord
-from dagster._serdes import ConfigurableClass, ConfigurableClassData
-from dagster._utils import PrintFn
-from dagster._utils.concurrency import ConcurrencyClaimStatus, ConcurrencyKeyInfo
-
-from .base_storage import DagsterStorage
-from .event_log.base import (
+from dagster._core.storage.base_storage import DagsterStorage
+from dagster._core.storage.event_log.base import (
+    AssetCheckSummaryRecord,
     AssetRecord,
     EventLogConnection,
     EventLogRecord,
@@ -24,8 +21,11 @@ from .event_log.base import (
     EventRecordsResult,
     PlannedMaterializationInfo,
 )
-from .runs.base import RunStorage
-from .schedules.base import ScheduleStorage
+from dagster._core.storage.runs.base import RunStorage
+from dagster._core.storage.schedules.base import ScheduleStorage
+from dagster._serdes import ConfigurableClass, ConfigurableClassData
+from dagster._utils import PrintFn
+from dagster._utils.concurrency import ConcurrencyClaimStatus, ConcurrencyKeyInfo
 
 if TYPE_CHECKING:
     from dagster._core.definitions.asset_check_spec import AssetCheckKey
@@ -33,7 +33,11 @@ if TYPE_CHECKING:
     from dagster._core.event_api import AssetRecordsFilter, RunStatusChangeRecordsFilter
     from dagster._core.events import DagsterEvent, DagsterEventType
     from dagster._core.events.log import EventLogEntry
-    from dagster._core.execution.backfill import BulkActionStatus, PartitionBackfill
+    from dagster._core.execution.backfill import (
+        BulkActionsFilter,
+        BulkActionStatus,
+        PartitionBackfill,
+    )
     from dagster._core.execution.stats import RunStepKeyStatsSnapshot
     from dagster._core.instance import DagsterInstance
     from dagster._core.remote_representation.origin import RemoteJobOrigin
@@ -46,7 +50,7 @@ if TYPE_CHECKING:
         TickStatus,
     )
     from dagster._core.snap.execution_plan_snapshot import ExecutionPlanSnapshot
-    from dagster._core.snap.job_snapshot import JobSnapshot
+    from dagster._core.snap.job_snapshot import JobSnap
     from dagster._core.storage.dagster_run import (
         DagsterRun,
         DagsterRunStatsSnapshot,
@@ -246,7 +250,7 @@ class LegacyRunStorage(RunStorage, ConfigurableClass):
 
     def add_snapshot(
         self,
-        snapshot: Union["JobSnapshot", "ExecutionPlanSnapshot"],
+        snapshot: Union["JobSnap", "ExecutionPlanSnapshot"],
         snapshot_id: Optional[str] = None,
     ) -> None:
         return self._storage.run_storage.add_snapshot(snapshot, snapshot_id)
@@ -257,12 +261,10 @@ class LegacyRunStorage(RunStorage, ConfigurableClass):
     def has_job_snapshot(self, job_snapshot_id: str) -> bool:
         return self._storage.run_storage.has_job_snapshot(job_snapshot_id)
 
-    def add_job_snapshot(
-        self, job_snapshot: "JobSnapshot", snapshot_id: Optional[str] = None
-    ) -> str:
+    def add_job_snapshot(self, job_snapshot: "JobSnap", snapshot_id: Optional[str] = None) -> str:
         return self._storage.run_storage.add_job_snapshot(job_snapshot, snapshot_id)
 
-    def get_job_snapshot(self, job_snapshot_id: str) -> "JobSnapshot":
+    def get_job_snapshot(self, job_snapshot_id: str) -> "JobSnap":
         return self._storage.run_storage.get_job_snapshot(job_snapshot_id)
 
     def has_execution_plan_snapshot(self, execution_plan_snapshot_id: str) -> bool:
@@ -309,11 +311,17 @@ class LegacyRunStorage(RunStorage, ConfigurableClass):
 
     def get_backfills(
         self,
-        status: Optional["BulkActionStatus"] = None,
+        filters: Optional["BulkActionsFilter"] = None,
         cursor: Optional[str] = None,
         limit: Optional[int] = None,
+        status: Optional["BulkActionStatus"] = None,
     ) -> Sequence["PartitionBackfill"]:
-        return self._storage.run_storage.get_backfills(status, cursor, limit)
+        return self._storage.run_storage.get_backfills(
+            cursor=cursor, limit=limit, filters=filters, status=status
+        )
+
+    def get_backfills_count(self, filters: Optional["BulkActionsFilter"] = None) -> int:
+        return self._storage.run_storage.get_backfills_count(filters=filters)
 
     def get_backfill(self, backfill_id: str) -> Optional["PartitionBackfill"]:
         return self._storage.run_storage.get_backfill(backfill_id)
@@ -804,10 +812,10 @@ class LegacyScheduleStorage(ScheduleStorage, ConfigurableClass):
         )
 
     def get_auto_materialize_asset_evaluations(
-        self, asset_key: AssetKey, limit: int, cursor: Optional[int] = None
+        self, key: EntityKey, limit: int, cursor: Optional[int] = None
     ) -> Sequence["AutoMaterializeAssetEvaluationRecord"]:
         return self._storage.schedule_storage.get_auto_materialize_asset_evaluations(
-            asset_key, limit, cursor
+            key, limit, cursor
         )
 
     def get_auto_materialize_evaluations_for_evaluation_id(

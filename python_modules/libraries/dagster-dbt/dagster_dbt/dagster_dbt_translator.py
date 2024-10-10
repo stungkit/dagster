@@ -10,9 +10,9 @@ from dagster import (
     _check as check,
 )
 from dagster._annotations import experimental, public
-from dagster._core.definitions.utils import is_valid_definition_tag_key
+from dagster._utils.tags import is_valid_tag_key
 
-from .asset_utils import (
+from dagster_dbt.asset_utils import (
     default_asset_key_fn,
     default_auto_materialize_policy_fn,
     default_description_fn,
@@ -254,7 +254,7 @@ class DagsterDbtTranslator:
                         return {"custom": "tag"}
         """
         tags = dbt_resource_props.get("tags", [])
-        return {tag: "" for tag in tags if is_valid_definition_tag_key(tag)}
+        return {tag: "" for tag in tags if is_valid_tag_key(tag)}
 
     @public
     def get_group_name(self, dbt_resource_props: Mapping[str, Any]) -> Optional[str]:

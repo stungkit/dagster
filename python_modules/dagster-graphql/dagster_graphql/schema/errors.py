@@ -1,11 +1,11 @@
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import dagster._check as check
 import graphene
 from dagster._core.definitions.events import AssetKey
 from dagster._utils.error import SerializableErrorInfo
 
-from .util import ResolveInfo, non_null_list
+from dagster_graphql.schema.util import ResolveInfo, non_null_list
 
 
 class GrapheneError(graphene.Interface):
@@ -192,7 +192,7 @@ class GraphenePipelineNotFoundError(graphene.ObjectType):
     repository_location_name = graphene.NonNull(graphene.String)
 
     def __init__(self, selector):
-        from ..implementation.utils import JobSubsetSelector
+        from dagster_graphql.implementation.utils import JobSubsetSelector
 
         super().__init__()
         check.inst_param(selector, "selector", JobSubsetSelector)
@@ -215,7 +215,7 @@ class GrapheneGraphNotFoundError(graphene.ObjectType):
     repository_location_name = graphene.NonNull(graphene.String)
 
     def __init__(self, selector):
-        from ..implementation.utils import GraphSelector
+        from dagster_graphql.implementation.utils import GraphSelector
 
         super().__init__()
         check.inst_param(selector, "selector", GraphSelector)
@@ -449,6 +449,21 @@ class GraphenePartitionSetNotFoundError(graphene.ObjectType):
         super().__init__()
         self.partition_set_name = check.str_param(partition_set_name, "partition_set_name")
         self.message = f"Partition set {self.partition_set_name} could not be found."
+
+
+class GraphenePartitionKeysNotFoundError(graphene.ObjectType):
+    class Meta:
+        interfaces = (GrapheneError,)
+        name = "PartitionKeysNotFoundError"
+
+    partition_keys = non_null_list(graphene.String)
+
+    def __init__(self, partition_keys: Set[str]):
+        super().__init__()
+        self.partition_keys = check.list_param(
+            sorted(partition_keys), "partition_keys", of_type=str
+        )
+        self.message = f"Partition keys `{self.partition_keys}` could not be found."
 
 
 class GrapheneRepositoryNotFoundError(graphene.ObjectType):

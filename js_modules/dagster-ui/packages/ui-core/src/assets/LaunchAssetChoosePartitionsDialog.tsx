@@ -1,4 +1,3 @@
-import {gql, useApolloClient, useQuery} from '@apollo/client';
 // eslint-disable-next-line no-restricted-imports
 import {Radio} from '@blueprintjs/core';
 import {
@@ -19,6 +18,7 @@ import {
 import reject from 'lodash/reject';
 import {useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
+import {useLaunchWithTelemetry} from 'shared/launchpad/useLaunchWithTelemetry.oss';
 
 import {partitionCountString} from './AssetNodePartitionCounts';
 import {AssetPartitionStatus} from './AssetPartitionStatus';
@@ -44,6 +44,7 @@ import {
 } from './types/LaunchAssetExecutionButton.types';
 import {usePartitionDimensionSelections} from './usePartitionDimensionSelections';
 import {PartitionDimensionSelection, usePartitionHealthData} from './usePartitionHealthData';
+import {gql, useApolloClient, useQuery} from '../apollo-client';
 import {showCustomAlert} from '../app/CustomAlertProvider';
 import {PipelineRunTag} from '../app/ExecutionSessionStorage';
 import {usePermissionsForLocation} from '../app/Permissions';
@@ -60,7 +61,6 @@ import {
   LaunchPartitionBackfillMutationVariables,
 } from '../instance/backfill/types/BackfillUtils.types';
 import {fetchTagsAndConfigForAssetJob} from '../launchpad/ConfigFetch';
-import {useLaunchPadHooks} from '../launchpad/LaunchpadHooksContext';
 import {TagContainer, TagEditor} from '../launchpad/TagEditor';
 import {
   DAEMON_NOT_RUNNING_ALERT_INSTANCE_FRAGMENT,
@@ -76,7 +76,7 @@ import {assembleIntoSpans, stringForSpan} from '../partitions/SpanRepresentation
 import {DagsterTag} from '../runs/RunTag';
 import {testId} from '../testing/testId';
 import {ToggleableSection} from '../ui/ToggleableSection';
-import {useFeatureFlagForCodeLocation} from '../workspace/WorkspaceContext';
+import {useFeatureFlagForCodeLocation} from '../workspace/WorkspaceContext/util';
 import {RepoAddress} from '../workspace/types';
 
 const MISSING_FAILED_STATUSES = [AssetPartitionStatus.MISSING, AssetPartitionStatus.FAILED];
@@ -215,7 +215,6 @@ const LaunchAssetChoosePartitionsDialogBody = ({
   const client = useApolloClient();
   const history = useHistory();
 
-  const {useLaunchWithTelemetry} = useLaunchPadHooks();
   const launchWithTelemetry = useLaunchWithTelemetry();
   const launchAsBackfill =
     ['pureWithAnchorAsset', 'pureAll'].includes(target.type) ||
@@ -710,7 +709,7 @@ const Warnings = ({
 }) => {
   const warningsResult = useQuery<LaunchAssetWarningsQuery, LaunchAssetWarningsQueryVariables>(
     LAUNCH_ASSET_WARNINGS_QUERY,
-    {variables: {upstreamAssetKeys}},
+    {variables: {upstreamAssetKeys}, blocking: false},
   );
 
   const instance = warningsResult.data?.instance;

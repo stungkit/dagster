@@ -25,21 +25,45 @@ from dagster._config import Field, Shape, StringSource
 from dagster._config.config_type import ConfigType
 from dagster._config.validate import validate_config
 from dagster._core.definitions.asset_check_spec import AssetCheckKey
+from dagster._core.definitions.asset_layer import AssetLayer
 from dagster._core.definitions.asset_selection import AssetSelection
 from dagster._core.definitions.backfill_policy import BackfillPolicy, resolve_backfill_policy
-from dagster._core.definitions.dependency import Node, NodeHandle, NodeInputHandle, NodeInvocation
+from dagster._core.definitions.config import ConfigMapping
+from dagster._core.definitions.dependency import (
+    DependencyMapping,
+    DependencyStructure,
+    Node,
+    NodeHandle,
+    NodeInputHandle,
+    NodeInvocation,
+    OpNode,
+)
 from dagster._core.definitions.events import AssetKey
+from dagster._core.definitions.executor_definition import (
+    ExecutorDefinition,
+    multi_or_in_process_executor,
+)
+from dagster._core.definitions.graph_definition import GraphDefinition, SubselectedGraphDefinition
+from dagster._core.definitions.hook_definition import HookDefinition
+from dagster._core.definitions.logger_definition import LoggerDefinition
+from dagster._core.definitions.metadata import MetadataValue, RawMetadataValue, normalize_metadata
 from dagster._core.definitions.node_definition import NodeDefinition
 from dagster._core.definitions.op_definition import OpDefinition
 from dagster._core.definitions.op_selection import OpSelection, get_graph_subset
-from dagster._core.definitions.partition import DynamicPartitionsDefinition
+from dagster._core.definitions.partition import (
+    DynamicPartitionsDefinition,
+    PartitionedConfig,
+    PartitionsDefinition,
+)
 from dagster._core.definitions.policy import RetryPolicy
+from dagster._core.definitions.resource_definition import ResourceDefinition
 from dagster._core.definitions.resource_requirement import (
     ResourceKeyRequirement,
     ResourceRequirement,
     ensure_requirements_satisfied,
 )
-from dagster._core.definitions.utils import check_valid_name
+from dagster._core.definitions.run_request import RunRequest
+from dagster._core.definitions.utils import DEFAULT_IO_MANAGER_KEY, check_valid_name
 from dagster._core.errors import (
     DagsterInvalidConfigError,
     DagsterInvalidDefinitionError,
@@ -56,32 +80,20 @@ from dagster._core.storage.io_manager import (
 from dagster._core.types.dagster_type import DagsterType
 from dagster._core.utils import str_format_set
 from dagster._utils import IHasInternalInit
+from dagster._utils.cached_method import cached_method
 from dagster._utils.merger import merge_dicts
-
-from .asset_layer import AssetLayer
-from .config import ConfigMapping
-from .dependency import DependencyMapping, DependencyStructure, OpNode
-from .executor_definition import ExecutorDefinition, multi_or_in_process_executor
-from .graph_definition import GraphDefinition, SubselectedGraphDefinition
-from .hook_definition import HookDefinition
-from .logger_definition import LoggerDefinition
-from .metadata import MetadataValue, RawMetadataValue, normalize_metadata
-from .partition import PartitionedConfig, PartitionsDefinition
-from .resource_definition import ResourceDefinition
-from .run_request import RunRequest
-from .utils import DEFAULT_IO_MANAGER_KEY, NormalizedTags, normalize_tags
+from dagster._utils.tags import normalize_tags
 
 if TYPE_CHECKING:
     from dagster._config.snap import ConfigSchemaSnapshot
     from dagster._core.definitions.assets import AssetsDefinition
     from dagster._core.definitions.run_config import RunConfig
+    from dagster._core.definitions.run_config_schema import RunConfigSchema
     from dagster._core.execution.execute_in_process_result import ExecuteInProcessResult
     from dagster._core.execution.resources_init import InitResourceContext
     from dagster._core.instance import DagsterInstance, DynamicPartitionsStore
     from dagster._core.remote_representation.job_index import JobIndex
-    from dagster._core.snap import JobSnapshot
-
-    from .run_config_schema import RunConfigSchema
+    from dagster._core.snap import JobSnap
 
 DEFAULT_EXECUTOR_DEF = multi_or_in_process_executor
 
@@ -93,6 +105,7 @@ class JobDefinition(IHasInternalInit):
     _graph_def: GraphDefinition
     _description: Optional[str]
     _tags: Mapping[str, str]
+    _run_tags: Optional[Mapping[str, str]]
     _metadata: Mapping[str, MetadataValue]
     _current_level_node_defs: Sequence[NodeDefinition]
     _hook_defs: AbstractSet[HookDefinition]
@@ -117,7 +130,8 @@ class JobDefinition(IHasInternalInit):
         ] = None,
         description: Optional[str] = None,
         partitions_def: Optional[PartitionsDefinition] = None,
-        tags: Union[NormalizedTags, Optional[Mapping[str, Any]]] = None,
+        tags: Optional[Mapping[str, Any]] = None,
+        run_tags: Optional[Mapping[str, Any]] = None,
         metadata: Optional[Mapping[str, RawMetadataValue]] = None,
         hook_defs: Optional[AbstractSet[HookDefinition]] = None,
         op_retry_policy: Optional[RetryPolicy] = None,
@@ -159,7 +173,10 @@ class JobDefinition(IHasInternalInit):
         # tags and description can exist on graph as well, but since
         # same graph may be in multiple jobs, keep separate layer
         self._description = check.opt_str_param(description, "description")
-        self._tags = normalize_tags(tags).tags
+
+        self._tags = normalize_tags(tags)
+        self._run_tags = run_tags  # don't normalize to preserve None
+
         self._metadata = normalize_metadata(
             check.opt_mapping_param(metadata, "metadata", key_type=str)
         )
@@ -258,7 +275,8 @@ class JobDefinition(IHasInternalInit):
         ],
         description: Optional[str],
         partitions_def: Optional[PartitionsDefinition],
-        tags: Union[NormalizedTags, Optional[Mapping[str, Any]]],
+        tags: Optional[Mapping[str, Any]],
+        run_tags: Optional[Mapping[str, Any]],
         metadata: Optional[Mapping[str, RawMetadataValue]],
         hook_defs: Optional[AbstractSet[HookDefinition]],
         op_retry_policy: Optional[RetryPolicy],
@@ -277,6 +295,7 @@ class JobDefinition(IHasInternalInit):
             description=description,
             partitions_def=partitions_def,
             tags=tags,
+            run_tags=run_tags,
             metadata=metadata,
             hook_defs=hook_defs,
             op_retry_policy=op_retry_policy,
@@ -290,9 +309,37 @@ class JobDefinition(IHasInternalInit):
     def name(self) -> str:
         return self._name
 
-    @property
+    # If `run_tags` is set (not None), then `tags` and `run_tags` are separate specifications of
+    # "definition" and "run" tags respectively. Otherwise, `tags` is used for both.
+    # This is for backcompat with old behavior prior to the introduction of `run_tags`.
+    #
+    # We need to preserve the distinction between None and {} values for `run_tags` so that the
+    # same logic can be applied in the host process receiving a snapshot of this job. Therefore
+    # we store an extra flag `_has_separately_defined_run_tags` which we use to control snapshot
+    # generation.
+    @cached_property
     def tags(self) -> Mapping[str, str]:
-        return merge_dicts(self._graph_def.tags, self._tags)
+        if self._run_tags is None:
+            return {**self._graph_def.tags, **self._tags}
+        else:
+            return self._tags
+
+    @cached_property
+    def run_tags(self) -> Mapping[str, str]:
+        if self._run_tags is None:
+            return self.tags
+        else:
+            return normalize_tags({**self._graph_def.tags, **self._run_tags})
+
+    # This property exists for backcompat purposes. If it is False, then we omit run_tags when
+    # generating a job snapshot. This lets host processes distinguish between None and {} `run_tags`
+    # values, which have different semantics:
+    #
+    # - run_tags=None (`tags` will be used for run tags)
+    # - run_tags={} (empty dict will be used for run tags), which have different semantics.
+    @property
+    def has_separately_defined_run_tags(self) -> bool:
+        return self._run_tags is not None
 
     @property
     def metadata(self) -> Mapping[str, MetadataValue]:
@@ -488,7 +535,7 @@ class JobDefinition(IHasInternalInit):
         }
 
     def _get_required_resource_keys(self, validate_requirements: bool = False) -> AbstractSet[str]:
-        from ..execution.resources_init import get_transitive_required_resource_keys
+        from dagster._core.execution.resources_init import get_transitive_required_resource_keys
 
         requirements = self._get_resource_requirements()
         if validate_requirements:
@@ -668,6 +715,7 @@ class JobDefinition(IHasInternalInit):
             hook_defs=self.hook_defs,
             config=self.config_mapping or self.partitioned_config or self.run_config,
             tags=self.tags,
+            run_tags=self._run_tags,
             op_retry_policy=self._op_retry_policy,
             asset_layer=self.asset_layer,
             input_values=input_values,
@@ -683,7 +731,7 @@ class JobDefinition(IHasInternalInit):
             asset_selection=frozenset(asset_selection) if asset_selection else None,
         )
 
-        merged_tags = merge_dicts(self.tags, tags or {})
+        merged_run_tags = merge_dicts(self.run_tags, tags or {})
         if partition_key:
             ephemeral_job.validate_partition_key(
                 partition_key,
@@ -699,13 +747,13 @@ class JobDefinition(IHasInternalInit):
                 run_config = self.partitioned_config.get_run_config_for_partition_key(partition_key)
 
             if self.partitioned_config:
-                merged_tags.update(
+                merged_run_tags.update(
                     self.partitioned_config.get_tags_for_partition_key(
                         partition_key, job_name=self.name
                     )
                 )
             else:
-                merged_tags.update(tags_for_partition_key)
+                merged_run_tags.update(tags_for_partition_key)
 
         return core_execute_in_process(
             ephemeral_job=ephemeral_job,
@@ -713,7 +761,7 @@ class JobDefinition(IHasInternalInit):
             instance=instance,
             output_capturing_enabled=True,
             raise_on_error=raise_on_error,
-            run_tags=merged_tags,
+            run_tags=merged_run_tags,
             run_id=run_id,
             asset_selection=frozenset(asset_selection),
         )
@@ -976,19 +1024,20 @@ class JobDefinition(IHasInternalInit):
     def get_config_schema_snapshot(self) -> "ConfigSchemaSnapshot":
         return self.get_job_snapshot().config_schema_snapshot
 
-    def get_job_snapshot(self) -> "JobSnapshot":
+    def get_job_snapshot(self) -> "JobSnap":
         return self.get_job_index().job_snapshot
 
+    @cached_method
     def get_job_index(self) -> "JobIndex":
         from dagster._core.remote_representation import JobIndex
-        from dagster._core.snap import JobSnapshot
+        from dagster._core.snap import JobSnap
 
-        return JobIndex(JobSnapshot.from_job_def(self), self.get_parent_job_snapshot())
+        return JobIndex(JobSnap.from_job_def(self), self.get_parent_job_snapshot())
 
     def get_job_snapshot_id(self) -> str:
         return self.get_job_index().job_snapshot_id
 
-    def get_parent_job_snapshot(self) -> Optional["JobSnapshot"]:
+    def get_parent_job_snapshot(self) -> Optional["JobSnap"]:
         if self.op_selection_data:
             return self.op_selection_data.parent_job_def.get_job_snapshot()
         elif self.asset_selection_data:
@@ -1019,6 +1068,7 @@ class JobDefinition(IHasInternalInit):
             name=self._name,
             description=self.description,
             tags=self.tags,
+            run_tags=self._run_tags,
             metadata=self._metadata,
             hook_defs=self.hook_defs,
             op_retry_policy=self._op_retry_policy,
@@ -1302,12 +1352,12 @@ def _create_run_config_schema(
     job_def: JobDefinition,
     required_resources: AbstractSet[str],
 ) -> "RunConfigSchema":
-    from .run_config import (
+    from dagster._core.definitions.run_config import (
         RunConfigSchemaCreationData,
         construct_config_type_dictionary,
         define_run_config_schema_type,
     )
-    from .run_config_schema import RunConfigSchema
+    from dagster._core.definitions.run_config_schema import RunConfigSchema
 
     # When executing with a subset job, include the missing nodes
     # from the original job as ignored to allow execution with

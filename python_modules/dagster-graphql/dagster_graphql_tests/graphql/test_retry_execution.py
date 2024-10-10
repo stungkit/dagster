@@ -20,12 +20,16 @@ from dagster_graphql.test.utils import (
     infer_job_selector,
 )
 
-from .graphql_context_test_suite import (
+from dagster_graphql_tests.graphql.graphql_context_test_suite import (
     ExecutingGraphQLContextTestMatrix,
     ReadonlyGraphQLContextTestMatrix,
 )
-from .repo import csv_hello_world_ops_config, get_retry_multi_execution_params, retry_config
-from .utils import (
+from dagster_graphql_tests.graphql.repo import (
+    csv_hello_world_ops_config,
+    get_retry_multi_execution_params,
+    retry_config,
+)
+from dagster_graphql_tests.graphql.utils import (
     get_all_logs_for_finished_run_via_subscription,
     step_did_fail,
     step_did_fail_in_records,
@@ -67,14 +71,12 @@ class TestRetryExecutionReadonly(ReadonlyGraphQLContextTestMatrix):
 
         code_location = graphql_context.get_code_location("test")
         repository = code_location.get_repository("test_repo")
-        external_job_origin = repository.get_full_external_job(
-            "eventually_successful"
-        ).get_external_origin()
+        external_job_origin = repository.get_full_job("eventually_successful").get_remote_origin()
 
         run_id = create_run_for_test(
             graphql_context.instance,
             "eventually_successful",
-            external_job_origin=external_job_origin,
+            remote_job_origin=external_job_origin,
         ).run_id
 
         result = execute_dagster_graphql(

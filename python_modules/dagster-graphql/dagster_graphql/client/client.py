@@ -6,13 +6,13 @@ import requests.exceptions
 from dagster import DagsterRunStatus
 from dagster._annotations import deprecated, public
 from dagster._core.definitions.run_config import RunConfig, convert_config_input
-from dagster._core.definitions.utils import normalize_tags
+from dagster._utils.tags import normalize_tags
 from gql import Client, gql
 from gql.transport import Transport
 from gql.transport.exceptions import TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
 
-from .client_queries import (
+from dagster_graphql.client.client_queries import (
     CLIENT_GET_REPO_LOCATIONS_NAMES_AND_PIPELINES_QUERY,
     CLIENT_SUBMIT_PIPELINE_RUN_MUTATION,
     GET_PIPELINE_RUN_STATUS_QUERY,
@@ -21,7 +21,7 @@ from .client_queries import (
     TERMINATE_RUN_JOB_MUTATION,
     TERMINATE_RUNS_JOB_MUTATION,
 )
-from .utils import (
+from dagster_graphql.client.utils import (
     DagsterGraphQLClientError,
     InvalidOutputErrorInfo,
     JobInfo,
@@ -151,7 +151,7 @@ class DagsterGraphQLClient:
             "Either a mode and run_config or a preset must be specified in order to "
             f"submit the pipeline {pipeline_name} for execution",
         )
-        tags = normalize_tags(tags).tags
+        tags = normalize_tags(tags)
 
         pipeline_or_job = "Job" if is_using_job_op_graph_apis else "Pipeline"
 

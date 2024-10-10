@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING, Dict, Mapping, Optional, Sequence, Set, Tuple,
 from typing_extensions import TypedDict
 
 from dagster._core.events import DagsterEvent
-from dagster._core.execution.backfill import BulkActionStatus, PartitionBackfill
+from dagster._core.execution.backfill import BulkActionsFilter, BulkActionStatus, PartitionBackfill
 from dagster._core.execution.telemetry import RunTelemetryData
 from dagster._core.instance import MayHaveInstanceWeakref, T_DagsterInstance
-from dagster._core.snap import ExecutionPlanSnapshot, JobSnapshot
+from dagster._core.snap import ExecutionPlanSnapshot, JobSnap
+from dagster._core.storage.daemon_cursor import DaemonCursorStorage
 from dagster._core.storage.dagster_run import (
     DagsterRun,
     JobBucket,
@@ -19,8 +20,6 @@ from dagster._core.storage.dagster_run import (
 from dagster._core.storage.sql import AlembicVersion
 from dagster._daemon.types import DaemonHeartbeat
 from dagster._utils import PrintFn
-
-from ..daemon_cursor import DaemonCursorStorage
 
 if TYPE_CHECKING:
     from dagster._core.remote_representation.origin import RemoteJobOrigin
@@ -205,7 +204,7 @@ class RunStorage(ABC, MayHaveInstanceWeakref[T_DagsterInstance], DaemonCursorSto
 
     def add_snapshot(
         self,
-        snapshot: Union[JobSnapshot, ExecutionPlanSnapshot],
+        snapshot: Union[JobSnap, ExecutionPlanSnapshot],
         snapshot_id: Optional[str] = None,
     ) -> None:
         """Add a snapshot to the storage.
@@ -217,7 +216,7 @@ class RunStorage(ABC, MayHaveInstanceWeakref[T_DagsterInstance], DaemonCursorSto
                 in debugging, where we might want to import a historical run whose snapshots were
                 calculated using a different hash function than the current code.
         """
-        if isinstance(snapshot, JobSnapshot):
+        if isinstance(snapshot, JobSnap):
             self.add_job_snapshot(snapshot, snapshot_id)
         else:
             self.add_execution_plan_snapshot(snapshot, snapshot_id)
@@ -237,7 +236,7 @@ class RunStorage(ABC, MayHaveInstanceWeakref[T_DagsterInstance], DaemonCursorSto
         """
 
     @abstractmethod
-    def add_job_snapshot(self, job_snapshot: JobSnapshot, snapshot_id: Optional[str] = None) -> str:
+    def add_job_snapshot(self, job_snapshot: JobSnap, snapshot_id: Optional[str] = None) -> str:
         """Add a pipeline snapshot to the run store.
 
         Pipeline snapshots are content-addressable, meaning
@@ -257,7 +256,7 @@ class RunStorage(ABC, MayHaveInstanceWeakref[T_DagsterInstance], DaemonCursorSto
         """
 
     @abstractmethod
-    def get_job_snapshot(self, job_snapshot_id: str) -> JobSnapshot:
+    def get_job_snapshot(self, job_snapshot_id: str) -> JobSnap:
         """Fetch a snapshot by ID.
 
         Args:
@@ -354,6 +353,10 @@ class RunStorage(ABC, MayHaveInstanceWeakref[T_DagsterInstance], DaemonCursorSto
     def get_daemon_heartbeats(self) -> Mapping[str, DaemonHeartbeat]:
         """Latest heartbeats of all daemon types."""
 
+    def supports_run_telemetry(self) -> bool:
+        """Whether the storage supports run telemetry."""
+        return False
+
     def add_run_telemetry(
         self,
         run_telemetry: RunTelemetryData,
@@ -370,11 +373,23 @@ class RunStorage(ABC, MayHaveInstanceWeakref[T_DagsterInstance], DaemonCursorSto
     @abstractmethod
     def get_backfills(
         self,
-        status: Optional[BulkActionStatus] = None,
+        filters: Optional[BulkActionsFilter] = None,
         cursor: Optional[str] = None,
         limit: Optional[int] = None,
+        status: Optional[BulkActionStatus] = None,
     ) -> Sequence[PartitionBackfill]:
         """Get a list of partition backfills."""
+
+    @abstractmethod
+    def get_backfills_count(self, filters: Optional[BulkActionsFilter] = None) -> int:
+        """Return the number of backfills present in the storage that match the given filters.
+
+        Args:
+            filters (Optional[BulkActionsFilter]) -- The filter by which to filter backfills
+
+        Returns:
+            int: The number of backfills that match the given filters.
+        """
 
     @abstractmethod
     def get_backfill(self, backfill_id: str) -> Optional[PartitionBackfill]:

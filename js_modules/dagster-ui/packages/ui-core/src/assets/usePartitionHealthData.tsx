@@ -1,4 +1,3 @@
-import {gql, useApolloClient} from '@apollo/client';
 import isEqual from 'lodash/isEqual';
 import keyBy from 'lodash/keyBy';
 import {useEffect, useMemo, useState} from 'react';
@@ -11,6 +10,7 @@ import {
   PartitionHealthQuery,
   PartitionHealthQueryVariables,
 } from './types/usePartitionHealthData.types';
+import {gql, useApolloClient} from '../apollo-client';
 import {assertUnreachable} from '../app/Util';
 import {LiveDataForNode} from '../asset-graph/Utils';
 import {PartitionDefinitionType, PartitionRangeStatus} from '../graphql/types';
@@ -569,11 +569,15 @@ export function usePartitionHealthData(
     });
   }, [assetKeyJSON, cacheClearStrategy, client.cache]);
 
+  const [loading, setLoading] = useState(true);
+  useBlockTraceUntilTrue('usePartitionHealthData', !loading);
+
   // Refresh state health ranges, one asset key at a time. This kicks off one
   // request and then missingKeyJSON updates when that is complete, kicking
   // off the next query.
   useMemo(() => {
     if (!missingKeyJSON) {
+      setLoading(false);
       return;
     }
     const loadKey: AssetKey = JSON.parse(missingKeyJSON);

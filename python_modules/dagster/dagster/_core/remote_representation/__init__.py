@@ -6,43 +6,42 @@ It also contains classes that represent historical representations
 that have been persisted. e.g. HistoricalPipeline
 """
 
-from .external import (
-    ExternalExecutionPlan as ExternalExecutionPlan,
-    ExternalJob as ExternalJob,
-    ExternalPartitionSet as ExternalPartitionSet,
-    ExternalRepository as ExternalRepository,
-    ExternalSchedule as ExternalSchedule,
-    ExternalSensor as ExternalSensor,
+from dagster._core.remote_representation.external import (
+    RemoteExecutionPlan as RemoteExecutionPlan,
+    RemoteJob as RemoteJob,
+    RemotePartitionSet as RemotePartitionSet,
+    RemoteRepository as RemoteRepository,
+    RemoteSchedule as RemoteSchedule,
+    RemoteSensor as RemoteSensor,
 )
-from .external_data import (
-    ExternalExecutionParamsData as ExternalExecutionParamsData,
-    ExternalExecutionParamsErrorData as ExternalExecutionParamsErrorData,
-    ExternalJobData as ExternalJobData,
-    ExternalJobRef as ExternalJobRef,
+from dagster._core.remote_representation.external_data import (
+    ExecutionParamsErrorSnap as ExecutionParamsErrorSnap,
+    ExecutionParamsSnap as ExecutionParamsSnap,
     ExternalJobSubsetResult as ExternalJobSubsetResult,
-    ExternalPartitionConfigData as ExternalPartitionConfigData,
-    ExternalPartitionExecutionErrorData as ExternalPartitionExecutionErrorData,
-    ExternalPartitionNamesData as ExternalPartitionNamesData,
-    ExternalPartitionSetExecutionParamData as ExternalPartitionSetExecutionParamData,
-    ExternalPartitionTagsData as ExternalPartitionTagsData,
-    ExternalPresetData as ExternalPresetData,
-    ExternalRepositoryData as ExternalRepositoryData,
-    ExternalRepositoryErrorData as ExternalRepositoryErrorData,
-    ExternalScheduleExecutionErrorData as ExternalScheduleExecutionErrorData,
-    ExternalSensorExecutionErrorData as ExternalSensorExecutionErrorData,
-    ExternalTargetData as ExternalTargetData,
+    JobDataSnap as JobDataSnap,
+    JobRefSnap as JobRefSnap,
+    PartitionConfigSnap as PartitionConfigSnap,
+    PartitionExecutionErrorSnap as PartitionExecutionErrorSnap,
+    PartitionNamesSnap as PartitionNamesSnap,
+    PartitionSetExecutionParamSnap as PartitionSetExecutionParamSnap,
     PartitionSetSnap as PartitionSetSnap,
+    PartitionTagsSnap as PartitionTagsSnap,
+    PresetSnap as PresetSnap,
+    RepositoryErrorSnap as RepositoryErrorSnap,
+    RepositorySnap as RepositorySnap,
+    ScheduleExecutionErrorSnap as ScheduleExecutionErrorSnap,
     ScheduleSnap as ScheduleSnap,
+    SensorExecutionErrorSnap as SensorExecutionErrorSnap,
     SensorSnap as SensorSnap,
+    TargetSnap as TargetSnap,
     external_job_data_from_def as external_job_data_from_def,
-    external_repository_data_from_def as external_repository_data_from_def,
 )
-from .handle import (
+from dagster._core.remote_representation.handle import (
     JobHandle as JobHandle,
     RepositoryHandle as RepositoryHandle,
 )
-from .historical import HistoricalJob as HistoricalJob
-from .origin import (
+from dagster._core.remote_representation.historical import HistoricalJob as HistoricalJob
+from dagster._core.remote_representation.origin import (
     IN_PROCESS_NAME as IN_PROCESS_NAME,
     CodeLocationOrigin as CodeLocationOrigin,
     GrpcServerCodeLocationOrigin as GrpcServerCodeLocationOrigin,
@@ -54,10 +53,10 @@ from .origin import (
 )
 
 # ruff: isort: split
-from .code_location import (
+from dagster._core.remote_representation.code_location import (
     CodeLocation as CodeLocation,
     GrpcServerCodeLocation as GrpcServerCodeLocation,
     InProcessCodeLocation as InProcessCodeLocation,
 )
-from .job_index import JobIndex as JobIndex
-from .represented import RepresentedJob as RepresentedJob
+from dagster._core.remote_representation.job_index import JobIndex as JobIndex
+from dagster._core.remote_representation.represented import RepresentedJob as RepresentedJob

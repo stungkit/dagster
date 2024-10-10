@@ -13,10 +13,10 @@ from rich.console import Console
 from rich.syntax import Syntax
 from typing_extensions import Annotated
 
-from ..dbt_core_version import DBT_CORE_VERSION_UPPER_BOUND
-from ..dbt_project import DbtProject
-from ..include import STARTER_PROJECT_PATH
-from ..version import __version__ as dagster_dbt_version
+from dagster_dbt.dbt_core_version import DBT_CORE_VERSION_UPPER_BOUND
+from dagster_dbt.dbt_project import DbtProject
+from dagster_dbt.include import STARTER_PROJECT_PATH
+from dagster_dbt.version import __version__ as dagster_dbt_version
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -346,7 +346,9 @@ def project_prepare_and_package_command(
         ),
     ],
 ) -> None:
-    """This command will invoke ``prepare_and_package`` on :py:class:`DbtProject` found in the target module or file."""
+    """This command will invoke ``prepare_and_package`` on :py:class:`DbtProject` found in the target module or file.
+    Note that this command runs `dbt deps` and `dbt parse`.
+    """
     console.print(
         f"Running with dagster-dbt version: [bold green]{dagster_dbt_version}[/bold green]."
     )

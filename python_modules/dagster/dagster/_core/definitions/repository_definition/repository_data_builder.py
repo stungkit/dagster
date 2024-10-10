@@ -21,7 +21,6 @@ from dagster._config.pythonic_config import (
     ConfigurableIOManagerFactoryResourceDefinition,
     ConfigurableResourceFactoryResourceDefinition,
 )
-from dagster._core.definitions.asset_checks import AssetChecksDefinition
 from dagster._core.definitions.asset_graph import AssetGraph
 from dagster._core.definitions.asset_job import (
     IMPLICIT_ASSET_JOB_NAME,
@@ -29,7 +28,7 @@ from dagster._core.definitions.asset_job import (
     is_base_asset_job_name,
 )
 from dagster._core.definitions.assets import AssetsDefinition
-from dagster._core.definitions.auto_materialize_sensor_definition import (
+from dagster._core.definitions.automation_condition_sensor_definition import (
     AutomationConditionSensorDefinition,
 )
 from dagster._core.definitions.base_asset_graph import BaseAssetGraph
@@ -46,6 +45,11 @@ from dagster._core.definitions.partition import (
 from dagster._core.definitions.partitioned_schedule import (
     UnresolvedPartitionedAssetScheduleDefinition,
 )
+from dagster._core.definitions.repository_definition.repository_data import CachingRepositoryData
+from dagster._core.definitions.repository_definition.valid_definitions import (
+    VALID_REPOSITORY_DATA_DICT_KEYS,
+    RepositoryListDefinition,
+)
 from dagster._core.definitions.resource_definition import ResourceDefinition
 from dagster._core.definitions.schedule_definition import ScheduleDefinition
 from dagster._core.definitions.sensor_definition import SensorDefinition
@@ -54,9 +58,6 @@ from dagster._core.definitions.time_window_partitions import TimeWindowPartition
 from dagster._core.definitions.unresolved_asset_job_definition import UnresolvedAssetJobDefinition
 from dagster._core.errors import DagsterInvalidDefinitionError
 from dagster._utils.warnings import deprecation_warning
-
-from .repository_data import CachingRepositoryData
-from .valid_definitions import VALID_REPOSITORY_DATA_DICT_KEYS, RepositoryListDefinition
 
 if TYPE_CHECKING:
     from dagster._core.definitions.asset_check_spec import AssetCheckKey
@@ -184,7 +185,7 @@ def build_caching_repository_data_from_list(
     asset_keys: Set[AssetKey] = set()
     asset_check_keys: Set["AssetCheckKey"] = set()
     source_assets: List[SourceAsset] = []
-    asset_checks_defs: List[AssetChecksDefinition] = []
+    asset_checks_defs: List[AssetsDefinition] = []
     partitions_defs: Set[PartitionsDefinition] = set()
     for definition in repository_definitions:
         if isinstance(definition, JobDefinition):
@@ -243,7 +244,11 @@ def build_caching_repository_data_from_list(
             if definition.partitions_def is not None:
                 partitions_defs.add(definition.partitions_def)
             unresolved_jobs[definition.name] = definition
-        elif isinstance(definition, AssetChecksDefinition):
+        elif (
+            isinstance(definition, AssetsDefinition)
+            and definition.has_check_keys
+            and not definition.has_keys
+        ):
             for key in definition.check_keys:
                 if key in asset_check_keys:
                     raise DagsterInvalidDefinitionError(f"Duplicate asset check key: {key}")

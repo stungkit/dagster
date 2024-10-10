@@ -24,7 +24,6 @@ from dagster._core.events import (
     EngineEventData,
 )
 from dagster._core.instance import DagsterInstance
-from dagster._core.storage.captured_log_manager import CapturedLogData, CapturedLogManager
 from dagster._core.storage.dagster_run import CANCELABLE_RUN_STATUSES
 from dagster._core.workspace.permissions import Permissions
 from dagster._utils.error import serializable_error_info_from_exc_info
@@ -32,29 +31,31 @@ from starlette.concurrency import (
     run_in_threadpool,  # can provide this indirectly if we dont want starlette dep in dagster-graphql
 )
 
-from dagster_graphql.implementation.fetch_assets import get_external_asset_node
-
 if TYPE_CHECKING:
-    from dagster_graphql.schema.errors import GrapheneUnsupportedOperationError
+    from dagster_graphql.schema.errors import (
+        GrapheneAssetNotFoundError,
+        GrapheneUnsupportedOperationError,
+    )
     from dagster_graphql.schema.roots.mutation import GrapheneTerminateRunPolicy
 
-from ..utils import assert_permission, assert_permission_for_location
-from .backfill import (
+
+from dagster_graphql.implementation.execution.backfill import (
     cancel_partition_backfill as cancel_partition_backfill,
     create_and_launch_partition_backfill as create_and_launch_partition_backfill,
     resume_partition_backfill as resume_partition_backfill,
 )
+from dagster_graphql.implementation.utils import assert_permission, assert_permission_for_location
 
 if TYPE_CHECKING:
+    from dagster._core.storage.compute_log_manager import CapturedLogData
+
+    from dagster_graphql.schema.errors import GrapheneRunNotFoundError
     from dagster_graphql.schema.logs.compute_logs import GrapheneCapturedLogs
     from dagster_graphql.schema.pipelines.subscription import (
         GraphenePipelineRunLogsSubscriptionFailure,
         GraphenePipelineRunLogsSubscriptionSuccess,
     )
-    from dagster_graphql.schema.util import ResolveInfo
-
-    from ...schema.errors import GrapheneRunNotFoundError
-    from ...schema.roots.mutation import (
+    from dagster_graphql.schema.roots.mutation import (
         GrapheneAssetWipeSuccess,
         GrapheneDeletePipelineRunSuccess,
         GrapheneReportRunlessAssetEventsSuccess,
@@ -62,13 +63,14 @@ if TYPE_CHECKING:
         GrapheneTerminateRunsResult,
         GrapheneTerminateRunSuccess,
     )
+    from dagster_graphql.schema.util import ResolveInfo
 
 
 def _force_mark_as_canceled(
     instance: DagsterInstance, run_id: str
 ) -> "GrapheneTerminateRunSuccess":
-    from ...schema.pipelines.pipeline import GrapheneRun
-    from ...schema.roots.mutation import GrapheneTerminateRunSuccess
+    from dagster_graphql.schema.pipelines.pipeline import GrapheneRun
+    from dagster_graphql.schema.roots.mutation import GrapheneTerminateRunSuccess
 
     reloaded_record = check.not_none(instance.get_run_record_by_id(run_id))
 
@@ -88,9 +90,9 @@ def terminate_pipeline_execution(
     run_id: str,
     terminate_policy: "GrapheneTerminateRunPolicy",
 ) -> Union["GrapheneTerminateRunSuccess", "GrapheneTerminateRunFailure"]:
-    from ...schema.errors import GrapheneRunNotFoundError
-    from ...schema.pipelines.pipeline import GrapheneRun
-    from ...schema.roots.mutation import (
+    from dagster_graphql.schema.errors import GrapheneRunNotFoundError
+    from dagster_graphql.schema.pipelines.pipeline import GrapheneRun
+    from dagster_graphql.schema.roots.mutation import (
         GrapheneTerminateRunFailure,
         GrapheneTerminateRunPolicy,
         GrapheneTerminateRunSuccess,
@@ -169,7 +171,7 @@ def terminate_pipeline_execution_for_runs(
     run_ids: Sequence[str],
     terminate_policy: "GrapheneTerminateRunPolicy",
 ) -> "GrapheneTerminateRunsResult":
-    from ...schema.roots.mutation import GrapheneTerminateRunsResult
+    from dagster_graphql.schema.roots.mutation import GrapheneTerminateRunsResult
 
     check.sequence_param(run_ids, "run_id", of_type=str)
 
@@ -189,8 +191,8 @@ def terminate_pipeline_execution_for_runs(
 def delete_pipeline_run(
     graphene_info: "ResolveInfo", run_id: str
 ) -> Union["GrapheneDeletePipelineRunSuccess", "GrapheneRunNotFoundError"]:
-    from ...schema.errors import GrapheneRunNotFoundError
-    from ...schema.roots.mutation import GrapheneDeletePipelineRunSuccess
+    from dagster_graphql.schema.errors import GrapheneRunNotFoundError
+    from dagster_graphql.schema.roots.mutation import GrapheneDeletePipelineRunSuccess
 
     instance = graphene_info.context.instance
 
@@ -235,12 +237,12 @@ async def gen_events_for_run(
         "GraphenePipelineRunLogsSubscriptionSuccess",
     ]
 ]:
-    from ...schema.pipelines.pipeline import GrapheneRun
-    from ...schema.pipelines.subscription import (
+    from dagster_graphql.implementation.events import from_event_record
+    from dagster_graphql.schema.pipelines.pipeline import GrapheneRun
+    from dagster_graphql.schema.pipelines.subscription import (
         GraphenePipelineRunLogsSubscriptionFailure,
         GraphenePipelineRunLogsSubscriptionSuccess,
     )
-    from ..events import from_event_record
 
     check.str_param(run_id, "run_id")
     after_cursor = check.opt_str_param(after_cursor, "after_cursor")
@@ -310,18 +312,15 @@ async def gen_events_for_run(
 async def gen_captured_log_data(
     graphene_info: "ResolveInfo", log_key: Sequence[str], cursor: Optional[str] = None
 ) -> AsyncIterator["GrapheneCapturedLogs"]:
-    from ...schema.logs.compute_logs import from_captured_log_data
+    from dagster_graphql.schema.logs.compute_logs import from_captured_log_data
 
     instance = graphene_info.context.instance
 
     compute_log_manager = instance.compute_log_manager
-    if not isinstance(compute_log_manager, CapturedLogManager):
-        return
-
     subscription = compute_log_manager.subscribe(log_key, cursor)
 
     loop = asyncio.get_event_loop()
-    queue: asyncio.Queue[CapturedLogData] = asyncio.Queue()
+    queue: asyncio.Queue["CapturedLogData"] = asyncio.Queue()
 
     def _enqueue(new_event):
         loop.call_soon_threadsafe(queue.put_nowait, new_event)
@@ -339,10 +338,15 @@ async def gen_captured_log_data(
 
 def wipe_assets(
     graphene_info: "ResolveInfo", asset_partition_ranges: Sequence[AssetPartitionWipeRange]
-) -> Union["GrapheneAssetWipeSuccess", "GrapheneUnsupportedOperationError"]:
-    from ...schema.backfill import GrapheneAssetPartitionRange
-    from ...schema.errors import GrapheneUnsupportedOperationError
-    from ...schema.roots.mutation import GrapheneAssetWipeSuccess
+) -> Union[
+    "GrapheneAssetWipeSuccess", "GrapheneUnsupportedOperationError", "GrapheneAssetNotFoundError"
+]:
+    from dagster_graphql.schema.backfill import GrapheneAssetPartitionRange
+    from dagster_graphql.schema.errors import (
+        GrapheneAssetNotFoundError,
+        GrapheneUnsupportedOperationError,
+    )
+    from dagster_graphql.schema.roots.mutation import GrapheneAssetWipeSuccess
 
     instance = graphene_info.context.instance
     whole_assets_to_wipe: List[AssetKey] = []
@@ -350,8 +354,11 @@ def wipe_assets(
         if apr.partition_range is None:
             whole_assets_to_wipe.append(apr.asset_key)
         else:
-            node = check.not_none(get_external_asset_node(graphene_info, apr.asset_key))
-            partitions_def = check.not_none(node.partitions_def_data).get_partitions_definition()
+            if apr.asset_key not in graphene_info.context.asset_graph.asset_node_snaps_by_key:
+                return GrapheneAssetNotFoundError(asset_key=apr.asset_key)
+
+            node = graphene_info.context.asset_graph.asset_node_snaps_by_key[apr.asset_key]
+            partitions_def = check.not_none(node.partitions).get_partitions_definition()
             partition_keys = partitions_def.get_partition_keys_in_range(apr.partition_range)
             try:
                 instance.wipe_asset_partitions(apr.asset_key, partition_keys)
@@ -399,7 +406,7 @@ def report_runless_asset_events(
     description: Optional[str] = None,
     tags: Optional[Mapping[str, str]] = None,
 ) -> "GrapheneReportRunlessAssetEventsSuccess":
-    from ...schema.roots.mutation import GrapheneReportRunlessAssetEventsSuccess
+    from dagster_graphql.schema.roots.mutation import GrapheneReportRunlessAssetEventsSuccess
 
     instance = graphene_info.context.instance
 

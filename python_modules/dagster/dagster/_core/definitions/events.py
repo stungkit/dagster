@@ -32,19 +32,18 @@ from dagster._core.definitions.data_version import (
     DATA_VERSION_TAG,
     DataVersion,
 )
-from dagster._core.definitions.partition_key_range import PartitionKeyRange
-from dagster._core.storage.tags import MULTIDIMENSIONAL_PARTITION_PREFIX, REPORTING_USER_TAG
-from dagster._serdes import whitelist_for_serdes
-from dagster._serdes.serdes import NamedTupleSerializer
-
-from .metadata import (
+from dagster._core.definitions.metadata import (
     MetadataFieldSerializer,
     MetadataMapping,
     MetadataValue,
     RawMetadataValue,
     normalize_metadata,
 )
-from .utils import DEFAULT_OUTPUT, check_valid_name
+from dagster._core.definitions.partition_key_range import PartitionKeyRange
+from dagster._core.definitions.utils import DEFAULT_OUTPUT, check_valid_name
+from dagster._core.storage.tags import MULTIDIMENSIONAL_PARTITION_PREFIX, REPORTING_USER_TAG
+from dagster._serdes import whitelist_for_serdes
+from dagster._serdes.serdes import NamedTupleSerializer
 
 if TYPE_CHECKING:
     from dagster._core.execution.context.output import OutputContext
@@ -751,23 +750,21 @@ UserEvent = Union[AssetMaterialization, AssetObservation, ExpectationResult]
 
 
 def validate_asset_event_tags(tags: Optional[Mapping[str, str]]) -> Optional[Mapping[str, str]]:
-    from dagster._core.definitions.utils import validate_tag_strict
+    from dagster._utils.tags import normalize_tags
 
     if tags is None:
         return None
 
-    for key, value in tags.items():
-        # The format of these particular tags does not fit strict validation. E.g.
-        # - Some of the keys have two slashes
-        # - The value for the data/code version tags can be an arbitrary string
-        if not is_system_asset_event_tag(key):
-            validate_tag_strict(key, value)
-
+    # The format of these particular tags does not fit strict validation. E.g.
+    # - Some of the keys have two slashes
+    # - The value for the data/code version tags can be an arbitrary string
+    tags_to_validate = {k: v for k, v in tags.items() if not is_system_asset_event_tag(k)}
+    normalize_tags(tags_to_validate, strict=True)  # performs validation
     return tags
 
 
 def is_system_asset_event_tag(key: str) -> bool:
-    from .data_version import (
+    from dagster._core.definitions.data_version import (
         CODE_VERSION_TAG,
         DATA_VERSION_TAG,
         INPUT_DATA_VERSION_TAG_PREFIX,

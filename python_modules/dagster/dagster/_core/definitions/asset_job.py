@@ -21,19 +21,11 @@ import dagster._check as check
 from dagster._core.definitions.asset_check_spec import AssetCheckKey
 from dagster._core.definitions.asset_checks import has_only_asset_checks
 from dagster._core.definitions.asset_graph import AssetGraph
+from dagster._core.definitions.asset_layer import AssetLayer
 from dagster._core.definitions.asset_selection import AssetSelection
-from dagster._core.definitions.hook_definition import HookDefinition
-from dagster._core.definitions.logger_definition import LoggerDefinition
-from dagster._core.definitions.policy import RetryPolicy
-from dagster._core.errors import DagsterInvalidDefinitionError, DagsterInvalidSubsetError
-from dagster._core.selector.subset_selector import AssetSelectionData
-from dagster._core.utils import toposort
-from dagster._utils.merger import merge_dicts
-
-from .asset_layer import AssetLayer
-from .assets import AssetsDefinition
-from .config import ConfigMapping
-from .dependency import (
+from dagster._core.definitions.assets import AssetsDefinition
+from dagster._core.definitions.config import ConfigMapping
+from dagster._core.definitions.dependency import (
     BlockingAssetChecksDependencyDefinition,
     DependencyDefinition,
     DependencyMapping,
@@ -42,23 +34,29 @@ from .dependency import (
     NodeInvocation,
     NodeOutputHandle,
 )
-from .events import AssetKey
-from .executor_definition import ExecutorDefinition
-from .graph_definition import GraphDefinition
-from .job_definition import JobDefinition, default_job_io_manager
-from .metadata import RawMetadataValue
-from .partition import PartitionedConfig, PartitionsDefinition
-from .resource_definition import ResourceDefinition
-from .resource_requirement import ensure_requirements_satisfied
-from .utils import DEFAULT_IO_MANAGER_KEY
+from dagster._core.definitions.events import AssetKey
+from dagster._core.definitions.executor_definition import ExecutorDefinition
+from dagster._core.definitions.graph_definition import GraphDefinition
+from dagster._core.definitions.hook_definition import HookDefinition
+from dagster._core.definitions.job_definition import JobDefinition, default_job_io_manager
+from dagster._core.definitions.logger_definition import LoggerDefinition
+from dagster._core.definitions.metadata import RawMetadataValue
+from dagster._core.definitions.partition import PartitionedConfig, PartitionsDefinition
+from dagster._core.definitions.policy import RetryPolicy
+from dagster._core.definitions.resource_definition import ResourceDefinition
+from dagster._core.definitions.resource_requirement import ensure_requirements_satisfied
+from dagster._core.definitions.utils import DEFAULT_IO_MANAGER_KEY
+from dagster._core.errors import DagsterInvalidDefinitionError, DagsterInvalidSubsetError
+from dagster._core.selector.subset_selector import AssetSelectionData
+from dagster._core.utils import toposort
+from dagster._utils.merger import merge_dicts
 
 # Name for auto-created job that's used to materialize assets
 IMPLICIT_ASSET_JOB_NAME = "__ASSET_JOB"
 
 if TYPE_CHECKING:
+    from dagster._core.definitions.asset_check_spec import AssetCheckSpec
     from dagster._core.definitions.run_config import RunConfig
-
-    from .asset_check_spec import AssetCheckSpec
 
 
 def is_base_asset_job_name(name: str) -> bool:
@@ -97,6 +95,7 @@ def build_asset_job(
         Union[ConfigMapping, Mapping[str, object], PartitionedConfig, "RunConfig"]
     ] = None,
     tags: Optional[Mapping[str, str]] = None,
+    run_tags: Optional[Mapping[str, str]] = None,
     metadata: Optional[Mapping[str, RawMetadataValue]] = None,
     executor_def: Optional[ExecutorDefinition] = None,
     partitions_def: Optional[PartitionsDefinition] = None,
@@ -191,6 +190,7 @@ def build_asset_job(
             resource_defs=all_resource_defs,
             config=config,
             tags=tags,
+            run_tags=run_tags,
             executor_def=executor_def,
             partitions_def=partitions_def,
             asset_layer=asset_layer,
@@ -200,11 +200,11 @@ def build_asset_job(
             hooks=original_job.hook_defs,
             op_retry_policy=original_job.op_retry_policy,
         )
-
     return graph.to_job(
         resource_defs=all_resource_defs,
         config=config,
         tags=tags,
+        run_tags=run_tags,
         metadata=metadata,
         executor_def=executor_def,
         partitions_def=partitions_def,
@@ -231,7 +231,7 @@ def get_asset_graph_for_job(
     Any unselected dependencies will be included as unexecutable AssetsDefinitions.
     """
     from dagster._core.definitions.external_asset import (
-        create_unexecutable_external_assets_from_assets_def,
+        create_unexecutable_external_asset_from_assets_def,
     )
 
     selected_keys = selection.resolve(parent_asset_graph)
@@ -275,9 +275,7 @@ def get_asset_graph_for_job(
         excluded_assets_defs, other_keys, None, allow_extraneous_asset_keys=True
     )
     unexecutable_assets_defs = [
-        unexecutable_ad
-        for ad in other_assets_defs
-        for unexecutable_ad in create_unexecutable_external_assets_from_assets_def(ad)
+        create_unexecutable_external_asset_from_assets_def(ad) for ad in other_assets_defs
     ]
 
     return AssetGraph.from_assets([*executable_assets_defs, *unexecutable_assets_defs])

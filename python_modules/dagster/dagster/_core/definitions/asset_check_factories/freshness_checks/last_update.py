@@ -3,6 +3,24 @@ from typing import Any, Dict, Iterable, Optional, Sequence, Union, cast
 
 from dagster import _check as check
 from dagster._annotations import experimental
+from dagster._core.definitions.asset_check_factories.utils import (
+    DEADLINE_CRON_PARAM_KEY,
+    DEFAULT_FRESHNESS_SEVERITY,
+    DEFAULT_FRESHNESS_TIMEZONE,
+    FRESH_UNTIL_METADATA_KEY,
+    FRESHNESS_PARAMS_METADATA_KEY,
+    LAST_UPDATED_TIMESTAMP_METADATA_KEY,
+    LATEST_CRON_TICK_METADATA_KEY,
+    LOWER_BOUND_DELTA_PARAM_KEY,
+    LOWER_BOUND_TIMESTAMP_METADATA_KEY,
+    TIMEZONE_PARAM_KEY,
+    assets_to_keys,
+    ensure_no_duplicate_assets,
+    freshness_multi_asset_check,
+    retrieve_last_update_record,
+    retrieve_timestamp_from_record,
+    seconds_in_words,
+)
 from dagster._core.definitions.asset_check_result import AssetCheckResult
 from dagster._core.definitions.asset_check_spec import AssetCheckSeverity
 from dagster._core.definitions.asset_checks import AssetChecksDefinition
@@ -19,25 +37,6 @@ from dagster._utils.schedules import (
     get_latest_completed_cron_tick,
     get_next_cron_tick,
     is_valid_cron_string,
-)
-
-from ..utils import (
-    DEADLINE_CRON_PARAM_KEY,
-    DEFAULT_FRESHNESS_SEVERITY,
-    DEFAULT_FRESHNESS_TIMEZONE,
-    FRESH_UNTIL_METADATA_KEY,
-    FRESHNESS_PARAMS_METADATA_KEY,
-    LAST_UPDATED_TIMESTAMP_METADATA_KEY,
-    LATEST_CRON_TICK_METADATA_KEY,
-    LOWER_BOUND_DELTA_PARAM_KEY,
-    LOWER_BOUND_TIMESTAMP_METADATA_KEY,
-    TIMEZONE_PARAM_KEY,
-    assets_to_keys,
-    ensure_no_duplicate_assets,
-    freshness_multi_asset_check,
-    get_last_updated_timestamp,
-    retrieve_last_update_record,
-    seconds_in_words,
 )
 
 
@@ -190,7 +189,9 @@ def _build_freshness_multi_check(
             latest_record = retrieve_last_update_record(
                 instance=context.instance, asset_key=asset_key, partition_key=None
             )
-            update_timestamp = get_last_updated_timestamp(latest_record, context)
+            update_timestamp = (
+                retrieve_timestamp_from_record(latest_record) if latest_record else None
+            )
             passed = (
                 update_timestamp is not None
                 and update_timestamp >= last_update_time_lower_bound.timestamp()

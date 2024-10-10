@@ -1,7 +1,6 @@
-import {gql} from '@apollo/client';
-
 import {RUN_TAGS_FRAGMENT} from './RunTagsFragment';
 import {RUN_TIME_FRAGMENT} from './RunUtils';
+import {gql} from '../apollo-client';
 
 export const RUN_TABLE_RUN_FRAGMENT = gql`
   fragment RunTableRunFragment on Run {
@@ -12,6 +11,7 @@ export const RUN_TABLE_RUN_FRAGMENT = gql`
     hasReExecutePermission
     hasTerminatePermission
     hasDeletePermission
+    hasRunMetricsEnabled
     mode
     rootRunId
     parentRunId

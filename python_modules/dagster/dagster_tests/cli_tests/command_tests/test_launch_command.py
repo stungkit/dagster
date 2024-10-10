@@ -8,12 +8,12 @@ from dagster._core.test_utils import new_cwd
 from dagster._core.utils import make_new_run_id
 from dagster._utils import file_relative_path
 
-from .test_cli_commands import (
+from dagster_tests.cli_tests.command_tests.test_cli_commands import (
     default_cli_test_instance,
     launch_command_contexts,
     non_existant_python_file_workspace_args,
     python_bar_cli_args,
-    valid_external_job_target_cli_args,
+    valid_remote_job_target_cli_args,
 )
 
 
@@ -55,7 +55,7 @@ def test_launch_non_existant_file():
             run_launch(kwargs, instance)
 
 
-@pytest.mark.parametrize("job_cli_args", valid_external_job_target_cli_args())
+@pytest.mark.parametrize("job_cli_args", valid_remote_job_target_cli_args())
 def test_launch_job_cli(job_cli_args):
     with default_cli_test_instance() as instance:
         run_job_launch_cli(job_cli_args, instance, expected_count=1)
