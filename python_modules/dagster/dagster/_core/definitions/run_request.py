@@ -5,7 +5,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, AbstractSet, Any, NamedTuple, Optional, Union  # noqa: UP035
 
 import dagster._check as check
-from dagster._annotations import PublicAttr, experimental_param
+from dagster._annotations import PublicAttr
 from dagster._core.definitions.asset_check_evaluation import AssetCheckEvaluation
 from dagster._core.definitions.asset_check_spec import AssetCheckKey
 from dagster._core.definitions.asset_graph_subset import AssetGraphSubset
@@ -49,7 +49,7 @@ class SkipReason(NamedTuple("_SkipReason", [("skip_message", PublicAttr[Optional
     """Represents a skipped evaluation, where no runs are requested. May contain a message to indicate
     why no runs were requested.
 
-    Attributes:
+    Args:
         skip_message (Optional[str]): A message displayed in the Dagster UI for why this evaluation resulted
             in no requested runs.
     """
@@ -76,7 +76,7 @@ class RunRequest(IHaveNew, LegacyNamedTupleMixin):
     """Represents all the information required to launch a single run.  Must be returned by a
     SensorDefinition or ScheduleDefinition's evaluation function for a run to be launched.
 
-    Attributes:
+    Args:
         run_key (Optional[str]): A string key to identify this launched run. For sensors, ensures that
             only one run is created per run key across all sensor evaluations.  For schedules,
             ensures that one run is created per tick, across failure recoveries. Passing in a `None`
@@ -86,7 +86,7 @@ class RunRequest(IHaveNew, LegacyNamedTupleMixin):
             provided by it.
         tags (Optional[Dict[str, Any]]): A dictionary of tags (string key-value pairs) to attach
             to the launched run.
-        job_name (Optional[str]): (Experimental) The name of the job this run request will launch.
+        job_name (Optional[str]): The name of the job this run request will launch.
             Required for sensors that target multiple jobs.
         asset_selection (Optional[Sequence[AssetKey]]): A subselection of assets that should be
             launched with this run. If the sensor or schedule targets a job, then by default a
@@ -94,7 +94,7 @@ class RunRequest(IHaveNew, LegacyNamedTupleMixin):
             targets an asset selection, then by default a RunRequest returned from it will launch
             all the assets in the selection. This argument is used to specify that only a subset of
             these assets should be launched, instead of all of them.
-        asset_check_keys (Optional[Sequence[AssetCheckKey]]): (Experimental) A subselection of asset checks that
+        asset_check_keys (Optional[Sequence[AssetCheckKey]]): A subselection of asset checks that
             should be launched with this run. This is currently only supported on sensors. If the
             sensor targets a job, then by default a RunRequest returned from it will launch all of
             the asset checks in the job. If the sensor targets an asset selection, then by default a
@@ -323,7 +323,7 @@ class DagsterRunReaction(
     """Represents a request that reacts to an existing dagster run. If success, it will report logs
     back to the run.
 
-    Attributes:
+    Args:
         dagster_run (Optional[DagsterRun]): The dagster run that originates this reaction.
         error (Optional[SerializableErrorInfo]): user code execution error.
         run_status: (Optional[DagsterRunStatus]): The run status that triggered the reaction.
@@ -343,9 +343,6 @@ class DagsterRunReaction(
         )
 
 
-@experimental_param(
-    param="asset_events", additional_warn_text="Runless asset events are experimental"
-)
 class SensorResult(
     NamedTuple(
         "_SensorResult",
@@ -372,20 +369,18 @@ class SensorResult(
 ):
     """The result of a sensor evaluation.
 
-    Attributes:
-        run_requests (Optional[Sequence[RunRequest]]): A list
-            of run requests to be executed.
+    Args:
+        run_requests (Optional[Sequence[RunRequest]]): A list of run requests to be executed.
         skip_reason (Optional[Union[str, SkipReason]]): A skip message indicating why sensor
             evaluation was skipped.
         cursor (Optional[str]): The cursor value for this sensor, which will be provided on the
             context for the next sensor evaluation.
-        dynamic_partitions_requests (Optional[Sequence[Union[DeleteDynamicPartitionsRequest,
-            AddDynamicPartitionsRequest]]]): A list of dynamic partition requests to request dynamic
+        dynamic_partitions_requests (Optional[Sequence[Union[DeleteDynamicPartitionsRequest, AddDynamicPartitionsRequest]]]): A list of dynamic partition requests to request dynamic
             partition addition and deletion. Run requests will be evaluated using the state of the
             partitions with these changes applied. We recommend limiting partition additions
             and deletions to a maximum of 25K partitions per sensor evaluation, as this is the maximum
             recommended partition limit per asset.
-        asset_events (Optional[Sequence[Union[AssetObservation, AssetMaterialization, AssetCheckEvaluation]]]):  (Experimental) A
+        asset_events (Optional[Sequence[Union[AssetObservation, AssetMaterialization, AssetCheckEvaluation]]]): A
             list of materializations, observations, and asset check evaluations that the system
             will persist on your behalf at the end of sensor evaluation. These events will be not
             be associated with any particular run, but will be queryable and viewable in the asset catalog.

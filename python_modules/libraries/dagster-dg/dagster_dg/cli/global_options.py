@@ -5,6 +5,7 @@ from typing import Any, Callable, Optional, TypeVar, Union
 import click
 
 from dagster_dg.config import DgConfig
+from dagster_dg.utils import set_option_help_output_group
 
 T_Command = TypeVar("T_Command", bound=Union[Callable[..., Any], click.Command])
 
@@ -42,8 +43,18 @@ GLOBAL_OPTIONS = {
             default=DgConfig.use_dg_managed_environment,
             help="Enable management of the virtual environment with uv.",
         ),
+        click.Option(
+            ["--require-local-venv/--no-require-local-venv"],
+            is_flag=True,
+            default=DgConfig.require_local_venv,
+            help="Require use of a local virtual environment (`.venv` found in ancestors of the working directory).",
+        ),
     ]
 }
+
+# Ensure that these options show up in the help output under the "Global options" group.
+for option in GLOBAL_OPTIONS.values():
+    set_option_help_output_group(option, "Global options")
 
 
 def dg_global_options(

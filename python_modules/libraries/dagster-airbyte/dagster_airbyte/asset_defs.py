@@ -20,7 +20,7 @@ from dagster import (
     SourceAsset,
     _check as check,
 )
-from dagster._annotations import experimental
+from dagster._annotations import beta
 from dagster._core.definitions import AssetsDefinition, multi_asset
 from dagster._core.definitions.cacheable_assets import (
     AssetsDefinitionCacheableData,
@@ -472,7 +472,7 @@ class AirbyteConnectionMetadata(
 ):
     """Contains information about an Airbyte connection.
 
-    Attributes:
+    Args:
         name (str): The name of the connection.
         stream_prefix (str): A prefix to add to all stream names.
         has_basic_normalization (bool): Whether or not the connection has basic normalization enabled.
@@ -1030,7 +1030,7 @@ def load_assets_from_airbyte_instance(
 # -----------------------
 
 
-@experimental
+@beta
 def build_airbyte_assets_definitions(
     *,
     workspace: AirbyteCloudWorkspace,

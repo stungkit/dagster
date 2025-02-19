@@ -34,7 +34,7 @@ from dagster import (
 from dagster._core.definitions.tags import build_kind_tag, has_kind
 from dagster._core.definitions.utils import DEFAULT_IO_MANAGER_KEY
 from dagster._core.execution.context.compute import AssetExecutionContext
-from dagster._core.types.dagster_type import DagsterType
+from dagster._core.types.dagster_type import DagsterType, Nothing
 from dagster_dbt.asset_decorator import dbt_assets
 from dagster_dbt.asset_specs import build_dbt_asset_specs
 from dagster_dbt.asset_utils import DUPLICATE_ASSET_KEY_ERROR_MESSAGE
@@ -290,6 +290,7 @@ def test_io_manager_key(
     for output_def in my_dbt_assets.node_def.output_defs:
         if output_def.name in my_dbt_assets.keys_by_output_name:
             assert output_def.io_manager_key == expected_io_manager_key
+            assert output_def.dagster_type == Nothing
         else:  # asset checks don't use io managers
             assert output_def.name in my_dbt_assets.check_specs_by_output_name
             assert output_def.io_manager_key == DEFAULT_IO_MANAGER_KEY
@@ -444,6 +445,15 @@ def test_op_tags(test_jaffle_shop_manifest: dict[str, Any]):
             op_tags={"dagster_dbt/exclude": "raw_customers+"},
         )
         def exclude_tag(): ...
+
+
+def test_pool(test_jaffle_shop_manifest: dict[str, Any]) -> None:
+    pool = "custom_pool"
+
+    @dbt_assets(manifest=test_jaffle_shop_manifest, pool=pool)
+    def my_dbt_assets(): ...
+
+    assert my_dbt_assets.op.pool == pool
 
 
 def test_with_asset_key_replacements(test_jaffle_shop_manifest: dict[str, Any]) -> None:

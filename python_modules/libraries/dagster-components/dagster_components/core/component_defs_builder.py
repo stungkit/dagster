@@ -8,7 +8,7 @@ from dagster_components.core.component import (
     Component,
     ComponentLoadContext,
     ComponentTypeRegistry,
-    TemplatedValueResolver,
+    ResolutionContext,
 )
 from dagster_components.core.component_decl_builder import (
     ComponentDeclNode,
@@ -16,7 +16,6 @@ from dagster_components.core.component_decl_builder import (
     YamlComponentDecl,
     path_to_decl_node,
 )
-from dagster_components.core.deployment import CodeLocationProjectContext
 
 if TYPE_CHECKING:
     from dagster._core.definitions.definitions_class import Definitions
@@ -43,6 +42,7 @@ def build_components_from_component_folder(
 
 
 def build_defs_from_component_path(
+    components_root: Path,
     path: Path,
     registry: ComponentTypeRegistry,
     resources: Mapping[str, object],
@@ -53,10 +53,11 @@ def build_defs_from_component_path(
         raise Exception(f"No component found at path {path}")
 
     context = ComponentLoadContext(
+        module_name=".".join(components_root.parts[-2:]),
         resources=resources,
         registry=registry,
         decl_node=decl_node,
-        templated_value_resolver=TemplatedValueResolver.default(),
+        resolution_context=ResolutionContext.default(),
     )
     components = decl_node.load(context)
     return defs_from_components(resources=resources, context=context, components=components)
@@ -85,31 +86,26 @@ def defs_from_components(
 # Public method so optional Nones are fine
 @suppress_dagster_warnings
 def build_component_defs(
-    code_location_root: Path,
+    components_root: Path,
     resources: Optional[Mapping[str, object]] = None,
     registry: Optional["ComponentTypeRegistry"] = None,
-    components_path: Optional[Path] = None,
 ) -> "Definitions":
     """Build a Definitions object for all the component instances in a given code location.
 
     Args:
-        code_location_root (Path): The path to the code location root.
-            The path must be a code location directory that has a pyproject.toml with a [dagster] section.
+        components_root (Path): The path to the components root. This is a directory containing
+            subdirectories with component instances.
     """
     from dagster._core.definitions.definitions_class import Definitions
 
-    context = CodeLocationProjectContext.from_code_location_path(
-        code_location_root,
-        registry or ComponentTypeRegistry.from_entry_point_discovery(),
-        components_path=components_path,
-    )
+    registry = registry or ComponentTypeRegistry.from_entry_point_discovery()
 
     all_defs: list[Definitions] = []
-    for component in context.component_instances:
-        component_path = Path(context.get_component_instance_path(component))
+    for component_path in components_root.iterdir():
         defs = build_defs_from_component_path(
+            components_root=components_root,
             path=component_path,
-            registry=context.component_registry,
+            registry=registry,
             resources=resources or {},
         )
         all_defs.append(defs)

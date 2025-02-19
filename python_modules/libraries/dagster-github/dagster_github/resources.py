@@ -5,7 +5,7 @@ from typing import Any, Optional
 import jwt
 import requests
 from dagster import ConfigurableResource, resource
-from dagster._annotations import public
+from dagster._annotations import deprecated, public
 from dagster._core.definitions.resource_definition import dagster_maintained_resource
 from pydantic import Field
 
@@ -101,13 +101,21 @@ def to_seconds(dt: datetime) -> float:
     return (dt - datetime(1970, 1, 1)).total_seconds()
 
 
+@deprecated(
+    breaking_version="0.27",
+    additional_warn_text=(
+        "`GithubClient` is deprecated. Use your own resource and client instead. "
+        "Learn how to create your own resource here: "
+        "https://docs.dagster.io/guides/build/external-resources/defining-resources"
+    ),
+)
 class GithubClient:
     """A client for interacting with the GitHub API.
 
     This client handles authentication and provides methods for making requests
     to the GitHub API using an authenticated session.
 
-    Attributes:
+    Args:
         client (requests.Session): The HTTP session used for making requests.
         app_id (int): The GitHub App ID.
         app_private_rsa_key (str): The private RSA key for the GitHub App.
@@ -438,13 +446,21 @@ class GithubClient:
         return pull_request
 
 
+@deprecated(
+    breaking_version="0.27",
+    additional_warn_text=(
+        "`GithubResource` is deprecated. Use your own resource instead. "
+        "Learn how to create your own resource here: "
+        "https://docs.dagster.io/guides/build/external-resources/defining-resources"
+    ),
+)
 class GithubResource(ConfigurableResource):
     """A resource configuration class for GitHub integration.
 
     This class provides configuration fields for setting up a GitHub Application,
     including the application ID, private RSA key, installation ID, and hostname.
 
-    Attributes:
+    Args:
         github_app_id (int): The GitHub Application ID. For more information, see
             https://developer.github.com/apps/.
         github_app_private_rsa_key (str): The private RSA key text for the GitHub Application.
@@ -504,6 +520,14 @@ class GithubResource(ConfigurableResource):
         )
 
 
+@deprecated(
+    breaking_version="0.27",
+    additional_warn_text=(
+        "`github_resource` is deprecated. Use your own resource instead. "
+        "Learn how to create your own resource here: "
+        "https://docs.dagster.io/guides/build/external-resources/defining-resources"
+    ),
+)
 @dagster_maintained_resource
 @resource(
     config_schema=GithubResource.to_config_schema(),

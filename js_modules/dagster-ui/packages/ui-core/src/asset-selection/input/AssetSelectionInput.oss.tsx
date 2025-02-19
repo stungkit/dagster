@@ -1,37 +1,29 @@
-import {Icons} from '@dagster-io/ui-components';
-import {Linter} from 'codemirror/addon/lint/lint';
-import {useMemo} from 'react';
-import {
-  AssetSelectionLexer,
-  AssetSelectionParser,
-} from 'shared/asset-selection/AssetSelectionAntlr.oss';
-import {createUseAssetSelectionAutoComplete as defaultCreateUseAssetSelectionAutoComplete} from 'shared/asset-selection/input/useAssetSelectionAutoComplete.oss';
-import styled from 'styled-components';
+import type {Linter} from 'codemirror/addon/lint/lint';
+import {useAssetSelectionAutoCompleteProvider as defaultUseAssetSelectionAutoCompleteProvider} from 'shared/asset-selection/input/useAssetSelectionAutoCompleteProvider.oss';
 
+import {assetSelectionSyntaxSupportedAttributes, unsupportedAttributeMessages} from './util';
 import {AssetGraphQueryItem} from '../../asset-graph/useAssetGraphData';
-import {SelectionAutoCompleteInput, iconStyle} from '../../selection/SelectionInput';
+import {SelectionAutoCompleteProvider} from '../../selection/SelectionAutoCompleteProvider';
+import {SelectionAutoCompleteInput} from '../../selection/SelectionInput';
 import {createSelectionLinter} from '../../selection/createSelectionLinter';
-import {placeholderTextForItems} from '../../ui/GraphQueryInput';
+import {AssetSelectionLexer} from '../generated/AssetSelectionLexer';
+import {AssetSelectionParser} from '../generated/AssetSelectionParser';
 
-import 'codemirror/addon/edit/closebrackets';
-import 'codemirror/lib/codemirror.css';
-import 'codemirror/addon/hint/show-hint';
-import 'codemirror/addon/hint/show-hint.css';
-
-import 'codemirror/addon/lint/lint.css';
-import 'codemirror/addon/display/placeholder';
-
-interface AssetSelectionInputProps {
+export interface AssetSelectionInputProps {
   assets: AssetGraphQueryItem[];
   value: string;
   onChange: (value: string) => void;
   linter?: Linter<any>;
-  createUseAssetSelectionAutoComplete?: typeof defaultCreateUseAssetSelectionAutoComplete;
+  useAssetSelectionAutoComplete?: (
+    assets: AssetGraphQueryItem[],
+  ) => Pick<SelectionAutoCompleteProvider, 'useAutoComplete'>;
 }
 
 const defaultLinter = createSelectionLinter({
   Lexer: AssetSelectionLexer,
   Parser: AssetSelectionParser,
+  supportedAttributes: assetSelectionSyntaxSupportedAttributes,
+  unsupportedAttributeMessages,
 });
 
 export const AssetSelectionInput = ({
@@ -39,45 +31,18 @@ export const AssetSelectionInput = ({
   onChange,
   assets,
   linter = defaultLinter,
-  createUseAssetSelectionAutoComplete = defaultCreateUseAssetSelectionAutoComplete,
+  useAssetSelectionAutoComplete = defaultUseAssetSelectionAutoCompleteProvider,
 }: AssetSelectionInputProps) => {
-  const useAssetSelectionAutoComplete = useMemo(
-    () => createUseAssetSelectionAutoComplete(assets),
-    [assets, createUseAssetSelectionAutoComplete],
-  );
+  const {useAutoComplete} = useAssetSelectionAutoComplete(assets);
 
   return (
-    <WrapperDiv>
-      <SelectionAutoCompleteInput
-        id="asset-selection-input"
-        useAutoComplete={useAssetSelectionAutoComplete}
-        placeholder={placeholderTextForItems('Type an asset subset…', assets)}
-        linter={linter}
-        value={value}
-        onChange={onChange}
-      />
-    </WrapperDiv>
+    <SelectionAutoCompleteInput
+      id="asset-selection-input"
+      useAutoComplete={useAutoComplete}
+      placeholder="Search and filter assets"
+      linter={linter}
+      value={value}
+      onChange={onChange}
+    />
   );
 };
-
-export const WrapperDiv = styled.div`
-  .attribute-owner {
-    ${iconStyle(Icons.owner.src)};
-  }
-  .attribute-tag {
-    ${iconStyle(Icons.tag.src)};
-  }
-  .attribute-key_substring,
-  .attribute-key {
-    ${iconStyle(Icons.asset.src)};
-  }
-  .attribute-group {
-    ${iconStyle(Icons.asset_group.src)};
-  }
-  .attribute-code_location {
-    ${iconStyle(Icons.code_location.src)};
-  }
-  .attribute-kind {
-    ${iconStyle(Icons.compute_kind.src)};
-  }
-`;

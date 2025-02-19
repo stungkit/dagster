@@ -20,7 +20,7 @@ from dagster import (
     _check as check,
     get_dagster_logger,
 )
-from dagster._annotations import deprecated, experimental
+from dagster._annotations import beta, deprecated
 from dagster._core.definitions.definitions_load_context import StateBackedDefinitionsLoader
 from dagster._record import record
 from dagster._utils.cached_method import cached_method
@@ -44,7 +44,7 @@ DEFAULT_POLL_TIMEOUT = 600
 TABLEAU_RECONSTRUCTION_METADATA_KEY_PREFIX = "dagster-tableau/reconstruction_metadata"
 
 
-@experimental
+@beta
 class BaseTableauClient:
     def __init__(
         self,
@@ -277,12 +277,44 @@ class BaseTableauClient:
                   updatedAt
                   path
                   parentEmbeddedDatasources {
+                    id
+                    name
+                    hasExtracts
+                    upstreamTables {
+                        id
+                        name
+                        connectionType
+                        schema
+                        isEmbedded
+                        tableType
+                        fullName
+                        projectName
+                        database {
+                            id
+                            name
+                            projectName
+                        }
+                    }   
                     parentPublishedDatasources {
-                      luid
-                      name
+                        luid
+                        name
+                        id
+                        name
+                        hasExtracts
+                        upstreamTables {
+                            name
+                            fullName
+                            connectionType
+                            schema
+                            database {
+                                id
+                                name
+                                projectName
+                            }
+                        }
                     }
-                  }
                 }
+            }
                 dashboards {
                   luid
                   name
@@ -298,7 +330,7 @@ class BaseTableauClient:
         """
 
 
-@experimental
+@beta
 class TableauCloudClient(BaseTableauClient):
     """Represents a client for Tableau Cloud and provides utilities
     to interact with the Tableau API.
@@ -328,7 +360,7 @@ class TableauCloudClient(BaseTableauClient):
         return f"https://{self.pod_name}.online.tableau.com"
 
 
-@experimental
+@beta
 class TableauServerClient(BaseTableauClient):
     """Represents a client for Tableau Server and provides utilities
     to interact with Tableau APIs.
@@ -358,7 +390,7 @@ class TableauServerClient(BaseTableauClient):
         return f"https://{self.server_name}"
 
 
-@experimental
+@beta
 class BaseTableauWorkspace(ConfigurableResource):
     """Base class to represent a workspace in Tableau and provides utilities
     to interact with Tableau APIs.
@@ -436,13 +468,18 @@ class BaseTableauWorkspace(ConfigurableResource):
                                 properties=augmented_sheet_data,
                             )
                         )
-
+                    """
+                    Lineage formation depends on the availability of published data sources.
+                    If published data sources are available (i.e., parentPublishedDatasources exists and is not empty), it means you can form the lineage by using the luid of those published sources.
+                    If the published data sources are missing, you create assets for embedded data sources by using their id.
+                    """
                     for embedded_data_source_data in sheet_data.get(
                         "parentEmbeddedDatasources", []
                     ):
-                        for published_data_source_data in embedded_data_source_data.get(
+                        published_data_source_list = embedded_data_source_data.get(
                             "parentPublishedDatasources", []
-                        ):
+                        )
+                        for published_data_source_data in published_data_source_list:
                             data_source_id = published_data_source_data["luid"]
                             if data_source_id and data_source_id not in data_source_ids:
                                 data_source_ids.add(data_source_id)
@@ -450,6 +487,19 @@ class BaseTableauWorkspace(ConfigurableResource):
                                     TableauContentData(
                                         content_type=TableauContentType.DATA_SOURCE,
                                         properties=published_data_source_data,
+                                    )
+                                )
+                        if not published_data_source_list:
+                            """While creating TableauWorkspaceData luid is mandatory for all TableauContentData
+                            and in case of embedded_data_source its missing hence we are using its id as luid"""
+                            data_source_id = embedded_data_source_data["id"]
+                            if data_source_id and data_source_id not in data_source_ids:
+                                data_source_ids.add(data_source_id)
+                                embedded_data_source_data["luid"] = data_source_id
+                                data_sources.append(
+                                    TableauContentData(
+                                        content_type=TableauContentType.DATA_SOURCE,
+                                        properties=embedded_data_source_data,
                                     )
                                 )
 
@@ -532,7 +582,7 @@ class BaseTableauWorkspace(ConfigurableResource):
         )
 
 
-@experimental
+@beta
 def load_tableau_asset_specs(
     workspace: BaseTableauWorkspace,
     dagster_tableau_translator: Optional[
@@ -572,7 +622,7 @@ def load_tableau_asset_specs(
         )
 
 
-@experimental
+@beta
 class TableauCloudWorkspace(BaseTableauWorkspace):
     """Represents a workspace in Tableau Cloud and provides utilities
     to interact with Tableau APIs.
@@ -591,7 +641,7 @@ class TableauCloudWorkspace(BaseTableauWorkspace):
         )
 
 
-@experimental
+@beta
 class TableauServerWorkspace(BaseTableauWorkspace):
     """Represents a workspace in Tableau Server and provides utilities
     to interact with Tableau APIs.

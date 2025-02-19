@@ -30,7 +30,7 @@ import yaml
 from typing_extensions import Protocol, Self, TypeAlias, TypeVar, runtime_checkable
 
 import dagster._check as check
-from dagster._annotations import deprecated, experimental, public
+from dagster._annotations import deprecated, public
 from dagster._core.definitions.asset_check_evaluation import (
     AssetCheckEvaluation,
     AssetCheckEvaluationPlanned,
@@ -49,6 +49,7 @@ from dagster._core.execution.retries import auto_reexecution_should_retry_run
 from dagster._core.instance.config import (
     DAGSTER_CONFIG_YAML_FILENAME,
     DEFAULT_LOCAL_CODE_SERVER_STARTUP_TIMEOUT,
+    ConcurrencyConfig,
     get_default_tick_retention_settings,
     get_tick_retention_settings,
 )
@@ -84,7 +85,7 @@ from dagster._time import get_current_datetime, get_current_timestamp
 from dagster._utils import PrintFn, is_uuid, traced
 from dagster._utils.error import serializable_error_info_from_exc_info
 from dagster._utils.merger import merge_dicts
-from dagster._utils.warnings import disable_dagster_warnings, experimental_warning
+from dagster._utils.warnings import beta_warning, disable_dagster_warnings
 
 # 'airflow_execution_date' and 'is_airflow_ingest_pipeline' are hardcoded tags used in the
 # airflow ingestion logic (see: dagster_pipeline_factory.py). 'airflow_execution_date' stores the
@@ -143,7 +144,6 @@ if TYPE_CHECKING:
     )
     from dagster._core.remote_representation.external import RemoteSchedule
     from dagster._core.run_coordinator import RunCoordinator
-    from dagster._core.run_coordinator.queued_run_coordinator import RunQueueConfig
     from dagster._core.scheduler import Scheduler, SchedulerDebugInfo
     from dagster._core.scheduler.instigation import (
         InstigatorState,
@@ -783,15 +783,17 @@ class DagsterInstance(DynamicPartitionsStore):
             self._run_coordinator.register_instance(self)
         return self._run_coordinator
 
-    def get_run_queue_config(self) -> Optional["RunQueueConfig"]:
+    def get_concurrency_config(self) -> ConcurrencyConfig:
         from dagster._core.run_coordinator.queued_run_coordinator import QueuedRunCoordinator
 
-        if not isinstance(self.run_coordinator, QueuedRunCoordinator):
-            return None
+        if isinstance(self.run_coordinator, QueuedRunCoordinator):
+            run_coordinator_run_queue_config = self.run_coordinator.get_run_queue_config()
+        else:
+            run_coordinator_run_queue_config = None
 
-        run_coordinator_run_queue_config = self.run_coordinator.get_run_queue_config()
-        return run_coordinator_run_queue_config.with_concurrency_settings(
-            self.get_settings("concurrency")
+        concurrency_settings = self.get_settings("concurrency")
+        return ConcurrencyConfig.from_concurrency_settings(
+            concurrency_settings, run_coordinator_run_queue_config
         )
 
     @property
@@ -969,12 +971,7 @@ class DagsterInstance(DynamicPartitionsStore):
 
     @property
     def global_op_concurrency_default_limit(self) -> Optional[int]:
-        default_limit = self.get_settings("concurrency").get("pools", {}).get("default_limit")
-        if default_limit is not None:
-            return default_limit
-
-        # fallback to the old settings
-        return self.get_settings("concurrency").get("default_op_concurrency_limit")
+        return self.get_concurrency_config().pool_config.default_pool_limit
 
     # python logs
 
@@ -1008,16 +1005,24 @@ class DagsterInstance(DynamicPartitionsStore):
             self._schedule_storage.upgrade()  # type: ignore  # (possible none)
             self._schedule_storage.migrate(print_fn)  # type: ignore  # (possible none)
 
-    def optimize_for_webserver(self, statement_timeout: int, pool_recycle: int) -> None:
+    def optimize_for_webserver(
+        self, statement_timeout: int, pool_recycle: int, max_overflow: int
+    ) -> None:
         if self._schedule_storage:
             self._schedule_storage.optimize_for_webserver(
-                statement_timeout=statement_timeout, pool_recycle=pool_recycle
+                statement_timeout=statement_timeout,
+                pool_recycle=pool_recycle,
+                max_overflow=max_overflow,
             )
         self._run_storage.optimize_for_webserver(
-            statement_timeout=statement_timeout, pool_recycle=pool_recycle
+            statement_timeout=statement_timeout,
+            pool_recycle=pool_recycle,
+            max_overflow=max_overflow,
         )
         self._event_storage.optimize_for_webserver(
-            statement_timeout=statement_timeout, pool_recycle=pool_recycle
+            statement_timeout=statement_timeout,
+            pool_recycle=pool_recycle,
+            max_overflow=max_overflow,
         )
 
     def reindex(self, print_fn: PrintFn = lambda _: None) -> None:
@@ -1318,9 +1323,7 @@ class DagsterInstance(DynamicPartitionsStore):
                 )
 
             if not self._run_storage.has_job_snapshot(parent_snapshot_id):
-                self._run_storage.add_job_snapshot(
-                    check.not_none(parent_job_snapshot), parent_snapshot_id
-                )
+                self._run_storage.add_job_snapshot(check.not_none(parent_job_snapshot))
 
         job_snapshot_id = job_snapshot.snapshot_id
         if not self._run_storage.has_job_snapshot(job_snapshot_id):
@@ -1807,9 +1810,8 @@ class DagsterInstance(DynamicPartitionsStore):
     def add_snapshot(
         self,
         snapshot: Union["JobSnap", "ExecutionPlanSnapshot"],
-        snapshot_id: Optional[str] = None,
     ) -> None:
-        return self._run_storage.add_snapshot(snapshot, snapshot_id)
+        return self._run_storage.add_snapshot(snapshot)
 
     @traced
     def handle_run_event(self, run_id: str, event: "DagsterEvent") -> None:
@@ -2394,7 +2396,7 @@ class DagsterInstance(DynamicPartitionsStore):
             logging_config = self.get_settings("python_logs").get("dagster_handler_config", {})
 
             if logging_config:
-                experimental_warning("Handling yaml-defined logging configuration")
+                beta_warning("Handling yaml-defined logging configuration")
 
             # Handlers can only be retrieved from dictConfig configuration if they are attached
             # to a logger. We add a dummy logger to the configuration that allows us to access user
@@ -3172,7 +3174,7 @@ class DagsterInstance(DynamicPartitionsStore):
 
     @property
     def should_start_background_run_thread(self) -> bool:
-        """Gate on an experimental feature to start a thread that monitors for if the run should be canceled."""
+        """Gate on a feature to start a thread that monitors for if the run should be canceled."""
         return False
 
     def get_tick_retention_settings(
@@ -3193,6 +3195,9 @@ class DagsterInstance(DynamicPartitionsStore):
 
         default_tick_settings = get_default_tick_retention_settings(instigator_type)
         return get_tick_retention_settings(tick_settings, default_tick_settings)
+
+    def get_tick_termination_check_interval(self) -> Optional[int]:
+        return None
 
     def inject_env_vars(self, location_name: Optional[str]) -> None:
         if not self._secrets_loader:
@@ -3270,7 +3275,6 @@ class DagsterInstance(DynamicPartitionsStore):
 
         return result
 
-    @experimental
     @public
     def report_runless_asset_event(
         self,

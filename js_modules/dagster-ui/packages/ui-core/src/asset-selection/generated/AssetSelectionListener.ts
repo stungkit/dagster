@@ -7,7 +7,10 @@ import {
   AndExpressionContext,
   AttributeExprContext,
   AttributeExpressionContext,
+  ChangedInBranchAttributeExprContext,
   CodeLocationAttributeExprContext,
+  ColumnAttributeExprContext,
+  ColumnTagAttributeExprContext,
   DownTraversalContext,
   DownTraversalExpressionContext,
   ExprContext,
@@ -15,13 +18,14 @@ import {
   FunctionNameContext,
   GroupAttributeExprContext,
   KeyExprContext,
-  KeySubstringExprContext,
+  KeyValueContext,
   KindAttributeExprContext,
   NotExpressionContext,
   OrExpressionContext,
   OwnerAttributeExprContext,
   ParenthesizedExpressionContext,
   StartContext,
+  TableNameAttributeExprContext,
   TagAttributeExprContext,
   TraversalAllowedExprContext,
   TraversalAllowedExpressionContext,
@@ -154,19 +158,6 @@ export interface AssetSelectionListener extends ParseTreeListener {
   exitKeyExpr?: (ctx: KeyExprContext) => void;
 
   /**
-   * Enter a parse tree produced by the `KeySubstringExpr`
-   * labeled alternative in `AssetSelectionParser.attributeExpr`.
-   * @param ctx the parse tree
-   */
-  enterKeySubstringExpr?: (ctx: KeySubstringExprContext) => void;
-  /**
-   * Exit a parse tree produced by the `KeySubstringExpr`
-   * labeled alternative in `AssetSelectionParser.attributeExpr`.
-   * @param ctx the parse tree
-   */
-  exitKeySubstringExpr?: (ctx: KeySubstringExprContext) => void;
-
-  /**
    * Enter a parse tree produced by the `TagAttributeExpr`
    * labeled alternative in `AssetSelectionParser.attributeExpr`.
    * @param ctx the parse tree
@@ -219,6 +210,45 @@ export interface AssetSelectionListener extends ParseTreeListener {
   exitKindAttributeExpr?: (ctx: KindAttributeExprContext) => void;
 
   /**
+   * Enter a parse tree produced by the `ColumnAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   */
+  enterColumnAttributeExpr?: (ctx: ColumnAttributeExprContext) => void;
+  /**
+   * Exit a parse tree produced by the `ColumnAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   */
+  exitColumnAttributeExpr?: (ctx: ColumnAttributeExprContext) => void;
+
+  /**
+   * Enter a parse tree produced by the `TableNameAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   */
+  enterTableNameAttributeExpr?: (ctx: TableNameAttributeExprContext) => void;
+  /**
+   * Exit a parse tree produced by the `TableNameAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   */
+  exitTableNameAttributeExpr?: (ctx: TableNameAttributeExprContext) => void;
+
+  /**
+   * Enter a parse tree produced by the `ColumnTagAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   */
+  enterColumnTagAttributeExpr?: (ctx: ColumnTagAttributeExprContext) => void;
+  /**
+   * Exit a parse tree produced by the `ColumnTagAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   */
+  exitColumnTagAttributeExpr?: (ctx: ColumnTagAttributeExprContext) => void;
+
+  /**
    * Enter a parse tree produced by the `CodeLocationAttributeExpr`
    * labeled alternative in `AssetSelectionParser.attributeExpr`.
    * @param ctx the parse tree
@@ -230,6 +260,19 @@ export interface AssetSelectionListener extends ParseTreeListener {
    * @param ctx the parse tree
    */
   exitCodeLocationAttributeExpr?: (ctx: CodeLocationAttributeExprContext) => void;
+
+  /**
+   * Enter a parse tree produced by the `ChangedInBranchAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   */
+  enterChangedInBranchAttributeExpr?: (ctx: ChangedInBranchAttributeExprContext) => void;
+  /**
+   * Exit a parse tree produced by the `ChangedInBranchAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   */
+  exitChangedInBranchAttributeExpr?: (ctx: ChangedInBranchAttributeExprContext) => void;
 
   /**
    * Enter a parse tree produced by the `AttributeExpression`
@@ -357,4 +400,15 @@ export interface AssetSelectionListener extends ParseTreeListener {
    * @param ctx the parse tree
    */
   exitValue?: (ctx: ValueContext) => void;
+
+  /**
+   * Enter a parse tree produced by `AssetSelectionParser.keyValue`.
+   * @param ctx the parse tree
+   */
+  enterKeyValue?: (ctx: KeyValueContext) => void;
+  /**
+   * Exit a parse tree produced by `AssetSelectionParser.keyValue`.
+   * @param ctx the parse tree
+   */
+  exitKeyValue?: (ctx: KeyValueContext) => void;
 }

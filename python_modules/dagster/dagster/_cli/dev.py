@@ -4,47 +4,32 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from collections.abc import Iterator, Sequence
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Optional
 
 import click
 import yaml
 
-from dagster import _check as check
 from dagster._annotations import deprecated
-from dagster._cli.job import apply_click_params
-from dagster._cli.utils import get_possibly_temporary_instance_for_cli
-from dagster._cli.workspace.cli_target import (
-    ClickArgValue,
-    get_workspace_load_target,
-    grpc_server_target_click_options,
-    python_file_option,
-    python_module_option,
-    working_directory_option,
-    workspace_option,
-)
+from dagster._cli.utils import assert_no_remaining_opts, get_possibly_temporary_instance_for_cli
+from dagster._cli.workspace.cli_target import WorkspaceOpts, workspace_options
 from dagster._core.instance import DagsterInstance
 from dagster._core.workspace.context import WorkspaceProcessContext
 from dagster._grpc.server import GrpcServerCommand
 from dagster._serdes import serialize_value
-from dagster._serdes.ipc import interrupt_ipc_subprocess, open_ipc_subprocess
+from dagster._serdes.ipc import (
+    get_ipc_shutdown_pipe,
+    interrupt_on_ipc_shutdown_message,
+    open_ipc_subprocess,
+    send_ipc_shutdown_message,
+)
+from dagster._utils.interrupts import setup_interrupt_handlers
 from dagster._utils.log import configure_loggers
 
 _SUBPROCESS_WAIT_TIMEOUT = 60
 _CHECK_SUBPROCESS_INTERVAL = 5
-
-
-def dev_command_options(f):
-    return apply_click_params(
-        f,
-        workspace_option(),
-        python_file_option(allow_multiple=True),
-        python_module_option(allow_multiple=True),
-        working_directory_option(),
-        *grpc_server_target_click_options(hidden=True),
-    )
 
 
 @click.command(
@@ -58,7 +43,6 @@ def dev_command_options(f):
         help_option_names=["--help"],  # Don't show '-h' since that's the webserver host
     ),
 )
-@dev_command_options
 @click.option(
     "--code-server-log-level",
     help="Set the log level for code servers spun up by dagster services.",
@@ -106,9 +90,16 @@ def dev_command_options(f):
     "--use-legacy-code-server-behavior",
     help="Use the legacy behavior of the daemon and webserver each starting up their own code server",
     is_flag=True,
-    required=False,
     default=False,
 )
+@click.option(
+    "--shutdown-pipe",
+    type=click.INT,
+    required=False,
+    hidden=True,
+    help="Internal use only. Pass a readable pipe file descriptor to the dev process that will be monitored for a shutdown signal.",
+)
+@workspace_options
 @deprecated(
     breaking_version="2.0", subject="--dagit-port and --dagit-host args", emit_runtime_warning=False
 )
@@ -120,8 +111,12 @@ def dev_command(
     host: Optional[str],
     live_data_poll_rate: Optional[str],
     use_legacy_code_server_behavior: bool,
-    **kwargs: ClickArgValue,
+    shutdown_pipe: Optional[int],
+    **other_opts: object,
 ) -> None:
+    workspace_opts = WorkspaceOpts.extract_from_cli_options(other_opts)
+    assert_no_remaining_opts(other_opts)
+
     # check if dagster-webserver installed, crash if not
     try:
         import dagster_webserver  #  # noqa: F401
@@ -151,12 +146,21 @@ def dev_command(
                 " unless it is placed in the same folder as DAGSTER_HOME."
             )
 
-    with get_possibly_temporary_instance_for_cli("dagster dev", logger=logger) as instance:
+    # Set up windows interrupt signals to raise KeyboardInterrupt. Note that these handlers are
+    # not used if we are using the shutdown pipe.
+    setup_interrupt_handlers()
+
+    with ExitStack() as stack:
+        if shutdown_pipe:
+            stack.enter_context(interrupt_on_ipc_shutdown_message(shutdown_pipe))
+        instance = stack.enter_context(
+            get_possibly_temporary_instance_for_cli("dagster dev", logger=logger)
+        )
+
         with _optionally_create_temp_workspace(
             use_legacy_code_server_behavior=use_legacy_code_server_behavior,
-            orig_kwargs=kwargs,
+            workspace_opts=workspace_opts,
             instance=instance,
-            code_server_log_level=code_server_log_level,
         ) as workspace_args:
             logger.info("Launching Dagster services...")
 
@@ -168,9 +172,7 @@ def dev_command(
                 *workspace_args,
             ]
 
-            if kwargs.get("use_ssl"):
-                args.extend(["--use-ssl"])
-
+            webserver_read_fd, webserver_write_fd = get_ipc_shutdown_pipe()
             webserver_process = open_ipc_subprocess(
                 [sys.executable, "-m", "dagster_webserver"]
                 + (["--port", port] if port else [])
@@ -178,8 +180,12 @@ def dev_command(
                 + (["--dagster-log-level", log_level])
                 + (["--log-format", log_format])
                 + (["--live-data-poll-rate", live_data_poll_rate] if live_data_poll_rate else [])
-                + args
+                + ["--shutdown-pipe", str(webserver_read_fd)]
+                + args,
+                pass_fds=[webserver_read_fd],
             )
+
+            daemon_read_fd, daemon_write_fd = get_ipc_shutdown_pipe()
             daemon_process = open_ipc_subprocess(
                 [
                     sys.executable,
@@ -190,8 +196,11 @@ def dev_command(
                     log_level,
                     "--log-format",
                     log_format,
+                    "--shutdown-pipe",
+                    str(daemon_read_fd),
                 ]
-                + args
+                + args,
+                pass_fds=[daemon_read_fd],
             )
             try:
                 while True:
@@ -215,8 +224,8 @@ def dev_command(
                 logger.exception("An unexpected exception has occurred")
             finally:
                 logger.info("Shutting down Dagster services...")
-                interrupt_ipc_subprocess(daemon_process)
-                interrupt_ipc_subprocess(webserver_process)
+                send_ipc_shutdown_message(webserver_write_fd)
+                send_ipc_shutdown_message(daemon_write_fd)
 
                 try:
                     webserver_process.wait(timeout=_SUBPROCESS_WAIT_TIMEOUT)
@@ -238,62 +247,70 @@ def dev_command(
 
 
 @contextmanager
-def _temp_grpc_socket_workspace_file(context: WorkspaceProcessContext) -> Iterator[str]:
-    with tempfile.NamedTemporaryFile(mode="w+") as temp_file:
-        temp_file.write(yaml.dump({"load_from": context.get_code_server_specs()}))
-        temp_file.flush()
-        yield temp_file.name
+def _temp_grpc_socket_workspace_file(context: WorkspaceProcessContext) -> Iterator[Path]:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        workspace_file = Path(temp_dir) / "workspace.yaml"
+        workspace_file.write_text(yaml.dump({"load_from": context.get_code_server_specs()}))
+        yield workspace_file
 
 
 @contextmanager
 def _optionally_create_temp_workspace(
     *,
     use_legacy_code_server_behavior: bool,
-    orig_kwargs: Mapping[str, ClickArgValue],
+    workspace_opts: WorkspaceOpts,
     instance: DagsterInstance,
-    code_server_log_level: str,
 ) -> Iterator[Sequence[str]]:
     """If not in legacy mode, spin up grpc servers and write a workspace file pointing at them.
     If in legacy mode, do nothing and return the target args.
     """
     if not use_legacy_code_server_behavior:
-        workspace_target = get_workspace_load_target(orig_kwargs)
         with WorkspaceProcessContext(
-            instance,
-            workspace_target,
+            instance=instance,
+            workspace_load_target=workspace_opts.to_load_target(),
             server_command=GrpcServerCommand.CODE_SERVER_START,
         ) as context:
             with _temp_grpc_socket_workspace_file(context) as workspace_file:
-                yield ["--workspace", workspace_file]
+                yield ["--workspace", str(workspace_file)]
     else:
         # sanity check workspace args
-        get_workspace_load_target(orig_kwargs)
-        yield _find_targets_in_kwargs(orig_kwargs)
+        workspace_opts.to_load_target()
+        yield _workspace_opts_to_serialized_cli_args(workspace_opts)
 
 
-def _find_targets_in_kwargs(kwargs: Mapping[str, ClickArgValue]) -> Sequence[str]:
+def _workspace_opts_to_serialized_cli_args(workspace_opts: WorkspaceOpts) -> Sequence[str]:
     args = []
-    if kwargs.get("workspace"):
-        for workspace in check.tuple_elem(kwargs, "workspace"):
+    if workspace_opts.empty_workspace:
+        args.append("--empty-workspace")
+
+    if workspace_opts.workspace:
+        for workspace in workspace_opts.workspace:
             args.extend(("--workspace", workspace))
 
-    if kwargs.get("python_file"):
-        for python_file in check.tuple_elem(kwargs, "python_file"):
+    if workspace_opts.python_file:
+        for python_file in workspace_opts.python_file:
             args.extend(("--python-file", python_file))
 
-    if kwargs.get("module_name"):
-        for module_name in check.tuple_elem(kwargs, "module_name"):
+    if workspace_opts.module_name:
+        for module_name in workspace_opts.module_name:
             args.extend(("--module-name", module_name))
 
-    if kwargs.get("working_directory"):
-        args.extend(("--working-directory", check.str_elem(kwargs, "working_directory")))
+    if workspace_opts.attribute:
+        args.extend(("--attribute", workspace_opts.attribute))
 
-    if kwargs.get("grpc_port"):
-        args.extend(("--grpc-port", str(kwargs["grpc_port"])))
+    if workspace_opts.working_directory:
+        args.extend(("--working-directory", workspace_opts.working_directory))
 
-    if kwargs.get("grpc_host"):
-        args.extend(("--grpc-host", str(kwargs["grpc_host"])))
+    if workspace_opts.grpc_port:
+        args.extend(("--grpc-port", str(workspace_opts.grpc_port)))
 
-    if kwargs.get("grpc_socket"):
-        args.extend(("--grpc-socket", str(kwargs["grpc_socket"])))
+    if workspace_opts.grpc_host:
+        args.extend(("--grpc-host", workspace_opts.grpc_host))
+
+    if workspace_opts.grpc_socket:
+        args.extend(("--grpc-socket", workspace_opts.grpc_socket))
+
+    if workspace_opts.use_ssl:
+        args.append("--use-ssl")
+
     return args

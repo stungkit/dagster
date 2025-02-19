@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 from typing import Optional
@@ -5,10 +6,15 @@ from typing import Optional
 import click
 
 from dagster_dg.cli.global_options import dg_global_options
+from dagster_dg.component import all_components_schema_from_dg_context
 from dagster_dg.config import normalize_cli_config
 from dagster_dg.context import DgContext
 from dagster_dg.scaffold import scaffold_code_location
 from dagster_dg.utils import DgClickCommand, DgClickGroup, exit_with_error
+from dagster_dg.utils.editor import (
+    install_or_update_yaml_schema_extension,
+    recommend_yaml_extension,
+)
 
 
 @click.group(name="code-location", cls=DgClickGroup)
@@ -41,6 +47,13 @@ def code_location_group():
     default=False,
     help="Do not create a virtual environment for the code location.",
 )
+@click.option(
+    "--populate-cache/--no-populate-cache",
+    is_flag=True,
+    default=True,
+    help="Whether to automatically populate the component type cache for the code location.",
+    hidden=True,
+)
 @dg_global_options
 @click.pass_context
 def code_location_scaffold_command(
@@ -48,6 +61,7 @@ def code_location_scaffold_command(
     name: str,
     use_editable_dagster: Optional[str],
     skip_venv: bool,
+    populate_cache: bool,
     **global_options: object,
 ) -> None:
     """Scaffold a Dagster code location file structure and a uv-managed virtual environment scoped
@@ -95,7 +109,11 @@ def code_location_scaffold_command(
         editable_dagster_root = None
 
     scaffold_code_location(
-        code_location_path, dg_context, editable_dagster_root, skip_venv=skip_venv
+        code_location_path,
+        dg_context,
+        editable_dagster_root,
+        skip_venv=skip_venv,
+        populate_cache=populate_cache,
     )
 
 
@@ -110,9 +128,36 @@ def code_location_scaffold_command(
 def code_location_list_command(context: click.Context, **global_options: object) -> None:
     """List code locations in the current deployment."""
     cli_config = normalize_cli_config(global_options, context)
-    dg_context = DgContext.from_config_file_discovery_and_cli_config(Path.cwd(), cli_config)
-    if not dg_context.is_deployment:
-        exit_with_error("This command must be run inside a Dagster deployment directory.")
+    dg_context = DgContext.for_deployment_environment(Path.cwd(), cli_config)
 
     for code_location in dg_context.get_code_location_names():
         click.echo(code_location)
+
+
+_DEFAULT_SCHEMA_FOLDER_NAME = ".vscode"
+
+
+@code_location_group.command(name="configure-editor", cls=DgClickCommand)
+@dg_global_options
+@click.argument("editor", type=click.Choice(["vscode", "cursor"]))
+@click.pass_context
+def configure_editor(
+    context: click.Context,
+    editor: str,
+    **global_options: object,
+) -> None:
+    """Generates and installs a VS Code or Cursor extension which provides JSON schemas for Components types specified by YamlComponentsLoader objects."""
+    executable_name = "code" if editor == "vscode" else "cursor"
+
+    cli_config = normalize_cli_config(global_options, context)
+    dg_context = DgContext.for_code_location_environment(Path.cwd(), cli_config)
+
+    recommend_yaml_extension(executable_name)
+
+    schema_folder = dg_context.root_path / _DEFAULT_SCHEMA_FOLDER_NAME
+    schema_folder.mkdir(exist_ok=True)
+
+    schema_path = schema_folder / "schema.json"
+    schema_path.write_text(json.dumps(all_components_schema_from_dg_context(dg_context), indent=2))
+
+    install_or_update_yaml_schema_extension(executable_name, dg_context.root_path, schema_path)

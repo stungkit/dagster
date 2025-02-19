@@ -1,30 +1,27 @@
-from typing import Optional
+from collections.abc import Sequence
 
 from dagster_components import (
+    AssetSpecSchema,
     Component,
     ComponentLoadContext,
-    ComponentSchemaBaseModel,
-    component_type,
+    ResolvableSchema,
+    registered_component_type,
 )
-from dagster_components.core.schema.objects import AssetAttributesModel, OpSpecBaseModel
 
-from dagster import Definitions
+import dagster as dg
 
 
-# highlight-start
-class ShellScriptSchema(ComponentSchemaBaseModel):
+class ShellScriptSchema(ResolvableSchema):
     script_path: str
-    asset_attributes: AssetAttributesModel
-    op: Optional[OpSpecBaseModel] = None
-    # highlight-end
+    asset_specs: Sequence[AssetSpecSchema]
 
 
-@component_type(name="shell_command")
+@registered_component_type(name="shell_command")
 class ShellCommand(Component):
-    @classmethod
-    def get_schema(cls) -> type[ComponentSchemaBaseModel]:
-        # higlight-start
-        return ShellScriptSchema
-        # highlight-end
+    """Models a shell script as a Dagster asset."""
 
-    def build_defs(self, load_context: ComponentLoadContext) -> Definitions: ...
+    @classmethod
+    def get_schema(cls) -> type[ShellScriptSchema]:
+        return ShellScriptSchema
+
+    def build_defs(self, load_context: ComponentLoadContext) -> dg.Definitions: ...

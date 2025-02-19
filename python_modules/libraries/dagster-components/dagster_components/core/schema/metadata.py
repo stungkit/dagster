@@ -1,22 +1,12 @@
 from collections.abc import Iterator, Mapping, Sequence, Set
-from dataclasses import dataclass
-from typing import Annotated, Any, Callable, Optional, Union, get_args, get_origin
+from typing import Any, Optional, Union
 
 import dagster._check as check
 from pydantic.fields import FieldInfo
 
 REF_BASE = "#/$defs/"
 REF_TEMPLATE = f"{REF_BASE}{{model}}"
-JSON_SCHEMA_EXTRA_DEFER_RENDERING_KEY = "dagster_defer_rendering"
 JSON_SCHEMA_EXTRA_REQUIRED_SCOPE_KEY = "dagster_required_scope"
-
-
-@dataclass
-class ResolutionMetadata:
-    """Internal class that stores arbitrary metadata about a resolved field."""
-
-    output_type: type
-    post_process: Optional[Callable[[Any], Any]] = None
 
 
 class ResolvableFieldInfo(FieldInfo):
@@ -24,41 +14,19 @@ class ResolvableFieldInfo(FieldInfo):
 
     Examples:
     ```python
-    class MyModel(ComponentSchemaBaseModel):
-        renderable_obj: Annotated[str, ResolvableFieldInfo(output_type=SomeObj)]
+    class MyModel(ComponentSchema):
+        resolvable_obj: Annotated[str, ResolvableFieldInfo(required_scope={"some_field"})]
     ```
     """
 
     def __init__(
         self,
         *,
-        output_type: Optional[type] = None,
-        post_process_fn: Optional[Callable[[Any], Any]] = None,
         required_scope: Optional[Set[str]] = None,
     ):
-        self.resolution_metadata = (
-            ResolutionMetadata(output_type=output_type, post_process=post_process_fn)
-            if output_type
-            else None
-        )
         super().__init__(
-            json_schema_extra={
-                JSON_SCHEMA_EXTRA_REQUIRED_SCOPE_KEY: list(required_scope or []),
-                # defer resolution if the output type will change
-                **(
-                    {JSON_SCHEMA_EXTRA_DEFER_RENDERING_KEY: True} if output_type is not None else {}
-                ),
-            },
+            json_schema_extra={JSON_SCHEMA_EXTRA_REQUIRED_SCOPE_KEY: list(required_scope or [])},
         )
-
-
-def get_resolution_metadata(annotation: type) -> ResolutionMetadata:
-    origin = get_origin(annotation)
-    if origin is Annotated:
-        _, f_metadata, *_ = get_args(annotation)
-        if isinstance(f_metadata, ResolvableFieldInfo) and f_metadata.resolution_metadata:
-            return f_metadata.resolution_metadata
-    return ResolutionMetadata(output_type=annotation)
 
 
 def _subschemas_on_path(
@@ -101,27 +69,9 @@ def _subschemas_on_path(
     yield from _subschemas_on_path(rest, json_schema, inner)
 
 
-def _get_should_defer_resolve(subschema: Mapping[str, Any]) -> bool:
-    raw = check.opt_inst(subschema.get(JSON_SCHEMA_EXTRA_DEFER_RENDERING_KEY), bool)
-    return raw or False
-
-
 def _get_additional_required_scope(subschema: Mapping[str, Any]) -> Set[str]:
     raw = check.opt_inst(subschema.get(JSON_SCHEMA_EXTRA_REQUIRED_SCOPE_KEY), list)
     return set(raw) if raw else set()
-
-
-def allow_resolve(
-    valpath: Sequence[Union[str, int]], json_schema: Mapping[str, Any], subschema: Mapping[str, Any]
-) -> bool:
-    """Given a valpath and the json schema of a given target type, determines if this value can be
-    resolved eagerly. This can only happen if the output type of the resolved value is unchanged,
-    and there is no additional scope required for resolution.
-    """
-    for subschema in _subschemas_on_path(valpath, json_schema, subschema):
-        if _get_should_defer_resolve(subschema) or _get_additional_required_scope(subschema):
-            return False
-    return True
 
 
 def get_required_scope(

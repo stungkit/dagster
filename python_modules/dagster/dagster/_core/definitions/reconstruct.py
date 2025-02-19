@@ -20,7 +20,6 @@ from typing_extensions import TypeAlias
 
 import dagster._check as check
 import dagster._seven as seven
-from dagster._annotations import experimental
 from dagster._core.code_pointer import (
     CodePointer,
     CustomPointer,
@@ -397,7 +396,7 @@ def reconstructable(target: Callable[..., "JobDefinition"]) -> ReconstructableJo
                 "``GraphDefinition.to_job``, you must wrap the ``to_job`` call in a function at "
                 "module scope, ie not within any other functions. "
                 "To learn more, check out the docs on ``reconstructable``: "
-                "https://docs.dagster.io/_apidocs/execution#dagster.reconstructable"
+                "https://docs.dagster.io/api/python-api/execution#dagster.reconstructable"
             )
         raise DagsterInvariantViolationError(
             "Reconstructable target should be a function or definition produced "
@@ -444,7 +443,6 @@ def reconstructable(target: Callable[..., "JobDefinition"]) -> ReconstructableJo
     return bootstrap_standalone_recon_job(pointer)
 
 
-@experimental
 def build_reconstructable_job(
     reconstructor_module_name: str,
     reconstructor_function_name: str,

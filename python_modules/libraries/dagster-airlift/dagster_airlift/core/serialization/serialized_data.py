@@ -1,12 +1,12 @@
 from collections.abc import Mapping
 from functools import cached_property
-from typing import AbstractSet, Any, NamedTuple  # noqa: UP035
+from typing import AbstractSet, Any, NamedTuple, Optional  # noqa: UP035
 
 from dagster import (
     AssetKey,
     _check as check,
 )
-from dagster._annotations import PublicAttr
+from dagster._annotations import PublicAttr, beta
 from dagster._record import record
 from dagster._serdes import whitelist_for_serdes
 
@@ -28,6 +28,7 @@ class TaskInfo:
         return check.is_list(self.metadata["downstream_task_ids"], str)
 
 
+@beta
 @whitelist_for_serdes
 @record
 class DagInfo:
@@ -36,7 +37,7 @@ class DagInfo:
     Users should not instantiate this class directly. It is provided when customizing which DAGs are included
     in the generated definitions using the `dag_selector_fn` argument of :py:func:`build_defs_from_airflow_instance`.
 
-    Attributes:
+    Args:
         metadata (Dict[str, Any]): The metadata associated with the dag, retrieved by the Airflow REST API:
             https://airflow.apache.org/docs/apache-airflow/stable/stable-rest-api-ref.html#operation/get_dags
     """
@@ -77,7 +78,7 @@ class SerializedDagData:
 
     dag_id: str
     dag_info: DagInfo
-    source_code: str
+    source_code: Optional[str]
     leaf_asset_keys: set[AssetKey]
     task_infos: Mapping[str, TaskInfo]
 

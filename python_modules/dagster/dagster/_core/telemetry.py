@@ -1,5 +1,5 @@
 """As an open source project, we collect usage statistics to inform development priorities.
-For more information, check out the docs at https://docs.dagster.io/getting-started/telemetry'.
+For more information, check out the docs at https://docs.dagster.io/about/telemetry'.
 
 To see the logs we send, inspect $DAGSTER_HOME/logs/ if $DAGSTER_HOME is set or ~/.dagster/logs/
 
@@ -12,6 +12,7 @@ For local development:
 
 import datetime
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -134,15 +135,18 @@ def _telemetry_wrapper(
             f"Attempted to log telemetry for function {f.__name__} that is not in telemetry whitelisted "
             f"functions list: {TELEMETRY_WHITELISTED_FUNCTIONS}."
         )
+    sig = inspect.signature(f)
+    instance_index = None
+    for i, name in enumerate(sig.parameters):
+        if name == "instance":
+            instance_index = i
+            break
 
-    var_names = f.__code__.co_varnames
-    try:
-        instance_index = var_names.index("instance")
-    except ValueError as e:
+    if instance_index is None:
         raise DagsterInvariantViolationError(
             "Attempted to log telemetry for function {name} that does not take a DagsterInstance "
             "in a parameter called 'instance'"
-        ) from e
+        )
 
     @wraps(f)
     def wrap(*args: P.args, **kwargs: P.kwargs) -> T:
@@ -764,7 +768,7 @@ TELEMETRY_TEXT = """
   {telemetry}
 
   As an open-source project, we collect usage statistics to inform development priorities. For more
-  information, read https://docs.dagster.io/getting-started/telemetry.
+  information, read https://docs.dagster.io/about/telemetry.
 
   We will not see or store any data that is processed by your code.
 

@@ -41,6 +41,7 @@ import dask from './kindtag-images/tool-dask-color.svg';
 import databricks from './kindtag-images/tool-databricks-color.svg';
 import datadog from './kindtag-images/tool-datadog-color.svg';
 import datahub from './kindtag-images/tool-datahub-color.svg';
+import db2 from './kindtag-images/tool-db2-color.svg';
 import dbt from './kindtag-images/tool-dbt-color.svg';
 import delta_lake from './kindtag-images/tool-deltalake-color.svg';
 import denodo from './kindtag-images/tool-denodo-color.svg';
@@ -128,6 +129,7 @@ import python from './kindtag-images/tool-python-color.svg';
 import pytorch from './kindtag-images/tool-pytorch-color.svg';
 import pytorchlightning from './kindtag-images/tool-pytorchlightning-color.svg';
 import r from './kindtag-images/tool-r-color.svg';
+import r2 from './kindtag-images/tool-r2-color.svg';
 import rabbitmq from './kindtag-images/tool-rabbitmq-color.svg';
 import ray from './kindtag-images/tool-ray-color.svg';
 import react from './kindtag-images/tool-react-color.svg';
@@ -212,6 +214,7 @@ export type KnownTagType =
   | 'snowpark'
   | 'python'
   | 'fivetran'
+  | 'db2'
   | 'dbt'
   | 'slack'
   | 'pytorch'
@@ -333,6 +336,7 @@ export type KnownTagType =
   | 'papertrail'
   | 'plural'
   | 'prefect'
+  | 'r2'
   | 'react'
   | 'reddit'
   | 'redshift'
@@ -441,6 +445,10 @@ export const KNOWN_TAGS: Record<KnownTagType, KnownTag> = {
   fivetran: {
     icon: fivetran,
     content: 'Fivetran',
+  },
+  db2: {
+    icon: db2,
+    content: 'IBM DB2',
   },
   dbt: {
     icon: dbt,
@@ -733,6 +741,10 @@ export const KNOWN_TAGS: Record<KnownTagType, KnownTag> = {
     icon: ray,
     content: 'Ray',
     blackAndWhite: true,
+  },
+  r2: {
+    icon: r2,
+    content: 'R2',
   },
   axioma: {
     icon: axioma,

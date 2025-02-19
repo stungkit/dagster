@@ -1,12 +1,12 @@
-import {Box, Button, Colors, Icon, Popover} from '@dagster-io/ui-components';
+import {Box, Colors, Icon, Popover, UnstyledButton} from '@dagster-io/ui-components';
 import useResizeObserver from '@react-hook/resize-observer';
-import CodeMirror, {Editor} from 'codemirror';
-import {Linter} from 'codemirror/addon/lint/lint';
+import CodeMirror, {Editor, EditorChange} from 'codemirror';
+import type {Linter} from 'codemirror/addon/lint/lint';
 import debounce from 'lodash/debounce';
 import React, {KeyboardEvent, useCallback, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import styled, {css} from 'styled-components';
+import styled from 'styled-components';
 
-import {Suggestion} from './SelectionAutoCompleteVisitor';
+import {SelectionAutoCompleteProvider} from './SelectionAutoCompleteProvider';
 import {SelectionInputAutoCompleteResults} from './SelectionInputAutoCompleteResults';
 import {
   SelectionAutoCompleteInputCSS,
@@ -19,6 +19,7 @@ import {useUpdatingRef} from '../hooks/useUpdatingRef';
 import 'codemirror/addon/edit/closebrackets';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/addon/lint/lint.css';
+import 'codemirror/addon/lint/lint';
 import 'codemirror/addon/display/placeholder';
 
 type SelectionAutoCompleteInputProps = {
@@ -27,17 +28,7 @@ type SelectionAutoCompleteInputProps = {
   linter: Linter<any>;
   value: string;
   onChange: (value: string) => void;
-  useAutoComplete: (
-    selection: string,
-    cursor: number,
-  ) => {
-    autoCompleteResults: {
-      list: Suggestion[];
-      from: number;
-      to: number;
-    };
-    loading: boolean;
-  };
+  useAutoComplete: SelectionAutoCompleteProvider['useAutoComplete'];
 };
 
 export const SelectionAutoCompleteInput = ({
@@ -79,8 +70,12 @@ export const SelectionAutoCompleteInput = ({
   const [showResults, setShowResults] = useState({current: false});
   const [cursorPosition, setCursorPosition] = useState<number>(0);
   const [innerValue, setInnerValue] = useState(value);
+  const cursorPositionRef = useUpdatingRef(cursorPosition);
 
-  const {autoCompleteResults, loading} = useAutoComplete(innerValue, cursorPosition);
+  const {autoCompleteResults, loading} = useAutoComplete({
+    line: innerValue,
+    cursorIndex: cursorPosition,
+  });
 
   const hintContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -88,15 +83,12 @@ export const SelectionAutoCompleteInput = ({
 
   const [selectedIndexRef, setSelectedIndex] = useState({current: 0});
 
-  const scrollToSelectionRef = useRef(false);
-
   useDangerousRenderEffect(() => {
     // Rather then using a useEffect + setState (extra render), we just set the current value directly
     selectedIndexRef.current = 0;
-    if (!autoCompleteResults?.list.length && !loading) {
+    if (!autoCompleteResults.list.length && !loading) {
       showResults.current = false;
     }
-    scrollToSelectionRef.current = true;
   }, [autoCompleteResults, loading]);
 
   useLayoutEffect(() => {
@@ -122,6 +114,7 @@ export const SelectionAutoCompleteInput = ({
       });
 
       cmInstance.current.setSize('100%', 20);
+      setCurrentHeight(20);
 
       // Enforce single line by preventing newlines
       cmInstance.current.on('beforeChange', (_instance: Editor, change) => {
@@ -134,7 +127,7 @@ export const SelectionAutoCompleteInput = ({
         }
       });
 
-      cmInstance.current.on('change', (instance: Editor) => {
+      cmInstance.current.on('change', (instance: Editor, changeObj: EditorChange) => {
         const newValue = instance.getValue().replace(/\s+/g, ' ');
         const cursor = instance.getCursor();
         if (instance.getValue() !== newValue) {
@@ -145,7 +138,11 @@ export const SelectionAutoCompleteInput = ({
           instance.setCursor({...cursor, ch: cursor.ch - difference});
         }
         setInnerValue(newValue);
-        setShowResults({current: true});
+        if (changeObj.origin !== 'setValue') {
+          // If we're programmatically setting the value, we don't want to display the dropdown
+          // automatically.
+          setShowResults({current: true});
+        }
         adjustHeight();
         setCursorPosition(instance.getCursor().ch);
       });
@@ -164,8 +161,13 @@ export const SelectionAutoCompleteInput = ({
 
       cmInstance.current.on('cursorActivity', (instance: Editor) => {
         applyStaticSyntaxHighlighting(instance);
-        setCursorPosition(instance.getCursor().ch);
-        setShowResults({current: true});
+        const nextCursorPosition = instance.getCursor().ch;
+        if (cursorPositionRef.current !== nextCursorPosition) {
+          // If the cursor has moved then update the cursor position
+          // and show the auto-complete results.
+          setCursorPosition(nextCursorPosition);
+          setShowResults({current: true});
+        }
       });
 
       requestAnimationFrame(() => {
@@ -179,6 +181,8 @@ export const SelectionAutoCompleteInput = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [currentHeight, setCurrentHeight] = useState(20);
+
   const adjustHeight = useCallback(() => {
     const lines = cmInstance.current?.getWrapperElement().querySelector('.CodeMirror-lines');
     if (!lines || !cmInstance.current || !focusRef.current) {
@@ -188,20 +192,21 @@ export const SelectionAutoCompleteInput = ({
       const linesHeight = lines?.clientHeight;
       if (linesHeight && focusRef.current) {
         cmInstance.current?.setSize('100%', `${linesHeight}px`);
+        setCurrentHeight(linesHeight);
       }
     });
   }, []);
 
   // Update CodeMirror when value prop changes
   useLayoutEffect(() => {
-    const noNewLineValue = value.replace('\n', ' ');
-    if (cmInstance.current && cmInstance.current.getValue() !== noNewLineValue) {
+    const noNewLineValue = value.replace(/\n/g, ' ');
+    const currentValue = cmInstance.current?.getValue();
+    if (cmInstance.current && currentValue !== noNewLineValue) {
       const instance = cmInstance.current;
       const cursor = instance.getCursor();
       instance.setValue(noNewLineValue);
       instance.setCursor(cursor);
       setCursorPosition(cursor.ch);
-      setShowResults({current: true});
       requestAnimationFrame(() => {
         // Reset selected index on value change
         setSelectedIndex({current: 0});
@@ -220,7 +225,7 @@ export const SelectionAutoCompleteInput = ({
   const selectedItem = autoCompleteResults?.list[selectedIndexRef.current];
 
   const onSelect = useCallback(
-    (suggestion: Suggestion) => {
+    (suggestion: {text: string}) => {
       if (autoCompleteResults && suggestion && cmInstance.current) {
         const editor = cmInstance.current;
         editor.replaceRange(
@@ -253,9 +258,6 @@ export const SelectionAutoCompleteInput = ({
       }
       if (!showResults.current) {
         return;
-      }
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        scrollToSelectionRef.current = true;
       }
       if (e.key === 'ArrowDown' && !e.shiftKey && !e.ctrlKey) {
         e.preventDefault();
@@ -308,13 +310,12 @@ export const SelectionAutoCompleteInput = ({
     };
   }, [setShowResults]);
 
-  const isCommitted = innerValue === value;
   const isEmpty = innerValue === '';
   useLayoutEffect(() => {
     requestAnimationFrame(() => {
       adjustHeight();
     });
-  }, [isCommitted, adjustHeight, isEmpty]);
+  }, [adjustHeight, isEmpty]);
 
   const onBlur = useCallback((ev: React.FocusEvent<HTMLDivElement>) => {
     const current = ev.relatedTarget;
@@ -331,12 +332,13 @@ export const SelectionAutoCompleteInput = ({
     focusRef.current = false;
     cmInstance.current?.setOption('lineWrapping', false);
     cmInstance.current?.setSize('100%', '20px');
+    setCurrentHeight(20);
   }, []);
 
   useResizeObserver(inputRef, adjustHeight);
 
   return (
-    <div onBlur={onBlur}>
+    <div onBlur={onBlur} style={{width: '100%'}}>
       <Popover
         content={
           <div ref={hintContainerRef} onKeyDown={handleKeyDown}>
@@ -344,7 +346,6 @@ export const SelectionAutoCompleteInput = ({
               results={autoCompleteResults}
               width={width}
               selectedIndex={selectedIndexRef.current}
-              scrollToSelection={scrollToSelectionRef}
               onSelect={onSelect}
               setSelectedIndex={setSelectedIndex}
               loading={loading}
@@ -357,6 +358,7 @@ export const SelectionAutoCompleteInput = ({
         canEscapeKeyClose={true}
       >
         <InputDiv
+          $isCommitted={innerValue === value}
           style={{
             display: 'grid',
             gridTemplateColumns: 'auto minmax(0, 1fr) auto',
@@ -368,28 +370,16 @@ export const SelectionAutoCompleteInput = ({
             setShowResults({current: true});
           }}
         >
-          <div style={{alignSelf: 'flex-start'}}>
-            <Icon name="op_selector" style={{marginTop: 2}} />
+          <div style={{alignSelf: currentHeight > 20 ? 'flex-start' : 'center'}}>
+            <Icon name="search" style={{marginTop: 2}} />
           </div>
           <div ref={editorRef} />
           <Box
             flex={{direction: 'row', alignItems: 'center', gap: 4}}
-            style={{alignSelf: 'flex-end'}}
+            style={{alignSelf: currentHeight > 20 ? 'flex-end' : 'center'}}
           >
-            {innerValue !== value ? (
-              <InputButton
-                outlined
-                onClick={() => {
-                  onSelectionChange(innerValue);
-                  setShowResults({current: false});
-                }}
-              >
-                Enter
-              </InputButton>
-            ) : null}
             {innerValue !== '' && (
-              <InputButton
-                outlined
+              <UnstyledButton
                 onClick={() => {
                   cmInstance.current?.setValue('');
                   onSelectionChange('');
@@ -397,7 +387,7 @@ export const SelectionAutoCompleteInput = ({
                 }}
               >
                 <Icon name="close" />
-              </InputButton>
+              </UnstyledButton>
             )}
           </Box>
         </InputDiv>
@@ -406,24 +396,12 @@ export const SelectionAutoCompleteInput = ({
   );
 };
 
-const InputButton = styled(Button)`
-  margin: -2px 0px;
-  padding: 2px 8px;
-`;
-
-export const iconStyle = (img: string) => css`
-  &:before {
-    content: ' ';
-    width: 14px;
-    mask-size: contain;
-    mask-repeat: no-repeat;
-    mask-position: center;
-    mask-image: url(${img});
-    background: ${Colors.accentPrimary()};
-    display: inline-block;
-  }
-`;
-
-export const InputDiv = styled.div`
+export const InputDiv = styled.div<{$isCommitted: boolean}>`
   ${SelectionAutoCompleteInputCSS}
+  ${({$isCommitted}) =>
+    $isCommitted
+      ? ''
+      : `
+      background: ${Colors.backgroundLight()}; 
+      `}
 `;

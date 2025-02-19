@@ -9,7 +9,7 @@ from dagster import (
     DagsterInvariantViolationError,
     Field as DagsterField,
 )
-from dagster._annotations import experimental
+from dagster._annotations import superseded
 from dagster._config import StringSource
 from dagster._config.pythonic_config import ConfigurableIOManagerFactory
 from dagster._core.definitions.events import AssetKey, AssetMaterialization
@@ -137,6 +137,7 @@ class FilesystemIOManager(ConfigurableIOManagerFactory["PickledObjectFilesystemI
     config_schema=FilesystemIOManager.to_config_schema(),
     description="Built-in filesystem IO manager that stores and retrieves values using pickling.",
 )
+@superseded(additional_warn_text="Use FilesystemIOManager directly instead")
 def fs_io_manager(init_context: InitResourceContext) -> "PickledObjectFilesystemIOManager":
     """Built-in filesystem IO manager that stores and retrieves values using pickling.
 
@@ -274,9 +275,9 @@ class PickledObjectFilesystemIOManager(UPathIOManager):
                 "io manager to continue using this output. For example, you can use the "
                 "mem_io_manager with the in_process_executor.\n"
                 "For more information on io managers, visit "
-                "https://docs.dagster.io/concepts/io-management/io-managers \n"
+                "https://docs.dagster.io/guides/build/io-managers/ \n"
                 "For more information on executors, vist "
-                "https://docs.dagster.io/deployment/executors#overview"
+                "https://docs.dagster.io/guides/operate/run-executors"
             ) from e
 
     def load_from_path(self, context: InputContext, path: "UPath") -> Any:
@@ -339,7 +340,6 @@ class CustomPathPickledObjectFilesystemIOManager(IOManager):
 
 @dagster_maintained_io_manager
 @io_manager(config_schema={"base_dir": DagsterField(StringSource, is_required=True)})
-@experimental
 def custom_path_fs_io_manager(
     init_context: InitResourceContext,
 ) -> CustomPathPickledObjectFilesystemIOManager:

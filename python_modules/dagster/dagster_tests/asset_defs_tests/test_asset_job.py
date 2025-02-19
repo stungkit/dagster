@@ -42,6 +42,7 @@ from dagster._core.definitions.data_version import DataVersion
 from dagster._core.definitions.decorators.asset_check_decorator import asset_check
 from dagster._core.definitions.dependency import NodeHandle, NodeInvocation
 from dagster._core.definitions.executor_definition import in_process_executor
+from dagster._core.definitions.result import MaterializeResult
 from dagster._core.errors import DagsterInvalidSubsetError
 from dagster._core.execution.api import execute_run_iterator
 from dagster._core.snap import DependencyStructureIndex
@@ -1676,7 +1677,7 @@ def test_graph_output_is_input_within_graph():
 
 
 @ignore_warning("Class `SourceAsset` is deprecated and will be removed in 2.0.0.")
-@ignore_warning("Parameter `io_manager_def` .* is experimental")
+@ignore_warning("Parameter `io_manager_def` .* is currently in beta")
 def test_source_asset_io_manager_def():
     class MyIOManager(IOManager):
         def handle_output(self, context, obj):
@@ -1761,8 +1762,8 @@ def test_source_asset_io_manager_key_provided():
 
 
 @ignore_warning("Class `SourceAsset` is deprecated and will be removed in 2.0.0.")
-@ignore_warning("Parameter `resource_defs` .* is experimental")
-@ignore_warning("Parameter `io_manager_def` .* is experimental")
+@ignore_warning("Parameter `resource_defs` .* is currently in beta")
+@ignore_warning("Parameter `io_manager_def` .* is currently in beta")
 def test_source_asset_requires_resource_defs():
     class MyIOManager(IOManager):
         def handle_output(self, context, obj):
@@ -1798,7 +1799,7 @@ def test_source_asset_requires_resource_defs():
     assert result.output_for_node("my_derived_asset") == 9
 
 
-@ignore_warning("Parameter `resource_defs` .* is experimental")
+@ignore_warning("Parameter `resource_defs` .* is currently in beta")
 def test_other_asset_provides_req():
     # Demonstrate that assets cannot resolve each other's dependencies with
     # resources on each definition.
@@ -1817,7 +1818,7 @@ def test_other_asset_provides_req():
         create_test_asset_job(assets=[asset_reqs_foo, asset_provides_foo])
 
 
-@ignore_warning("Parameter `resource_defs` .* is experimental")
+@ignore_warning("Parameter `resource_defs` .* is currently in beta")
 def test_transitive_deps_not_provided():
     @resource(required_resource_keys={"foo"})
     def unused_resource():
@@ -1834,7 +1835,7 @@ def test_transitive_deps_not_provided():
         create_test_asset_job(assets=[the_asset])
 
 
-@ignore_warning("Parameter `resource_defs` .* is experimental")
+@ignore_warning("Parameter `resource_defs` .* is currently in beta")
 def test_transitive_resource_deps_provided():
     @resource(required_resource_keys={"foo"})
     def used_resource(context):
@@ -1851,7 +1852,7 @@ def test_transitive_resource_deps_provided():
 
 
 @ignore_warning("Class `SourceAsset` is deprecated and will be removed in 2.0.0.")
-@ignore_warning("Parameter `io_manager_def` .* is experimental")
+@ignore_warning("Parameter `io_manager_def` .* is currently in beta")
 def test_transitive_io_manager_dep_not_provided():
     @io_manager(required_resource_keys={"foo"})  # pyright: ignore[reportArgumentType]
     def the_manager():
@@ -2665,6 +2666,70 @@ def test_subset_cycle_resolution_basic():
     assert result.output_for_node("foo_prime", "a_prime") == 2
     assert result.output_for_node("foo_2", "b") == 3
     assert result.output_for_node("foo_prime_2", "b_prime") == 4
+
+    assert _all_asset_keys(result) == {
+        AssetKey("a"),
+        AssetKey("b"),
+        AssetKey("a_prime"),
+        AssetKey("b_prime"),
+    }
+
+
+@ignore_warning("Class `SourceAsset` is deprecated and will be removed in 2.0.0.")
+def test_subset_cycle_resolution_asset_result():
+    """Ops:
+        foo produces: a, b
+        foo_prime produces: a', b'
+    Assets:
+        s -> a -> a' -> b -> b'.
+    """
+    io_manager_obj, io_manager_def = asset_aware_io_manager()
+    for item in "a,b,a_prime,b_prime".split(","):
+        io_manager_obj.db[AssetKey(item)] = None
+    # some value for the source
+    io_manager_obj.db[AssetKey("s")] = 0
+
+    s = SourceAsset("s")
+
+    @multi_asset(
+        outs={"a": AssetOut(is_required=False), "b": AssetOut(is_required=False)},
+        internal_asset_deps={
+            "a": {AssetKey("s")},
+            "b": {AssetKey("a_prime")},
+        },
+        can_subset=True,
+    )
+    def foo(context, s, a_prime):
+        context.log.info(context.selected_asset_keys)
+        if AssetKey("a") in context.selected_asset_keys:
+            yield MaterializeResult(asset_key=AssetKey("a"))
+        if AssetKey("b") in context.selected_asset_keys:
+            yield MaterializeResult(asset_key=AssetKey("b"))
+
+    @multi_asset(
+        outs={"a_prime": AssetOut(is_required=False), "b_prime": AssetOut(is_required=False)},
+        internal_asset_deps={
+            "a_prime": {AssetKey("a")},
+            "b_prime": {AssetKey("b")},
+        },
+        can_subset=True,
+    )
+    def foo_prime(context, a, b):
+        context.log.info(context.selected_asset_keys)
+        if AssetKey("a_prime") in context.selected_asset_keys:
+            yield MaterializeResult(asset_key=AssetKey("a_prime"))
+        if AssetKey("b_prime") in context.selected_asset_keys:
+            yield MaterializeResult(asset_key=AssetKey("b_prime"))
+
+    job = Definitions(
+        assets=[foo, foo_prime, s],
+        resources={"io_manager": io_manager_def},
+    ).get_implicit_global_asset_job_def()
+
+    # should produce a job with foo -> foo_prime -> foo_2 -> foo_prime_2
+    assert len(list(job.graph.iterate_op_defs())) == 4
+
+    result = job.execute_in_process()
 
     assert _all_asset_keys(result) == {
         AssetKey("a"),

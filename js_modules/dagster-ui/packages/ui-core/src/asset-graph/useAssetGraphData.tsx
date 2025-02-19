@@ -1,16 +1,16 @@
 import keyBy from 'lodash/keyBy';
 import memoize from 'lodash/memoize';
 import reject from 'lodash/reject';
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {FeatureFlag} from 'shared/app/FeatureFlags.oss';
 import {useAssetGraphSupplementaryData} from 'shared/asset-graph/useAssetGraphSupplementaryData.oss';
+import {Worker} from 'shared/workers/Worker.oss';
 
 import {ASSET_NODE_FRAGMENT} from './AssetNode';
 import {GraphData, buildGraphData as buildGraphDataImpl, tokenForAssetKey} from './Utils';
 import {gql} from '../apollo-client';
 import {computeGraphData as computeGraphDataImpl} from './ComputeGraphData';
 import {BuildGraphDataMessageType, ComputeGraphDataMessageType} from './ComputeGraphData.types';
-import {throttleLatest} from './throttleLatest';
 import {featureEnabled} from '../app/Flags';
 import {
   AssetGraphQuery,
@@ -80,7 +80,6 @@ export function useFullAssetGraphData(options: AssetGraphFetchScope) {
     const requestId = ++currentRequestRef.current;
     buildGraphData({
       nodes: queryItems,
-      flagSelectionSyntax: featureEnabled(FeatureFlag.flagSelectionSyntax),
     })
       ?.then((data) => {
         if (lastProcessedRequestRef.current < requestId) {
@@ -164,11 +163,19 @@ export function useAssetGraphData(opsQuery: string, options: AssetGraphFetchScop
   const {loading: supplementaryDataLoading, data: supplementaryData} =
     useAssetGraphSupplementaryData(opsQuery);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (options.loading || supplementaryDataLoading) {
       return;
     }
+
     const requestId = ++currentRequestRef.current;
+
+    if (repoFilteredNodes === undefined || graphQueryItems === undefined) {
+      lastProcessedRequestRef.current = requestId;
+      setState({allAssetKeys: [], graphAssetKeys: [], assetGraphData: null});
+      return;
+    }
+
     setGraphDataLoading(true);
     computeGraphData({
       repoFilteredNodes,
@@ -176,7 +183,6 @@ export function useAssetGraphData(opsQuery: string, options: AssetGraphFetchScop
       opsQuery,
       kinds,
       hideEdgesToNodesOutsideQuery,
-      flagSelectionSyntax: featureEnabled(FeatureFlag.flagSelectionSyntax),
       supplementaryData,
     })
       ?.then((data) => {
@@ -206,7 +212,7 @@ export function useAssetGraphData(opsQuery: string, options: AssetGraphFetchScop
     supplementaryDataLoading,
   ]);
 
-  const loading = fetchResult.loading || graphDataLoading;
+  const loading = fetchResult.loading || graphDataLoading || supplementaryDataLoading;
   useBlockTraceUntilTrue('useAssetGraphData', !loading);
   return {
     loading,
@@ -219,6 +225,14 @@ export function useAssetGraphData(opsQuery: string, options: AssetGraphFetchScop
 }
 
 type AssetNode = AssetNodeForGraphQueryFragment;
+
+const computeGraphData = indexedDBAsyncMemoize<
+  Omit<ComputeGraphDataMessageType, 'id' | 'type'>,
+  GraphDataState,
+  typeof computeGraphDataWrapper
+>(computeGraphDataWrapper, (props) => {
+  return JSON.stringify(props);
+});
 
 const buildGraphQueryItems = (nodes: AssetNode[]) => {
   const items: {[name: string]: AssetGraphQueryItem} = {};
@@ -340,20 +354,16 @@ export const ASSET_GRAPH_QUERY = gql`
   ${ASSET_NODE_FRAGMENT}
 `;
 
-const computeGraphData = throttleLatest(
-  indexedDBAsyncMemoize<
-    Omit<ComputeGraphDataMessageType, 'id' | 'type'>,
-    GraphDataState,
-    typeof computeGraphDataWrapper
-  >(computeGraphDataWrapper, (props) => {
-    return JSON.stringify(props);
-  }),
-  2000,
+const getWorker = memoize(
+  (_key: 'computeGraphWorker' | 'buildGraphWorker') =>
+    new Worker(new URL('./ComputeGraphData.worker', import.meta.url)),
 );
 
-const getWorker = memoize(
-  (_key: string = '') => new Worker(new URL('./ComputeGraphData.worker', import.meta.url)),
-);
+if (typeof jest === 'undefined') {
+  // Pre-warm workers
+  getWorker('computeGraphWorker');
+  getWorker('buildGraphWorker');
+}
 
 let _id = 0;
 async function computeGraphDataWrapper(
@@ -363,14 +373,13 @@ async function computeGraphDataWrapper(
     const worker = getWorker('computeGraphWorker');
     return new Promise<GraphDataState>((resolve) => {
       const id = ++_id;
-      const callback = (event: MessageEvent) => {
+      const removeMessageListener = worker.onMessage((event: MessageEvent) => {
         const data = event.data as GraphDataState & {id: number};
         if (data.id === id) {
           resolve(data);
-          worker.removeEventListener('message', callback);
+          removeMessageListener();
         }
-      };
-      worker.addEventListener('message', callback);
+      });
       const message: ComputeGraphDataMessageType = {
         type: 'computeGraphData',
         id,
@@ -382,15 +391,13 @@ async function computeGraphDataWrapper(
   return computeGraphDataImpl(props);
 }
 
-const buildGraphData = throttleLatest(
-  indexedDBAsyncMemoize<BuildGraphDataMessageType, GraphData, typeof buildGraphDataWrapper>(
-    buildGraphDataWrapper,
-    (props) => {
-      return JSON.stringify(props);
-    },
-  ),
-  2000,
-);
+const buildGraphData = indexedDBAsyncMemoize<
+  BuildGraphDataMessageType,
+  GraphData,
+  typeof buildGraphDataWrapper
+>(buildGraphDataWrapper, (props) => {
+  return JSON.stringify(props);
+});
 
 async function buildGraphDataWrapper(
   props: Omit<BuildGraphDataMessageType, 'id' | 'type'>,
@@ -399,14 +406,13 @@ async function buildGraphDataWrapper(
     const worker = getWorker('buildGraphWorker');
     return new Promise<GraphData>((resolve) => {
       const id = ++_id;
-      const callback = (event: MessageEvent) => {
+      const removeMessageListener = worker.onMessage((event: MessageEvent) => {
         const data = event.data as GraphData & {id: number};
         if (data.id === id) {
           resolve(data);
-          worker.removeEventListener('message', callback);
+          removeMessageListener();
         }
-      };
-      worker.addEventListener('message', callback);
+      });
       const message: BuildGraphDataMessageType = {
         type: 'buildGraphData',
         id,

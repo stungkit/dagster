@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, AbstractSet, Any, NamedTuple, Optional, Union 
 from typing_extensions import Self
 
 import dagster._check as check
-from dagster._annotations import PublicAttr, experimental_param, public
+from dagster._annotations import PublicAttr, public
 from dagster._core.definitions.asset_check_spec import AssetCheckKey
 from dagster._core.definitions.events import AssetKey
 from dagster._core.loader import LoadableBy, LoadingContext
@@ -19,6 +19,7 @@ from dagster._core.storage.tags import (
     AUTOMATION_CONDITION_TAG,
     BACKFILL_ID_TAG,
     PARENT_RUN_ID_TAG,
+    POOL_TAG_PREFIX,
     REPOSITORY_LABEL_TAG,
     RESUME_RETRY_TAG,
     ROOT_RUN_ID_TAG,
@@ -298,12 +299,25 @@ class DagsterRun(
     """Serializable internal representation of a dagster run, as stored in a
     :py:class:`~dagster._core.storage.runs.RunStorage`.
 
-    Attributes:
-        job_name (str): The name of the job executed in this run
-        run_id (str): The ID of the run
-        run_config (Mapping[str, object]): The config for the run
-        tags (Mapping[str, str]): The tags applied to the run
-
+    Args:
+        job_name (str): The name of the job executed in this run.
+        run_id (str): The ID of the run.
+        run_config (Mapping[str, object]): The config for the run.
+        asset_selection (Optional[AbstractSet[AssetKey]]): The assets selected for this run.
+        asset_check_selection (Optional[AbstractSet[AssetCheckKey]]): The asset checks selected for this run.
+        op_selection (Optional[Sequence[str]]): The op queries provided by the user.
+        resolved_op_selection (Optional[AbstractSet[str]]): The resolved set of op names to execute.
+        step_keys_to_execute (Optional[Sequence[str]]): The step keys to execute.
+        status (DagsterRunStatus): The status of the run.
+        tags (Mapping[str, str]): The tags applied to the run.
+        root_run_id (Optional[str]): The ID of the root run in the run's group.
+        parent_run_id (Optional[str]): The ID of the parent run in the run's group.
+        job_snapshot_id (Optional[str]): The ID of the job snapshot.
+        execution_plan_snapshot_id (Optional[str]): The ID of the execution plan snapshot.
+        remote_job_origin (Optional[RemoteJobOrigin]): The origin of the executed job.
+        job_code_origin (Optional[JobPythonOrigin]): The origin of the job code.
+        has_repository_load_data (bool): Whether the run has repository load data.
+        run_op_concurrency (Optional[RunOpConcurrency]): The op concurrency information for the run.
     """
 
     def __new__(
@@ -484,10 +498,13 @@ class DagsterRun(
                 self.remote_job_origin.repository_origin.get_label()
             )
 
-        if not self.tags:
-            return repository_tags
+        pool_tags = {}
+        if self.run_op_concurrency and self.run_op_concurrency.all_pools:
+            pool_tags = {
+                f"{POOL_TAG_PREFIX}{pool}": "true" for pool in self.run_op_concurrency.all_pools
+            }
 
-        return {**repository_tags, **self.tags}
+        return {**repository_tags, **pool_tags, **(self.tags or {})}
 
     @public
     @property
@@ -607,7 +624,6 @@ class RunsFilter(IHaveNew):
     created_before: Optional[datetime]
     exclude_subruns: Optional[bool]
 
-    @experimental_param(param="exclude_subruns")
     def __new__(
         cls,
         run_ids: Optional[Sequence[str]] = None,

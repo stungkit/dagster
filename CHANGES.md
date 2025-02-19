@@ -1,5 +1,130 @@
 # Changelog
 
+## 1.10.1 (core) / 0.26.1 (libraries)
+
+### Bugfixes
+
+- Fixed an issue where runs containing pool-assigned ops without limits set got stuck in the run queue.
+- Fixed an issue where a "Message: Cannot return null for non-nullable field PartitionKeys.partitionKeys." error was raised in the launchpad for jobs with unpartitioned assets.
+- [ui] Updated "Queue criteria" modal to reference and link to pool concurrency settings pages.
+- [ui] The "Queue criteria" modal for a run no longer closes as new runs arrive.
+
+## 1.10.0 (core) / 0.26.0 (libraries)
+
+### New
+
+- Added a new `AutomationCondition.data_version_changed()` condition.
+- [dagster-msteams] Added support for sending messages to PowerAutomate flows using AdaptiveCard formatting.
+- `dagster definitions validate` is now less verbose, primarily highlighting load errors.
+- [ui] Made defunct code locations removable when editing environment variables.
+- [ui] Added a warning icon to the Agents item in Deployment settings, indicating when there are no active agents.
+- [dagster-tableau] Changed logic to show embedded data sources in case published data sources are not present. Also, pulled more metadata from Tableau. (Thanks [@VenkyRules](https://github.com/VenkyRules)!)
+- Added new decorators to reflect our [new API lifecycle](https://docs.dagster.io/api/api-lifecycle): `@preview`, `@beta` and `@superseded`. Also added new annotations and warnings to match these new decorators.
+
+### Bugfixes
+
+- [ui] Fixed persistence of the group-by setting in the run timeline view.
+- [ui] Fixed timestamped links to asset pages from asset check evaluations in run logs.
+- [ui] Fixed excessive rendering and querying on the Concurrency configuration page.
+- Fixed the step stats calculations for steps that fail and request a retry before the step starts. This happened if a failure occurred in the step worker before the compute function began execution. This should help with sporadic hanging of step retries.
+- Fixed an issue where the Concurrency UI was broken for keys with slashes.
+- Fixed an issue with emitting `AssetResult` with ops or multi-assets that are triggered multiple times in the same run.
+- [dagster-dbt] Fixed a bug introduced in dagster-dbt 0.25.7 that would cause execution to fail when using the `@dbt_assets` decorator with an `io_manager_key` specified.
+- [dagster-dbt] Refactored `UnitTestDefinition` instantiation to address failure to initialize dbt models with unit tests. (Thanks [@kang8](https://github.com/kang8)!)
+- Fixed issue where `dagster instance migrate` was failing for instances with tables having non-empty concurrency limits.
+- Fixed an issue where Declarative Automation sensors in code locations that included source assets referencing assets with automation conditions in other code locations would sometimes cause duplicate runs to be created.
+- Turned on run blocking for concurrency keys/pools by default. For op granularity, runs are dequeued if there exists at least one op that can execute once the run has started. For run granularity, runs are dequeued if all pools have available slots.
+- [dagster-dbt] Added pool support.
+- [dagster-dlt] Added pool support.
+- [dagster-sling] Added pool support.
+
+### Documentation
+
+- Corrected docs on managing concurrency.
+- Fixed a Markdown link to "assets metadata." (Thanks [@rchrand](https://github.com/rchrand)!)
+- Fixed a `pip install` command for Zsh. (Thanks [@aimeecodes](https://github.com/aimeecodes)!)
+
+### Breaking Changes
+
+- The `include_sources` param on all `AssetSelection` APIs has been renamed to `include_external_assets`.
+- Disallowed invalid characters (i.e. anything other than letters, numbers, dashes, and underscores) in pool names.
+- Changed the default run coordinator to be the queued run coordinator. This requires the Dagster daemon to be running for runs to be launched. To restore the previous behavior, you can add the following configuration block to your `dagster.yaml`:
+
+  ```
+  run_coordinator:
+    module: dagster.core.run_coordinator.sync_in_memory_run_coordinator
+    class: SyncInMemoryRunCoordinator
+  ```
+
+### Deprecations
+
+- [dagster-sdf] Moved the `dagster-sdf` library to the community-supported repo.
+- [dagster-blueprints] Removed the `dagster-blueprints` package. We are actively developing a project, currently named Components, that has similar goals to Blueprints of increasing the accessibility of Dagster.
+- Removed the `@experimental` decorator in favor of the `@preview` and `@beta` decorators. Also removed annotations and warnings related to the `@experimental` decorator.
+
+### Dagster Plus
+
+- Shipped a range of improvements to alerts in Dagster+, including more granular targeting, streamlined UIs, and more helpful content. Stay tuned for some final changes and a full announcement in the coming weeks!
+
+## 1.9.13 (core) / 0.25.13 (libraries)
+
+### Dagster Plus
+
+- Fixed a bug where runs using global op concurrency would raise an exception when claiming a concurrency slot.
+
+## 1.9.12 (core) / 0.25.12 (libraries)
+
+### New
+
+- Adds a top-level argument `pool` to asset/op definitions to replace the use of op tags to specify concurrency conditions.
+- The `dagster definitions validate` command now loads locations in-process by default, which speeds up runtime.
+- All published dagster libraries now include a `py.typed` file, which means their type annotations will be used by static analyzers. Previously a few libraries were missing this file.
+- Adds concurrency pool information in the UI for asset / op definitions that use concurrency pools.
+- Optional data migration to improve performance of the Runs page. Run `dagster instance migrate` to run the data migration. The migration will update serialized backfill objects in the database with an end timestamp attribute computed by querying the runs launched by that backfill to determine when the last run completed.
+- Added the ability to distinguish between explicitly set concurrency pool limits and default-set pool limits. Requires a schema migration using `dagster instance migrate`.
+- Moves run queue configuration from its standalone deployment setting into the `concurrency` deployment setting, along with new settings for concurrency pools.
+- Enabled run granularity concurrency enforcement of concurrency pool limits.
+- [dagster-dbt] Specifying a dbt profiles directory and profile is now supported in `DbtProject`.
+- [dagster-dlt] `DagsterDltTranslator.get_*` methods have been superseded in favor of `DagsterDltTranslator.get_asset_spec`.
+- [dagster-gcp] Added `PipesDataprocJobClient`, a Pipes client for running workloads on GCP Dataproc in Job mode.
+- [dagster-looker] `DagsterLookerLkmlTranslator.get_*` methods have been superseded in favor of `DagsterLookerLkmlTranslator.get_asset_spec`.
+- [dagster-pipes] Dagster Pipes now support passing messages and Dagster context via Google Cloud Storage.
+- [ui] Created a standalone view for concurrency pools under the Deployment tab.
+- [ui] When launching partitioned assets in the launchpad from the global graph, Dagster will now warn you if you have not made a partition selection.
+- [ui] When viewing Runs, allow freeform search for filtering to view runs launched by schedules and sensors.
+- [ui] Remove misleading run status dot from the asset events list.
+- [ui] Introduce a stepped workflow for creating new Alerts.
+
+### Bugfixes
+
+- Fixed an issue where querying for Asset Materialization events from multi-partition runs would assign incorrect partition keys to the events.
+- Fixed an issue where partition keys could be dropped when converting a list of partition keys for a `MultiPartitionsDefinition` to a `PartitionSubset`.
+- Fixed an issue where the "Reload definitions" button didn't work when using `dagster dev` on Windows, starting in the 1.9.10 release.
+- Fixed an issue where dagster could not be imported alongside some other libraries using gRPC with an 'api.proto' file.
+- [ui] Fixed an issue where non-`None` default config fields weren't being displayed in the Launchpad view.
+- [ui] Fixed an issue with the search bar on the Asset partitions page incorrectly filtering partitions when combined with a status filter.
+- [ui] Fixed Asset page header display of long key values.
+- [ui] Fixed Slack tag in alert creation review step for orgs that have Slack workspaces connected.
+- [dagster-dbt] Fixed a bug introduced in `dagster-dbt` 0.25.7 which would cause execution to fail when using the `@dbt_assets` decorator with an `io_manager_key` specified.
+- [dagster-databricks] Fixed an issue with Dagster Pipes log capturing when running on Databricks.
+
+### Documentation
+
+- Fixed a mistake in the docs concerning configuring asset concurrency tags in Dagster+.
+- Added a tutorial for using GCP Dataproc with Dagster Pipes.
+
+### Dagster Plus
+
+- Relaxed pins on the 'opentelemetry-api' dependency in the 'dagster-cloud' package to `>=1.27.0` to allow using `dagster-cloud` with `protobuf` versions 3 and 4.
+
+## 1.9.11 (core) / 0.25.11 (libraries)
+
+### Bugfixes
+
+- Fixed an issue where running `dagster dev` would fail on Windows machines.
+- Fixed an issue where partially resolved config with default values were not able to be overridden at runtime.
+- Fixed an issue where default config values at the top level were not propagated to nested config values.
+
 ## 1.9.10 (core) / 0.25.10 (libraries)
 
 ### New

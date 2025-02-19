@@ -292,11 +292,12 @@ def test_sensor_invocation_resources_context_manager() -> None:
     # Fails bc resource is a contextmanager and sensor context is not entered
     with pytest.raises(
         DagsterInvariantViolationError, match="At least one provided resource is a generator"
-    ):
+    ) as exc_info:
         basic_sensor_str_resource_req(
             build_sensor_context(resources={"my_resource": my_cm_resource})
         )
 
+    assert "with build_sensor_context" in str(exc_info.value)
     with build_sensor_context(resources={"my_resource": my_cm_resource}) as context:
         assert cast(RunRequest, basic_sensor_str_resource_req(context)).run_config == {"foo": "foo"}
 
@@ -435,7 +436,7 @@ def test_run_status_sensor_invocation_resources() -> None:
     result = my_job_2.execute_in_process(instance=instance, raise_on_error=False)
 
     dagster_run = result.dagster_run
-    dagster_event = result.get_job_success_event()
+    dagster_event = result.get_run_success_event()
 
     context = build_run_status_sensor_context(
         sensor_name="status_sensor",
@@ -474,7 +475,7 @@ def test_run_status_sensor_invocation_resources_direct() -> None:
     result = my_job_2.execute_in_process(instance=instance, raise_on_error=False)
 
     dagster_run = result.dagster_run
-    dagster_event = result.get_job_success_event()
+    dagster_event = result.get_run_success_event()
 
     context = build_run_status_sensor_context(
         sensor_name="status_sensor",
@@ -512,7 +513,7 @@ def test_run_failure_sensor_invocation_resources() -> None:
     result = my_job_2.execute_in_process(instance=instance, raise_on_error=False)
 
     dagster_run = result.dagster_run
-    dagster_event = result.get_job_success_event()
+    dagster_event = result.get_run_success_event()
 
     context = build_run_status_sensor_context(
         sensor_name="failure_sensor",
@@ -715,7 +716,7 @@ def test_run_status_sensor():
     result = my_job_2.execute_in_process(instance=instance, raise_on_error=False)
 
     dagster_run = result.dagster_run
-    dagster_event = result.get_job_success_event()
+    dagster_event = result.get_run_success_event()
 
     context = build_run_status_sensor_context(
         sensor_name="status_sensor",
@@ -744,7 +745,7 @@ def test_run_failure_sensor():
     result = my_job.execute_in_process(instance=instance, raise_on_error=False)
 
     dagster_run = result.dagster_run
-    dagster_event = result.get_job_failure_event()
+    dagster_event = result.get_run_failure_event()
 
     context = build_run_status_sensor_context(
         sensor_name="failure_sensor",
@@ -769,7 +770,7 @@ def test_run_status_sensor_run_request():
     result = my_job_2.execute_in_process(instance=instance, raise_on_error=False)
 
     dagster_run = result.dagster_run
-    dagster_event = result.get_job_success_event()
+    dagster_event = result.get_run_success_event()
 
     context = build_run_status_sensor_context(
         sensor_name="status_sensor",
@@ -806,7 +807,7 @@ def test_run_failure_w_run_request():
     result = my_job.execute_in_process(instance=instance, raise_on_error=False)
 
     dagster_run = result.dagster_run
-    dagster_event = result.get_job_failure_event()
+    dagster_event = result.get_run_failure_event()
 
     context = build_run_status_sensor_context(
         sensor_name="failure_sensor",

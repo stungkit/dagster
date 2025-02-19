@@ -44,15 +44,15 @@ def test_list_component_types_command():
     result = json.loads(result.output)
 
     assert list(result.keys()) == [
-        "dagster_components.test.all_metadata_empty_asset",
-        "dagster_components.test.complex_schema_asset",
-        "dagster_components.test.simple_asset",
-        "dagster_components.test.simple_pipes_script_asset",
+        "all_metadata_empty_asset@dagster_components.test",
+        "complex_schema_asset@dagster_components.test",
+        "simple_asset@dagster_components.test",
+        "simple_pipes_script_asset@dagster_components.test",
     ]
 
-    assert result["dagster_components.test.simple_asset"] == {
+    assert result["simple_asset@dagster_components.test"] == {
         "name": "simple_asset",
-        "package": "dagster_components.test",
+        "namespace": "dagster_components.test",
         "summary": "A simple asset that returns a constant string value.",
         "description": "A simple asset that returns a constant string value.",
         "scaffold_params_schema": None,
@@ -62,7 +62,7 @@ def test_list_component_types_command():
                 "value": {"title": "Value", "type": "string"},
             },
             "required": ["asset_key", "value"],
-            "title": "SimpleAssetParams",
+            "title": "SimpleAssetSchema",
             "type": "object",
         },
     }
@@ -73,13 +73,13 @@ def test_list_component_types_command():
             "filename": {"title": "Filename", "type": "string"},
         },
         "required": ["asset_key", "filename"],
-        "title": "SimplePipesScriptAssetParams",
+        "title": "SimplePipesScriptAssetSchema",
         "type": "object",
     }
 
-    assert result["dagster_components.test.simple_pipes_script_asset"] == {
+    assert result["simple_pipes_script_asset@dagster_components.test"] == {
         "name": "simple_pipes_script_asset",
-        "package": "dagster_components.test",
+        "namespace": "dagster_components.test",
         "summary": "A simple asset that runs a Python script with the Pipes subprocess client.",
         "description": "A simple asset that runs a Python script with the Pipes subprocess client.\n\nBecause it is a pipes asset, no value is returned.",
         "scaffold_params_schema": pipes_script_params_schema,
@@ -112,8 +112,10 @@ def test_list_local_components_types() -> None:
 
             result = json.loads(result.output)
             assert len(result) == 1
-            assert result[0]["directory"] == "my_location/components/local_component_sample"
-            assert result[0]["key"] == ".my_component"
+            assert set(result.keys()) == {"my_location/components/local_component_sample"}
+            assert set(result["my_location/components/local_component_sample"].keys()) == {
+                "my_component@__init__.py"
+            }
 
             # Add a second directory and local component
             result = runner.invoke(
@@ -153,6 +155,40 @@ def test_list_local_components_types() -> None:
             assert len(result) == 2
 
 
+def test_all_components_schema_command():
+    runner = CliRunner()
+
+    result = runner.invoke(
+        cli, ["--builtin-component-lib", "dagster_components.test", "list", "all-components-schema"]
+    )
+    assert result.exit_code == 0
+    result = json.loads(result.output)
+
+    component_type_keys = [
+        "complex_schema_asset",
+        "simple_asset",
+        "simple_pipes_script_asset",
+    ]
+
+    assert result["anyOf"] == [
+        {"$ref": f"#/$defs/{component_type_key}"} for component_type_key in component_type_keys
+    ]
+
+    # Sanity check each of the component type schemas has a constant type property matching the
+    # fully scoped component type key
+    for component_type_key in component_type_keys:
+        component_type_schema_def = result["$defs"][component_type_key]
+        assert "type" in component_type_schema_def["properties"]
+        assert (
+            component_type_schema_def["properties"]["type"]["default"]
+            == f"{component_type_key}@dagster_components.test"
+        )
+        assert (
+            component_type_schema_def["properties"]["type"]["const"]
+            == f"{component_type_key}@dagster_components.test"
+        )
+
+
 def test_scaffold_component_command():
     runner = CliRunner()
 
@@ -164,8 +200,8 @@ def test_scaffold_component_command():
                 "dagster_components.test",
                 "scaffold",
                 "component",
-                "dagster_components.test.simple_pipes_script_asset",
-                "qux",
+                "simple_pipes_script_asset@dagster_components.test",
+                "bar/components/qux",
                 "--json-params",
                 '{"asset_key": "my_asset", "filename": "my_asset.py"}',
             ],

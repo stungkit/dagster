@@ -27,7 +27,7 @@ from dagster._core.definitions.resource_requirement import (
     ResourceRequirement,
 )
 from dagster._core.definitions.result import MaterializeResult, ObserveResult
-from dagster._core.definitions.utils import DEFAULT_IO_MANAGER_KEY
+from dagster._core.definitions.utils import DEFAULT_IO_MANAGER_KEY, check_valid_chars
 from dagster._core.errors import (
     DagsterInvalidDefinitionError,
     DagsterInvalidInvocationError,
@@ -36,7 +36,7 @@ from dagster._core.errors import (
 from dagster._core.storage.tags import GLOBAL_CONCURRENCY_TAG
 from dagster._core.types.dagster_type import DagsterType, DagsterTypeKind
 from dagster._utils import IHasInternalInit
-from dagster._utils.warnings import normalize_renamed_param, preview_warning
+from dagster._utils.warnings import normalize_renamed_param
 
 if TYPE_CHECKING:
     from dagster._core.definitions.asset_layer import AssetLayer
@@ -47,7 +47,9 @@ OpComputeFunction: TypeAlias = Callable[..., Any]
 
 
 @deprecated_param(
-    param="version", breaking_version="2.0", additional_warn_text="Use `code_version` instead."
+    param="version",
+    breaking_version="2.0",
+    additional_warn_text="Use `code_version` instead.",
 )
 class OpDefinition(NodeDefinition, IHasInternalInit):
     """Defines an op, the functional unit of user-defined computation.
@@ -78,7 +80,7 @@ class OpDefinition(NodeDefinition, IHasInternalInit):
             not set metadata directly. Values that are not strings will be json encoded and must meet
             the criteria that `json.loads(json.dumps(value)) == value`.
         required_resource_keys (Optional[Set[str]]): Set of resources handles required by this op.
-        code_version (Optional[str]): (Experimental) Version of the code encapsulated by the op. If set,
+        code_version (Optional[str]): Version of the code encapsulated by the op. If set,
             this is used as a default code version for all outputs.
         retry_policy (Optional[RetryPolicy]): The retry policy for this op.
         pool (Optional[str]): A string that identifies the pool that governs this op's execution.
@@ -297,8 +299,7 @@ class OpDefinition(NodeDefinition, IHasInternalInit):
     @property
     def pool(self) -> Optional[str]:
         """Optional[str]: The concurrency pool for this op."""
-        # fallback to fetching from tags for backwards compatibility
-        return self._pool if self._pool else self.tags.get(GLOBAL_CONCURRENCY_TAG)
+        return self._pool
 
     @property
     def pools(self) -> Set[str]:
@@ -601,21 +602,17 @@ def _is_result_object_type(ttype):
 
 
 def _validate_pool(pool, tags):
-    from dagster._core.storage.tags import GLOBAL_CONCURRENCY_TAG
-
     check.opt_str_param(pool, "pool")
+    if not pool:
+        return None
+
+    check_valid_chars(pool)
+
     tags = check.opt_mapping_param(tags, "tags")
     tag_concurrency_key = tags.get(GLOBAL_CONCURRENCY_TAG)
-    if pool and tag_concurrency_key and pool != tag_concurrency_key:
+    if tag_concurrency_key and pool != tag_concurrency_key:
         raise DagsterInvalidDefinitionError(
             f'Pool "{pool}" conflicts with the concurrency key tag "{tag_concurrency_key}".'
         )
 
-    if pool:
-        preview_warning("Pools")
-        return pool
-
-    if tag_concurrency_key:
-        return tag_concurrency_key
-
-    return None
+    return pool

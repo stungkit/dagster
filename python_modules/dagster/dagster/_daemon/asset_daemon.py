@@ -271,6 +271,12 @@ class AutoMaterializeLaunchContext:
 
         self._tick = self._tick.with_status(status=status, **kwargs)
 
+    def set_user_interrupted(self, user_interrupted: bool):
+        self._tick = self._tick.with_user_interrupted(user_interrupted)
+
+    def set_skip_reason(self, skip_reason: str):
+        self._tick = self._tick.with_reason(skip_reason)
+
     def __enter__(self):
         return self
 
@@ -688,7 +694,7 @@ class AssetDaemon(DagsterDaemon):
 
         workspace = workspace_process_context.create_request_context()
 
-        asset_graph = workspace.asset_graph
+        workspace_asset_graph = workspace.asset_graph
 
         instance: DagsterInstance = workspace_process_context.instance
         error_info = None
@@ -713,18 +719,32 @@ class AssetDaemon(DagsterDaemon):
 
             if sensor:
                 selection = check.not_none(sensor.asset_selection)
+                repository_origin = check.not_none(repository).get_remote_origin()
                 # resolve the selection against just the assets in the sensor's repository
                 repo_asset_graph = check.not_none(repository).asset_graph
-                eligible_keys = selection.resolve(repo_asset_graph) | selection.resolve_checks(
+                resolved_keys = selection.resolve(repo_asset_graph) | selection.resolve_checks(
                     repo_asset_graph
                 )
+                eligibility_graph = repo_asset_graph
+
+                # Ensure that if there are two identical asset keys defined in different code
+                # locations with automation conditions, only one of them actually launches runs
+                eligible_keys = {
+                    key
+                    for key in resolved_keys
+                    if (
+                        workspace_asset_graph.get_repository_handle(key).get_remote_origin()
+                        == repository_origin
+                    )
+                }
             else:
-                eligible_keys = asset_graph.get_all_asset_keys()
+                eligible_keys = workspace_asset_graph.get_all_asset_keys()
+                eligibility_graph = workspace_asset_graph
 
             auto_materialize_entity_keys = {
                 target_key
                 for target_key in eligible_keys
-                if asset_graph.get(target_key).automation_condition is not None
+                if eligibility_graph.get(target_key).automation_condition is not None
             }
             num_target_entities = len(auto_materialize_entity_keys)
 
@@ -732,7 +752,7 @@ class AssetDaemon(DagsterDaemon):
                 key
                 for key in eligible_keys
                 if isinstance(key, AssetKey)
-                and asset_graph.get(key).auto_observe_interval_minutes is not None
+                and eligibility_graph.get(key).auto_observe_interval_minutes is not None
             }
             num_auto_observe_assets = len(auto_observe_asset_keys)
 
@@ -753,14 +773,16 @@ class AssetDaemon(DagsterDaemon):
                         SensorInstigatorData,
                         check.not_none(auto_materialize_instigator_state).instigator_data,
                     ).cursor,
-                    asset_graph,
+                    workspace_asset_graph,
                 )
 
                 instigator_origin_id = sensor.get_remote_origin().get_id()
                 instigator_selector_id = sensor.get_remote_origin().get_selector().get_id()
                 instigator_name = sensor.name
             else:
-                stored_cursor = _get_pre_sensor_auto_materialize_cursor(instance, asset_graph)
+                stored_cursor = _get_pre_sensor_auto_materialize_cursor(
+                    instance, workspace_asset_graph
+                )
                 instigator_origin_id = _PRE_SENSOR_AUTO_MATERIALIZE_ORIGIN_ID
                 instigator_selector_id = _PRE_SENSOR_AUTO_MATERIALIZE_SELECTOR_ID
                 instigator_name = _PRE_SENSOR_AUTO_MATERIALIZE_INSTIGATOR_NAME
@@ -871,7 +893,7 @@ class AssetDaemon(DagsterDaemon):
                     tick,
                     sensor,
                     workspace_process_context,
-                    asset_graph,
+                    workspace_asset_graph,
                     auto_materialize_entity_keys,
                     stored_cursor,
                     auto_observe_asset_keys,
@@ -1035,6 +1057,7 @@ class AssetDaemon(DagsterDaemon):
             reserved_run_ids=reserved_run_ids,
             debug_crash_flags=debug_crash_flags,
             submit_threadpool_executor=submit_threadpool_executor,
+            remote_sensor=sensor,
         )
 
         if schedule_storage.supports_auto_materialize_asset_evaluations:
@@ -1118,17 +1141,19 @@ class AssetDaemon(DagsterDaemon):
         reserved_run_ids: Sequence[str],
         debug_crash_flags: SingleInstigatorDebugCrashFlags,
         submit_threadpool_executor: Optional[ThreadPoolExecutor],
+        remote_sensor: Optional[RemoteSensor],
     ):
         updated_evaluation_keys = set()
         run_request_execution_data_cache = {}
+        check_after_runs_num = instance.get_tick_termination_check_interval()
 
         check.invariant(len(run_requests) == len(reserved_run_ids))
-        to_submit = zip(range(len(run_requests)), reserved_run_ids, run_requests)
+        to_submit = enumerate(tick_context.tick.reserved_run_ids_with_requests)
 
         def submit_run_request(
-            run_id_with_run_request: tuple[int, str, RunRequest],
+            run_id_with_run_request: tuple[int, tuple[str, RunRequest]],
         ) -> tuple[str, AbstractSet[EntityKey]]:
-            i, run_id, run_request = run_id_with_run_request
+            i, (run_id, run_request) = run_id_with_run_request
             return self._submit_run_request(
                 i=i,
                 instance=instance,
@@ -1145,7 +1170,7 @@ class AssetDaemon(DagsterDaemon):
         else:
             gen_run_request_results = map(submit_run_request, to_submit)
 
-        for submitted_run_id, entity_keys in gen_run_request_results:
+        for i, (submitted_run_id, entity_keys) in enumerate(gen_run_request_results):
             # heartbeat after each submitted run
             yield
 
@@ -1161,6 +1186,20 @@ class AssetDaemon(DagsterDaemon):
                     )
                     updated_evaluation_keys.add(entity_key)
 
+            # check if the sensor is still enabled:
+            if check_after_runs_num is not None and i % check_after_runs_num == 0:
+                if not self._sensor_is_enabled(instance, remote_sensor):
+                    # The user has manually stopped the sensor mid-iteration. In this case we assume
+                    # the user has a good reason for stopping the sensor (e.g. the sensor is submitting
+                    # many unintentional runs) so we stop submitting runs and will mark the tick as
+                    # skipped so that when the sensor is turned back on we don't detect this tick as incomplete
+                    # and try to submit the same runs again.
+                    self._logger.info(
+                        "Sensor has been manually stopped while submitted runs. No more runs will be submitted."
+                    )
+                    tick_context.set_user_interrupted(True)
+                    break
+
         evaluations_to_update = [
             evaluations_by_key[asset_key] for asset_key in updated_evaluation_keys
         ]
@@ -1172,6 +1211,24 @@ class AssetDaemon(DagsterDaemon):
 
         check_for_debug_crash(debug_crash_flags, "RUN_IDS_ADDED_TO_EVALUATIONS")
 
-        tick_context.update_state(
-            TickStatus.SUCCESS if len(run_requests) > 0 else TickStatus.SKIPPED,
-        )
+        if tick_context.tick.tick_data.user_interrupted:
+            # mark as skipped so that we don't request any remaining runs when the sensor is started again
+            tick_context.update_state(TickStatus.SKIPPED)
+            tick_context.set_skip_reason("Sensor manually stopped mid-iteration.")
+        else:
+            tick_context.update_state(
+                TickStatus.SUCCESS if len(run_requests) > 0 else TickStatus.SKIPPED,
+            )
+
+    def _sensor_is_enabled(self, instance: DagsterInstance, remote_sensor: Optional[RemoteSensor]):
+        use_auto_materialize_sensors = instance.auto_materialize_use_sensors
+        if (not use_auto_materialize_sensors) and get_auto_materialize_paused(instance):
+            return False
+        if use_auto_materialize_sensors and remote_sensor:
+            instigator_state = instance.get_instigator_state(
+                remote_sensor.get_remote_origin_id(), remote_sensor.selector_id
+            )
+            if instigator_state and not instigator_state.is_running:
+                return False
+
+        return True

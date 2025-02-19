@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, AbstractSet, NamedTuple, Optional  # noqa: UP035
 
-from dagster._annotations import experimental
+from dagster._annotations import deprecated
 from dagster._core.asset_graph_view.serializable_entity_subset import SerializableEntitySubset
 from dagster._core.definitions.auto_materialize_rule import AutoMaterializeRule
 from dagster._core.definitions.auto_materialize_rule_evaluation import (
@@ -211,7 +211,7 @@ class MaterializeOnCronRule(
 
 
 @whitelist_for_serdes
-@experimental
+@deprecated(breaking_version="1.10.0")
 class AutoMaterializeAssetPartitionsFilter(
     NamedTuple(
         "_AutoMaterializeAssetPartitionsFilter",
@@ -221,7 +221,7 @@ class AutoMaterializeAssetPartitionsFilter(
     """A filter that can be applied to an asset partition, during auto-materialize evaluation, and
     returns a boolean for whether it passes.
 
-    Attributes:
+    Args:
         latest_run_required_tags (Optional[Sequence[str]]): `passes` returns
             True if the run responsible for the latest materialization of the asset partition
             has all of these tags.
@@ -676,7 +676,7 @@ class SkipOnNotAllParentsUpdatedRule(
     """An auto-materialize rule that enforces that an asset can only be materialized if all parents
     have been materialized since the asset's last materialization.
 
-    Attributes:
+    Args:
         require_update_for_all_parent_partitions (Optional[bool]): Applies only to an unpartitioned
             asset or an asset partition that depends on more than one partition in any upstream asset.
             If true, requires all upstream partitions in each upstream asset to be materialized since
@@ -847,6 +847,7 @@ class SkipOnNotAllParentsUpdatedSinceCronRule(
                 context.legacy_context.instance_queryer.get_asset_subset_updated_after_cursor(
                     asset_key=parent_asset_key,
                     after_cursor=context.legacy_context.previous_max_storage_id,
+                    require_data_version_update=False,
                 ),
                 parent_partitions_def,
             )

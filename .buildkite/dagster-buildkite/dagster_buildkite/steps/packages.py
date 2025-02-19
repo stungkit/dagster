@@ -16,6 +16,7 @@ from dagster_buildkite.utils import (
     BuildkiteStep,
     connect_sibling_docker_container,
     has_dagster_airlift_changes,
+    has_dg_or_components_changes,
     has_storage_test_fixture_changes,
     network_buildkite_container,
     skip_if_not_airlift_or_dlift_commit,
@@ -66,12 +67,6 @@ def build_library_packages_steps() -> List[BuildkiteStep]:
 
     return build_steps_from_package_specs(
         LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG + library_packages_with_standard_config
-    )
-
-
-def build_dagster_ui_screenshot_steps() -> List[BuildkiteStep]:
-    return build_steps_from_package_specs(
-        [PackageSpec("docs/dagster-ui-screenshot", run_pytest=False)]
     )
 
 
@@ -316,7 +311,8 @@ EXAMPLE_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         # snippets in all python versions since we are testing the core code exercised by the
         # snippets against all supported python versions.
         unsupported_python_versions=AvailablePythonVersion.get_all_except_default(),
-        pytest_tox_factors=["all", "integrations"],
+        pytest_tox_factors=["all", "integrations", "docs_snapshot_test"],
+        always_run_if=has_dg_or_components_changes,
     ),
     PackageSpec(
         "examples/project_fully_featured",
@@ -376,9 +372,6 @@ EXAMPLE_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
     PackageSpec(
         "examples/quickstart_snowflake",
         pytest_tox_factors=["pypi"],
-    ),
-    PackageSpec(
-        "examples/experimental/dagster-blueprints",
     ),
     # Runs against live dbt cloud instance, we only want to run on commits and on the
     # nightly build
@@ -548,7 +541,7 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         "python_modules/libraries/dagster-dbt",
         pytest_tox_factors=[
             f"{deps_factor}-{command_factor}"
-            for deps_factor in ["dbt17", "dbt18"]
+            for deps_factor in ["dbt17", "dbt18", "dbt19"]
             for command_factor in ["cloud", "core-main", "core-derived-metadata"]
         ],
     ),

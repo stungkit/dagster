@@ -12,18 +12,13 @@ from dagster._core.definitions.events import AssetMaterialization
 from dagster._core.definitions.result import MaterializeResult
 from dagster._core.execution.context.asset_execution_context import AssetExecutionContext
 from dagster._utils.env import environ
-from dagster_components import component_type
-from dagster_components.core.component_decl_builder import ComponentFileModel
-from dagster_components.core.component_defs_builder import (
-    YamlComponentDecl,
-    build_components_from_component_folder,
-)
-from dagster_components.lib.sling_replication_collection.component import (
-    SlingReplicationCollectionComponent,
-)
+from dagster_components import registered_component_type
+from dagster_components.core.component_decl_builder import ComponentFileModel, path_to_decl_node
+from dagster_components.core.component_defs_builder import YamlComponentDecl, build_component_defs
+from dagster_components.lib.sling_replication_collection.component import SlingReplicationCollection
 from dagster_sling import SlingResource
 
-from dagster_components_tests.utils import assert_assets, get_asset_keys, script_load_context
+from dagster_components_tests.utils import script_load_context
 
 STUB_LOCATION_PATH = Path(__file__).parent.parent / "code_locations" / "sling_location"
 COMPONENT_RELPATH = "components/ingest"
@@ -44,7 +39,7 @@ def sling_path() -> Iterator[Path]:
     the proper temp path.
     """
     with tempfile.TemporaryDirectory() as temp_dir:
-        with environ({"HOME": temp_dir}):
+        with environ({"HOME": temp_dir, "SOME_PASSWORD": "password"}):
             shutil.copytree(STUB_LOCATION_PATH, temp_dir, dirs_exist_ok=True)
 
             # update the replication yaml to reference a CSV file in the tempdir
@@ -78,19 +73,19 @@ def test_python_params(sling_path: Path) -> None:
         ),
     )
     context = script_load_context(decl_node)
-    params = decl_node.get_params(context, SlingReplicationCollectionComponent.get_schema())
-    component = SlingReplicationCollectionComponent.load(params, context)
+    params = decl_node.get_params(SlingReplicationCollection.get_schema())
+    component = SlingReplicationCollection.load(params, context)
 
-    replications = component.sling_replications
+    replications = component.replications
     assert len(replications) == 1
-    op_spec = replications[0].op
-    assert op_spec is None
-    assert get_asset_keys(component) == {
+    op = replications[0].op
+    assert op is None
+
+    defs = component.build_defs(context)
+    assert defs.get_asset_graph().get_all_asset_keys() == {
         AssetKey("input_csv"),
         AssetKey("input_duckdb"),
     }
-
-    defs = component.build_defs(context)
     # inherited from directory name
     assert defs.get_assets_def("input_duckdb").op.name == "replication"
 
@@ -109,14 +104,14 @@ def test_python_params_op_name(sling_path: Path) -> None:
         ),
     )
     context = script_load_context(decl_node)
-    params = decl_node.get_params(context, SlingReplicationCollectionComponent.get_schema())
-    component = SlingReplicationCollectionComponent.load(params, context=context)
+    params = decl_node.get_params(SlingReplicationCollection.get_schema())
+    component = SlingReplicationCollection.load(params, context=context)
 
-    replications = component.sling_replications
+    replications = component.replications
     assert len(replications) == 1
-    op_spec = replications[0].op
-    assert op_spec
-    assert op_spec.name == "my_op"
+    op = replications[0].op
+    assert op
+    assert op.name == "my_op"
     defs = component.build_defs(context)
     assert defs.get_asset_graph().get_all_asset_keys() == {
         AssetKey("input_csv"),
@@ -139,33 +134,43 @@ def test_python_params_op_tags(sling_path: Path) -> None:
         ),
     )
     context = script_load_context(decl_node)
-    params = decl_node.get_params(context, SlingReplicationCollectionComponent.get_schema())
-    component = SlingReplicationCollectionComponent.load(params=params, context=context)
-    replications = component.sling_replications
+    params = decl_node.get_params(SlingReplicationCollection.get_schema())
+    component = SlingReplicationCollection.load(params=params, context=context)
+    replications = component.replications
     assert len(replications) == 1
-    op_spec = replications[0].op
-    assert op_spec
-    assert op_spec.tags == {"tag1": "value1"}
+    op = replications[0].op
+    assert op
+    assert op.tags == {"tag1": "value1"}
     defs = component.build_defs(context)
     assert defs.get_assets_def("input_duckdb").op.tags == {"tag1": "value1"}
 
 
 def test_load_from_path(sling_path: Path) -> None:
-    components = build_components_from_component_folder(
-        script_load_context(), sling_path / "components"
-    )
+    decl_node = path_to_decl_node(sling_path / "components")
+    assert decl_node
+    context = script_load_context(decl_node)
+    components = decl_node.load(context)
     assert len(components) == 1
-    assert get_asset_keys(components[0]) == {
+    component = components[0]
+    assert isinstance(component, SlingReplicationCollection)
+
+    resource = getattr(component, "resource")
+    assert isinstance(resource, SlingResource)
+    assert len(resource.connections) == 1
+    assert resource.connections[0].name == "DUCKDB"
+    assert resource.connections[0].type == "duckdb"
+    assert resource.connections[0].password == "password"
+
+    defs = build_component_defs(components_root=sling_path / "components")
+    assert defs.get_asset_graph().get_all_asset_keys() == {
         AssetKey("input_csv"),
         AssetKey(["foo", "input_duckdb"]),
     }
 
-    assert_assets(components[0], 2)
-
 
 def test_sling_subclass() -> None:
-    @component_type(name="debug_sling_replication")
-    class DebugSlingReplicationComponent(SlingReplicationCollectionComponent):
+    @registered_component_type(name="debug_sling_replication")
+    class DebugSlingReplicationComponent(SlingReplicationCollection):
         def execute(
             self, context: AssetExecutionContext, sling: SlingResource
         ) -> Iterator[Union[AssetMaterialization, MaterializeResult]]:
@@ -178,14 +183,10 @@ def test_sling_subclass() -> None:
             params={"sling": {}, "replications": [{"path": "./replication.yaml"}]},
         ),
     )
-    params = decl_node.get_params(
-        script_load_context(decl_node), DebugSlingReplicationComponent.get_schema()
-    )
-    component_inst = DebugSlingReplicationComponent.load(
-        params=params,
-        context=script_load_context(decl_node),
-    )
-    assert get_asset_keys(component_inst) == {
+    context = script_load_context(decl_node)
+    params = decl_node.get_params(DebugSlingReplicationComponent.get_schema())
+    component_inst = DebugSlingReplicationComponent.load(params=params, context=context)
+    assert component_inst.build_defs(context).get_asset_graph().get_all_asset_keys() == {
         AssetKey("input_csv"),
         AssetKey("input_duckdb"),
     }

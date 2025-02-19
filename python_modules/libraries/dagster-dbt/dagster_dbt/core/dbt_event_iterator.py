@@ -10,7 +10,7 @@ from dagster import (
     _check as check,
     get_dagster_logger,
 )
-from dagster._annotations import experimental, public
+from dagster._annotations import public
 from dagster._core.definitions.metadata import TableMetadataSet, TextMetadataValue
 from dagster._core.errors import DagsterInvalidPropertyError
 from dagster._core.utils import exhaust_iterator_and_yield_results_with_exception, imap
@@ -206,13 +206,12 @@ class DbtEventIterator(Iterator[T]):
         return self
 
     @public
-    @experimental
     def fetch_row_counts(
         self,
     ) -> (
         "DbtEventIterator[Union[Output, AssetMaterialization, AssetObservation, AssetCheckResult]]"
     ):
-        """Experimental functionality which will fetch row counts for materialized dbt
+        """Functionality which will fetch row counts for materialized dbt
         models in a dbt run once they are built. Note that row counts will not be fetched
         for views, since this requires running the view's SQL query which may be costly.
 
@@ -224,14 +223,13 @@ class DbtEventIterator(Iterator[T]):
         return self._attach_metadata(_fetch_row_count_metadata)
 
     @public
-    @experimental
     def fetch_column_metadata(
         self,
         with_column_lineage: bool = True,
     ) -> (
         "DbtEventIterator[Union[Output, AssetMaterialization, AssetObservation, AssetCheckResult]]"
     ):
-        """Experimental functionality which will fetch column schema metadata for dbt models in a run
+        """Functionality which will fetch column schema metadata for dbt models in a run
         once they're built. It will also fetch schema information for upstream models and generate
         column lineage metadata using sqlglot, if enabled.
 
@@ -305,7 +303,6 @@ class DbtEventIterator(Iterator[T]):
         )
 
     @public
-    @experimental
     def with_insights(
         self,
         skip_config_check: bool = False,

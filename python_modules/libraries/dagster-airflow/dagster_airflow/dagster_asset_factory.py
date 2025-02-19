@@ -11,6 +11,7 @@ from dagster import (
     TimeWindowPartitionsDefinition,
     _check as check,
 )
+from dagster._annotations import superseded
 from dagster._core.definitions.graph_definition import create_adjacency_lists
 from dagster._utils.schedules import is_valid_cron_schedule
 
@@ -95,13 +96,18 @@ def _build_asset_dependencies(
     return (output_mappings, keys_by_output_name, internal_asset_deps)
 
 
+@superseded(
+    additional_warn_text=(
+        "`load_assets_from_airflow_dag` has been superseded by the functionality in the `dagster-airlift` library."
+    )
+)
 def load_assets_from_airflow_dag(
     dag: DAG,
     task_ids_by_asset_key: Mapping[AssetKey, AbstractSet[str]] = {},
     upstream_dependencies_by_asset_key: Mapping[AssetKey, AbstractSet[AssetKey]] = {},
     connections: Optional[list[Connection]] = None,
 ) -> list[AssetsDefinition]:
-    """[Experimental] Construct Dagster Assets for a given Airflow DAG.
+    """Construct Dagster Assets for a given Airflow DAG.
 
     Args:
         dag (DAG): The Airflow DAG to compile into a Dagster job
@@ -109,7 +115,7 @@ def load_assets_from_airflow_dag(
             keys to task ids. Used break up the Airflow Dag into multiple SDAs
         upstream_dependencies_by_asset_key (Optional[Mapping[AssetKey, AbstractSet[AssetKey]]]): A
             mapping from upstream asset keys to assets provided in task_ids_by_asset_key. Used to
-            declare new upstream SDA depenencies.
+            declare new upstream SDA dependencies.
         connections (List[Connection]): List of Airflow Connections to be created in the Airflow DB
 
     Returns:
