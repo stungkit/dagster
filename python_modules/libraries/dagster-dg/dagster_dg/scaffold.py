@@ -2,14 +2,16 @@ import json
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import click
 import tomlkit
 import tomlkit.items
+from typing_extensions import TypeAlias
 
 from dagster_dg.component import RemoteLibraryObjectRegistry
 from dagster_dg.config import (
+    DgProjectPythonEnvironment,
     DgRawWorkspaceConfig,
     DgWorkspaceScaffoldProjectOptions,
     discover_workspace_root,
@@ -24,6 +26,7 @@ from dagster_dg.utils import (
     set_toml_node,
 )
 
+ScaffoldFormatOptions: TypeAlias = Literal["yaml", "python"]
 # ########################
 # ##### WORKSPACE
 # ########################
@@ -74,6 +77,7 @@ def scaffold_project(
     use_editable_dagster: Optional[str],
     skip_venv: bool = False,
     populate_cache: bool = True,
+    python_environment: Optional[DgProjectPythonEnvironment] = None,
 ) -> None:
     click.echo(f"Creating a Dagster project at {path}.")
 
@@ -119,6 +123,10 @@ def scaffold_project(
         uv_sources=uv_sources_str,
     )
     click.echo(f"Scaffolded files for Dagster project at {path}.")
+
+    if python_environment:
+        with modify_toml(dg_context.with_root_path(path).pyproject_toml_path) as toml:
+            set_toml_node(toml, ("tool", "dg", "project", "python_environment"), python_environment)
 
     # Build the venv
     cl_dg_context = dg_context.with_root_path(path)
@@ -250,7 +258,11 @@ def scaffold_component_type(dg_context: DgContext, class_name: str, module_name:
 
 
 def scaffold_library_object(
-    path: Path, typename: str, scaffold_params: Optional[Mapping[str, Any]], dg_context: "DgContext"
+    path: Path,
+    typename: str,
+    scaffold_params: Optional[Mapping[str, Any]],
+    dg_context: "DgContext",
+    scaffold_format: ScaffoldFormatOptions,
 ) -> None:
     scaffold_command = [
         "scaffold",
@@ -258,5 +270,6 @@ def scaffold_library_object(
         typename,
         str(path),
         *(["--json-params", json.dumps(scaffold_params)] if scaffold_params else []),
+        *(["--scaffold-format", scaffold_format]),
     ]
     dg_context.external_components_command(scaffold_command)
