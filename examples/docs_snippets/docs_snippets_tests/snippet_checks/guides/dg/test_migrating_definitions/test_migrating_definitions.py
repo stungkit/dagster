@@ -17,6 +17,7 @@ from docs_snippets_tests.snippet_checks.utils import (
 MASK_MY_EXISTING_PROJECT = (r" \/.*?\/my-existing-project", " /.../my-existing-project")
 MASK_ISORT = (r"#isort:skip-file", "# definitions.py")
 MASK_VENV = (r"Using.*\.venv.*", "")
+MASK_USING_LOG_MESSAGE = (r"Using.*\n", "")
 
 
 SNIPPETS_DIR = (
@@ -58,8 +59,7 @@ def test_components_docs_migrating_definitions(update_snippets: bool) -> None:
         _run_command(cmd="uv venv")
         _run_command(cmd="uv sync")
         _run_command(
-            f"uv add --editable '{DAGSTER_ROOT / 'python_modules' / 'libraries' / 'dagster-components'!s}' "
-            f"'{DAGSTER_ROOT / 'python_modules' / 'dagster'!s}' "
+            f"uv add --editable '{DAGSTER_ROOT / 'python_modules' / 'dagster'!s}' "
             f"'{DAGSTER_ROOT / 'python_modules' / 'libraries' / 'dagster-shared'!s}' "
             f"'{DAGSTER_ROOT / 'python_modules' / 'dagster-webserver'!s}' "
             f"'{DAGSTER_ROOT / 'python_modules' / 'dagster-pipes'!s}' "
@@ -77,7 +77,6 @@ def test_components_docs_migrating_definitions(update_snippets: bool) -> None:
         create_file(
             Path("my_existing_project") / "definitions.py",
             format_multiline("""
-            import dagster_components as dg_components
             import my_existing_project.defs
             from my_existing_project.analytics import assets as analytics_assets
             from my_existing_project.analytics.jobs import (
@@ -86,6 +85,7 @@ def test_components_docs_migrating_definitions(update_snippets: bool) -> None:
             )
 
             import dagster as dg
+            import dagster.components
 
             defs = dg.Definitions.merge(
                 dg.Definitions(
@@ -93,7 +93,7 @@ def test_components_docs_migrating_definitions(update_snippets: bool) -> None:
                     jobs=[regenerate_analytics_job],
                     schedules=[regenerate_analytics_hourly_schedule],
                 ),
-                dg_components.load_defs(my_existing_project.defs),
+                dagster.components.load_defs(my_existing_project.defs),
             )
         """),
             SNIPPETS_DIR / f"{get_next_snip_number()}-definitions-after.py",
@@ -136,10 +136,10 @@ def test_components_docs_migrating_definitions(update_snippets: bool) -> None:
         create_file(
             Path("my_existing_project") / "definitions.py",
             format_multiline("""
-                import dagster_components as dg_components
+                import dagster as dg
                 import my_existing_project.defs
 
-                defs = dg_components.load_defs(my_existing_project.defs)
+                defs = dg.components.load_defs(my_existing_project.defs)
             """),
             SNIPPETS_DIR / f"{get_next_snip_number()}-definitions-after-all.py",
         )
@@ -154,5 +154,5 @@ def test_components_docs_migrating_definitions(update_snippets: bool) -> None:
             snippet_path=SNIPPETS_DIR
             / f"{get_next_snip_number()}-list-defs-after-all.txt",
             update_snippets=update_snippets,
-            snippet_replace_regex=[MASK_VENV],
+            snippet_replace_regex=[MASK_VENV, MASK_USING_LOG_MESSAGE],
         )

@@ -33,9 +33,12 @@ export interface AssetGraphFetchScope {
   groupSelector?: AssetGroupSelector;
   kinds?: string[];
 
+  externalAssets?: {id: string; key: {path: Array<string>}}[];
+
   // This is used to indicate we shouldn't start handling any input.
   // This is used by pages where `hideNodesMatching` is only available asynchronously.
   loading?: boolean;
+  useWorker?: boolean;
 }
 
 export type AssetGraphQueryItem = GraphQueryItem & {
@@ -65,11 +68,23 @@ export function useFullAssetGraphData(options: AssetGraphFetchScope) {
     () => workerSpawner(() => new Worker(new URL('./ComputeGraphData.worker', import.meta.url))),
     [],
   );
+  useEffect(() => {
+    return () => {
+      spawnBuildGraphDataWorker.terminate();
+    };
+  }, [spawnBuildGraphDataWorker]);
 
+  const externalAssetNodes = useMemo(
+    () => (options.externalAssets ?? []).map((a) => buildExternalAssetQueryItem(a).node),
+    [options.externalAssets],
+  );
   const nodes = fetchResult.data?.assetNodes;
   const queryItems = useMemo(
-    () => (nodes ? buildGraphQueryItems(nodes) : []).map(({node}) => node),
-    [nodes],
+    () => [
+      ...(nodes ? buildGraphQueryItems(nodes) : []).map(({node}) => node),
+      ...externalAssetNodes,
+    ],
+    [nodes, externalAssetNodes],
   );
 
   const [fullAssetGraphData, setFullAssetGraphData] = useState<GraphData | null>(null);
@@ -88,6 +103,7 @@ export function useFullAssetGraphData(options: AssetGraphFetchScope) {
         nodes: queryItems,
       },
       spawnBuildGraphDataWorker,
+      options.useWorker ?? true,
     )
       ?.then((data) => {
         if (lastProcessedRequestRef.current < requestId) {
@@ -99,7 +115,7 @@ export function useFullAssetGraphData(options: AssetGraphFetchScope) {
         // buildGraphData is throttled and rejects promises when another call is made before the throttle delay.
         console.warn(e);
       });
-  }, [options.loading, queryItems, spawnBuildGraphDataWorker]);
+  }, [options.loading, options.useWorker, queryItems, spawnBuildGraphDataWorker]);
 
   return {fullAssetGraphData, loading: !fetchResult.data || fetchResult.loading || options.loading};
 }
@@ -154,9 +170,17 @@ export function useAssetGraphData(opsQuery: string, options: AssetGraphFetchScop
     return matching;
   }, [nodes, options.hideNodesMatching]);
 
+  const externalAssetNodes = useMemo(
+    () => (options.externalAssets ?? []).map(buildExternalAssetQueryItem),
+    [options.externalAssets],
+  );
+
   const graphQueryItems = useMemo(
-    () => (repoFilteredNodes ? buildGraphQueryItems(repoFilteredNodes) : []),
-    [repoFilteredNodes],
+    () => [
+      ...(repoFilteredNodes ? buildGraphQueryItems(repoFilteredNodes) : []),
+      ...externalAssetNodes,
+    ],
+    [repoFilteredNodes, externalAssetNodes],
   );
 
   const [state, setState] = useState<GraphDataState>(INITIAL_STATE);
@@ -175,6 +199,11 @@ export function useAssetGraphData(opsQuery: string, options: AssetGraphFetchScop
     () => workerSpawner(() => new Worker(new URL('./ComputeGraphData.worker', import.meta.url))),
     [],
   );
+  useEffect(() => {
+    return () => {
+      spawnComputeGraphDataWorker.terminate();
+    };
+  }, [spawnComputeGraphDataWorker]);
 
   useLayoutEffect(() => {
     if (options.loading || supplementaryDataLoading) {
@@ -201,6 +230,7 @@ export function useAssetGraphData(opsQuery: string, options: AssetGraphFetchScop
         supplementaryData,
       },
       spawnComputeGraphDataWorker,
+      options.useWorker ?? true,
     )
       ?.then((data) => {
         if (lastProcessedRequestRef.current < requestId) {
@@ -228,6 +258,7 @@ export function useAssetGraphData(opsQuery: string, options: AssetGraphFetchScop
     supplementaryData,
     supplementaryDataLoading,
     spawnComputeGraphDataWorker,
+    options.useWorker,
   ]);
 
   const loading = fetchResult.loading || graphDataLoading || supplementaryDataLoading;
@@ -387,8 +418,9 @@ let _id = 0;
 async function computeGraphDataWrapper(
   props: Omit<ComputeGraphDataMessageType, 'id' | 'type'>,
   spawnComputeGraphDataWorker: () => Worker,
+  useWorker: boolean,
 ): Promise<GraphDataState> {
-  if (featureEnabled(FeatureFlag.flagAssetSelectionWorker)) {
+  if (featureEnabled(FeatureFlag.flagAssetSelectionWorker) && useWorker) {
     const worker = spawnComputeGraphDataWorker();
     return new Promise<GraphDataState>((resolve) => {
       const id = ++_id;
@@ -426,8 +458,9 @@ const buildGraphData = indexedDBAsyncMemoize<GraphData, typeof buildGraphDataWra
 async function buildGraphDataWrapper(
   props: Omit<BuildGraphDataMessageType, 'id' | 'type'>,
   spawnBuildGraphDataWorker: () => Worker,
+  useWorker: boolean,
 ): Promise<GraphData> {
-  if (featureEnabled(FeatureFlag.flagAssetSelectionWorker)) {
+  if (featureEnabled(FeatureFlag.flagAssetSelectionWorker) && useWorker) {
     const worker = spawnBuildGraphDataWorker();
     return new Promise<GraphData>((resolve) => {
       const id = ++_id;
@@ -454,3 +487,50 @@ async function buildGraphDataWrapper(
   }
   return buildGraphDataImpl(props.nodes);
 }
+
+const buildExternalAssetQueryItem = (asset: {
+  id: string;
+  key: {path: string[]};
+}): AssetGraphQueryItem => {
+  return {
+    name: tokenForAssetKey(asset.key),
+    inputs: [],
+    outputs: [],
+    node: {
+      __typename: 'AssetNode',
+      id: asset.id,
+      assetKey: {
+        __typename: 'AssetKey',
+        ...asset.key,
+      },
+      groupName: '',
+      isExecutable: false,
+      changedReasons: [],
+      tags: [],
+      owners: [],
+      hasMaterializePermission: false,
+      repository: {
+        __typename: 'Repository',
+        id: '',
+        name: '',
+        location: {
+          __typename: 'RepositoryLocation',
+          id: '',
+          name: '',
+        },
+      },
+      dependencyKeys: [],
+      dependedByKeys: [],
+      graphName: null,
+      jobNames: [],
+      opNames: [],
+      opVersion: null,
+      description: null,
+      computeKind: null,
+      isPartitioned: false,
+      isObservable: false,
+      isMaterializable: false,
+      kinds: [],
+    },
+  };
+};

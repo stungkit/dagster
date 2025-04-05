@@ -8,6 +8,8 @@ from typing import (  # noqa: UP035
     TYPE_CHECKING,
     Any,
     Callable,
+    Generic,
+    Iterator,
     NamedTuple,
     Optional,
     Tuple,  # noqa: F401
@@ -34,6 +36,7 @@ TVal = TypeVar("TVal")
 
 
 _RECORD_ANNOTATIONS_FIELD = "__record_annotations__"
+_RECORD_DEFAULTS_FIELD = "__record_defaults__"
 _CHECKED_NEW = "__checked_new__"
 _DEFAULTS_NEW = "__defaults_new__"
 _NAMED_TUPLE_BASE_NEW_FIELD = "__nt_new__"
@@ -163,6 +166,7 @@ def _namedtuple_record_transform(
         "__hidden_replace__": base._replace,
         RECORD_MARKER_FIELD: RECORD_MARKER_VALUE,
         _RECORD_ANNOTATIONS_FIELD: field_set,
+        _RECORD_DEFAULTS_FIELD: defaults,
         _NAMED_TUPLE_BASE_NEW_FIELD: nt_new,
         _REMAPPING_FIELD: field_to_new_mapping or {},
         _ORIGINAL_CLASS_FIELD: cls,
@@ -364,6 +368,11 @@ def has_generated_new(obj) -> bool:
 def get_record_annotations(obj) -> Mapping[str, type]:
     check.invariant(is_record(obj), "Only works for @record decorated classes")
     return getattr(obj, _RECORD_ANNOTATIONS_FIELD)
+
+
+def get_record_defaults(obj) -> Mapping[str, Any]:
+    check.invariant(is_record(obj), "Only works for @record decorated classes")
+    return getattr(obj, _RECORD_DEFAULTS_FIELD)
 
 
 def get_original_class(obj):
@@ -609,3 +618,17 @@ def _pydantic_core_schema(cls, source: Any, handler):
     from pydantic_core import core_schema
 
     return core_schema.is_instance_schema(cls)
+
+
+TRecord = TypeVar("TRecord")
+
+
+class NamedTupleAdapter(Generic[TRecord]):
+    def _asdict(self: TRecord) -> Mapping[str, Any]:
+        return as_dict(self)
+
+    def _replace(self: TRecord, **kwargs) -> TRecord:
+        return replace(self, **kwargs)
+
+    def __iter__(self) -> Iterator:
+        return tuple.__iter__(self)  # type: ignore

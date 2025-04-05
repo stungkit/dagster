@@ -30,7 +30,7 @@ from dagster._core.definitions.reconstruct import ReconstructableRepository
 from dagster._core.definitions.repository_definition import RepositoryLoadData
 from dagster._core.definitions.resource_definition import resource
 from dagster._core.execution.with_resources import with_resources
-from dagster._utils.test.definitions import lazy_definitions, scoped_definitions_load_context
+from dagster._utils.test.definitions import definitions, scoped_definitions_load_context
 
 from dagster_tests.general_tests.test_repository import (
     define_empty_job,
@@ -74,7 +74,7 @@ def define_cacheable_and_uncacheable_assets():
     return [MyCacheableAssets("a"), MyCacheableAssets("b"), upstream, downstream]
 
 
-@lazy_definitions
+@definitions
 def cacheable_asset_repo():
     @repository
     def cacheable_asset_repo():
@@ -226,13 +226,21 @@ def test_resolve_with_resources():
         def foo_resource():
             return 3
 
+        cacheable_assets = define_uncacheable_and_resource_dependent_cacheable_assets()
+        cacheable_assets_with_resources = with_resources(
+            define_uncacheable_and_resource_dependent_cacheable_assets(),
+            {"foo": foo_resource},
+        )
+
+        assert (
+            cacheable_assets_with_resources[0].unique_id
+            == f"{cacheable_assets[0].unique_id}_with_resources"
+        )
+
         @repository
         def resource_dependent_repo_with_resources():
             return [
-                with_resources(
-                    define_uncacheable_and_resource_dependent_cacheable_assets(),
-                    {"foo": foo_resource},
-                ),
+                cacheable_assets_with_resources,
                 define_asset_job(
                     "all_asset_job",
                 ),

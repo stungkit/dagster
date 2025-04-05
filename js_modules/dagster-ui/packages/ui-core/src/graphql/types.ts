@@ -101,7 +101,7 @@ export type Asset = {
   __typename: 'Asset';
   assetMaterializationHistory: MaterializationHistoryConnection;
   assetMaterializations: Array<MaterializationEvent>;
-  assetObservations: Array<ObservationEvent>;
+  assetObservations: ObservationEventConnection;
   definition: Maybe<AssetNode>;
   id: Scalars['String']['output'];
   key: AssetKey;
@@ -128,6 +128,7 @@ export type AssetAssetMaterializationsArgs = {
 export type AssetAssetObservationsArgs = {
   afterTimestampMillis?: InputMaybe<Scalars['String']['input']>;
   beforeTimestampMillis?: InputMaybe<Scalars['String']['input']>;
+  cursor?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   partitionInLast?: InputMaybe<Scalars['Int']['input']>;
   partitions?: InputMaybe<Array<Scalars['String']['input']>>;
@@ -406,13 +407,15 @@ export type AssetLineageInfo = {
 export type AssetMaterializationEventType = FailedToMaterializeEvent | MaterializationEvent;
 
 export enum AssetMaterializationFailureReason {
-  COMPUTE_FAILED = 'COMPUTE_FAILED',
-  SKIPPED_OPTIONAL = 'SKIPPED_OPTIONAL',
-  UNEXPECTED_TERMINATION = 'UNEXPECTED_TERMINATION',
+  FAILED_TO_MATERIALIZE = 'FAILED_TO_MATERIALIZE',
+  RUN_TERMINATED = 'RUN_TERMINATED',
   UNKNOWN = 'UNKNOWN',
-  UPSTREAM_COMPUTE_FAILED = 'UPSTREAM_COMPUTE_FAILED',
-  UPSTREAM_SKIPPED = 'UPSTREAM_SKIPPED',
-  USER_TERMINATION = 'USER_TERMINATION',
+  UPSTREAM_FAILED_TO_MATERIALIZE = 'UPSTREAM_FAILED_TO_MATERIALIZE',
+}
+
+export enum AssetMaterializationFailureType {
+  FAILED = 'FAILED',
+  SKIPPED = 'SKIPPED',
 }
 
 export type AssetMaterializationPlannedEvent = MessageEvent &
@@ -1645,6 +1648,7 @@ export type FailedToMaterializeEvent = DisplayableEvent &
     label: Maybe<Scalars['String']['output']>;
     level: LogLevel;
     materializationFailureReason: AssetMaterializationFailureReason;
+    materializationFailureType: AssetMaterializationFailureType;
     message: Scalars['String']['output'];
     metadataEntries: Array<
       | AssetMetadataEntry
@@ -3139,6 +3143,12 @@ export type ObservationEvent = DisplayableEvent &
     timestamp: Scalars['String']['output'];
   };
 
+export type ObservationEventConnection = {
+  __typename: 'ObservationEventConnection';
+  cursor: Scalars['String']['output'];
+  results: Array<ObservationEvent>;
+};
+
 export type Output = {
   __typename: 'Output';
   definition: OutputDefinition;
@@ -4187,8 +4197,10 @@ export type QueryWorkspaceLocationEntryOrErrorArgs = {
 };
 
 export type ReexecutionParams = {
+  extraTags?: InputMaybe<Array<ExecutionTag>>;
   parentRunId: Scalars['String']['input'];
   strategy: ReexecutionStrategy;
+  useParentRunTags?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export enum ReexecutionStrategy {
@@ -6076,7 +6088,9 @@ export const buildAsset = (
     assetObservations:
       overrides && overrides.hasOwnProperty('assetObservations')
         ? overrides.assetObservations!
-        : [],
+        : relationshipsToOmit.has('ObservationEventConnection')
+          ? ({} as ObservationEventConnection)
+          : buildObservationEventConnection({}, relationshipsToOmit),
     definition:
       overrides && overrides.hasOwnProperty('definition')
         ? overrides.definition!
@@ -8653,7 +8667,11 @@ export const buildFailedToMaterializeEvent = (
     materializationFailureReason:
       overrides && overrides.hasOwnProperty('materializationFailureReason')
         ? overrides.materializationFailureReason!
-        : AssetMaterializationFailureReason.COMPUTE_FAILED,
+        : AssetMaterializationFailureReason.FAILED_TO_MATERIALIZE,
+    materializationFailureType:
+      overrides && overrides.hasOwnProperty('materializationFailureType')
+        ? overrides.materializationFailureType!
+        : AssetMaterializationFailureType.FAILED,
     message: overrides && overrides.hasOwnProperty('message') ? overrides.message! : 'libero',
     metadataEntries:
       overrides && overrides.hasOwnProperty('metadataEntries') ? overrides.metadataEntries! : [],
@@ -11033,6 +11051,19 @@ export const buildObservationEvent = (
   };
 };
 
+export const buildObservationEventConnection = (
+  overrides?: Partial<ObservationEventConnection>,
+  _relationshipsToOmit: Set<string> = new Set(),
+): {__typename: 'ObservationEventConnection'} & ObservationEventConnection => {
+  const relationshipsToOmit: Set<string> = new Set(_relationshipsToOmit);
+  relationshipsToOmit.add('ObservationEventConnection');
+  return {
+    __typename: 'ObservationEventConnection',
+    cursor: overrides && overrides.hasOwnProperty('cursor') ? overrides.cursor! : 'veniam',
+    results: overrides && overrides.hasOwnProperty('results') ? overrides.results! : [],
+  };
+};
+
 export const buildOutput = (
   overrides?: Partial<Output>,
   _relationshipsToOmit: Set<string> = new Set(),
@@ -12728,12 +12759,17 @@ export const buildReexecutionParams = (
   const relationshipsToOmit: Set<string> = new Set(_relationshipsToOmit);
   relationshipsToOmit.add('ReexecutionParams');
   return {
+    extraTags: overrides && overrides.hasOwnProperty('extraTags') ? overrides.extraTags! : [],
     parentRunId:
       overrides && overrides.hasOwnProperty('parentRunId') ? overrides.parentRunId! : 'sunt',
     strategy:
       overrides && overrides.hasOwnProperty('strategy')
         ? overrides.strategy!
         : ReexecutionStrategy.ALL_STEPS,
+    useParentRunTags:
+      overrides && overrides.hasOwnProperty('useParentRunTags')
+        ? overrides.useParentRunTags!
+        : false,
   };
 };
 

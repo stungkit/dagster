@@ -16,7 +16,6 @@ instead of this:
 For more information, see "[Defining assets](defining-assets)".
 ```
 
-
 ### Partials
 
 Docusaurus supports [markdown partials](https://docusaurus.io/docs/markdown-features/react#importing-markdown) for including content in multiple places.
@@ -40,6 +39,16 @@ import Deprecated from '@site/docs/partials/\_Deprecated.md';
 
 <Deprecated />
 ```
+
+### API documentation
+
+API documentation lives in reStructuredText files in the [/docs/sphinx/sections/api/apidocs](https://github.com/dagster-io/dagster/tree/master/docs/sphinx/sections/api/apidocs) directory. These files reference modules, classes, and methods from Python files in the [python_modules](https://github.com/dagster-io/dagster/tree/master/python_modules) directory (mainly the `dagster`, `dagster-pipes`, and `libraries` directories). When the API docs are built, Sphinx populates them with the docstrings from those modules, classes, and methods.
+
+When you make changes to the API, you may need to do some or all of the following:
+* Add or update docstrings in Python files
+* Update reStructuredText files to reference new modules, classes, or methods
+
+In any case, you will need to follow the [reStructuredText syntax](https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html).
 
 ## Formatting
 
@@ -151,11 +160,11 @@ Here's a note
 
 Available admonitions:
 
-* `:::note`
-* `:::tip`
-* `:::info`
-* `:::warning`
-* `:::danger`
+- `:::note`
+- `:::tip`
+- `:::info`
+- `:::warning`
+- `:::danger`
 
 You can specify your own title for admonitions:
 
@@ -247,7 +256,7 @@ The `path` is relative to the `./examples/` directory for maximum flexibility. T
 Some CLI invocations may be brief enough that we don't want to include them in a separate file. In that case, we can use the `contents` prop:
 
 ```
-<CliInvocationExample contents="uv add 'dagster-components[sling]'" />
+<CliInvocationExample contents="uv add dagster-sling" />
 ```
 
 For more information on testing the CLI commands used in docs, see [the README in docs tests](../../examples/docs_snippets/docs_snippets_tests/snippet_checks/README.md).

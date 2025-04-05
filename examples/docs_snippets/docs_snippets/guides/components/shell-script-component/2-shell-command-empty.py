@@ -1,16 +1,18 @@
-from dagster import Definitions
-from dagster_components import (
-    Component,
-    ComponentLoadContext,
-    ResolvableModel,
-)
+from dataclasses import dataclass
 
-class ShellCommand(Component, ResolvableModel):
+import dagster as dg
+from dagster.components import Component, ComponentLoadContext, Resolvable
+
+
+@dataclass
+class ShellCommand(Component, Resolvable):
     """COMPONENT SUMMARY HERE.
 
     COMPONENT DESCRIPTION HERE.
     """
 
-    def build_defs(self, load_context: ComponentLoadContext) -> Definitions:
+    # added fields here will define yaml schema via Resolvable
+
+    def build_defs(self, context: ComponentLoadContext) -> dg.Definitions:
         # Add definition construction logic here.
-        return Definitions()
+        return dg.Definitions()

@@ -6,6 +6,7 @@ from dagster_dg.cache import DgCache
 from dagster_dg.cli.check import check_group
 from dagster_dg.cli.dev import dev_command
 from dagster_dg.cli.docs import docs_group
+from dagster_dg.cli.env import env_group
 from dagster_dg.cli.init import init_command
 from dagster_dg.cli.launch import launch_command
 from dagster_dg.cli.list import list_group
@@ -28,6 +29,7 @@ def create_dg_cli():
         commands={
             "check": check_group,
             "docs": docs_group,
+            "env": env_group,
             "utils": utils_group,
             "launch": launch_command,
             "list": list_group,
@@ -109,7 +111,7 @@ def create_dg_cli():
 def _rebuild_component_registry(dg_context: DgContext):
     if not dg_context.has_cache:
         exit_with_error("Cache is disabled. This command cannot be run without a cache.")
-    elif not dg_context.config.cli.use_dg_managed_environment:
+    elif not dg_context.use_dg_managed_environment:
         exit_with_error(
             "Cannot rebuild the component registry with environment management disabled."
         )

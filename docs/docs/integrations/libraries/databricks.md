@@ -9,13 +9,12 @@ date: 2024-08-20
 apireflink: https://docs.dagster.io/api/python-api/libraries/dagster-databricks
 docslink: https://docs.dagster.io/integrations/libraries/databricks
 partnerlink: https://databricks.com/
-logo: /integrations/databricks.svg
 categories:
   - Compute
 enabledBy:
 enables:
 tags: [dagster-supported, compute]
-sidebar_custom_props: 
+sidebar_custom_props:
   logo: images/integrations/databricks.svg
 ---
 

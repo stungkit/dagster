@@ -19,8 +19,8 @@ from pydantic import BaseModel
 from typing_extensions import TypeAlias, TypeGuard, get_args, get_origin
 
 import dagster._check as check
-from dagster import Field as DagsterField
 from dagster._annotations import deprecated
+from dagster._config.field import Field as DagsterField
 from dagster._config.field_utils import config_dictionary_from_values
 from dagster._config.pythonic_config.attach_other_object_to_context import (
     IAttachDifferentObjectToOpContext as IAttachDifferentObjectToOpContext,
@@ -834,7 +834,7 @@ def _is_annotated_as_resource_type(annotation: type, metadata: list[str]) -> boo
     """Determines if a field in a structured config class is annotated as a resource type or not."""
     from dagster._config.pythonic_config.type_check_utils import safe_is_subclass
 
-    if metadata and metadata[0] == "resource_dependency":
+    if metadata and any(m == "resource_dependency" for m in metadata):
         return True
 
     if is_closed_python_optional_type(annotation):

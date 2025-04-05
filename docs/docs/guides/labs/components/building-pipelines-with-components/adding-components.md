@@ -1,5 +1,5 @@
 ---
-title: "Adding components to your project"
+title: 'Adding components to your project'
 sidebar_position: 200
 ---
 
@@ -50,7 +50,7 @@ This will create a new directory inside your `components/` folder that contains 
 The `component.yaml` is the primary configuration file for a component. It contains two top-level fields:
 
 - `type`: The type of the component defined in this directory
-- `attributes`: A dictionary of attributes that are specific to this component type. The schema for these attributes is defined by the `get_schema` method on the component class.
+- `attributes`: A dictionary of attributes that are specific to this component type. The schema for these attributes is defined by attributes on the `Component`  and totally customized by overriding `get_model_cls` method on the component class.
 
 To see a sample `component.yaml` file for your specific component, you can run:
 
@@ -70,6 +70,6 @@ A common use case for templating is to avoid exposing environment variables (par
 component_type: my_snowflake_component
 
 attributes:
-    account: "{{ env('SNOWFLAKE_ACCOUNT') }}"
-    password: "{{ env('SNOWFLAKE_PASSWORD') }}"
+  account: "{{ env('SNOWFLAKE_ACCOUNT') }}"
+  password: "{{ env('SNOWFLAKE_PASSWORD') }}"
 ```

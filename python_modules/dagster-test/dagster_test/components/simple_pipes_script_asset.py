@@ -6,14 +6,20 @@ from dagster._core.definitions.decorators.asset_decorator import asset
 from dagster._core.definitions.definitions_class import Definitions
 from dagster._core.execution.context.asset_execution_context import AssetExecutionContext
 from dagster._core.pipes.subprocess import PipesSubprocessClient
-from dagster_components import Component, ComponentLoadContext
-from dagster_components.component_scaffolding import scaffold_component_yaml
-from dagster_components.scaffold.scaffold import Scaffolder, ScaffoldRequest, scaffold_with
+from dagster.components import Component, ComponentLoadContext, Model
+from dagster.components.component_scaffolding import scaffold_component
+from dagster.components.scaffold.scaffold import Scaffolder, ScaffoldRequest, scaffold_with
 from pydantic import BaseModel
 
 
 # Same schema used for file generation and defs generation
 class SimplePipesScriptScaffoldParams(BaseModel):
+    asset_key: str
+    filename: str
+
+
+# Same schema used for file generation and defs generation
+class SimplePipesScriptComponentModel(Model):
     asset_key: str
     filename: str
 
@@ -24,7 +30,7 @@ class SimplePipesScriptScaffolder(Scaffolder):
         return SimplePipesScriptScaffoldParams
 
     def scaffold(self, request: ScaffoldRequest, params: SimplePipesScriptScaffoldParams) -> None:
-        scaffold_component_yaml(request, params.model_dump())
+        scaffold_component(request, params.model_dump())
         Path(request.target_path, params.filename).write_text(
             _SCRIPT_TEMPLATE.format(asset_key=params.asset_key)
         )
@@ -48,8 +54,8 @@ class SimplePipesScriptComponent(Component):
     """
 
     @classmethod
-    def get_schema(cls):  # pyright: ignore[reportIncompatibleMethodOverride]
-        return SimplePipesScriptScaffoldParams
+    def get_model_cls(cls):
+        return SimplePipesScriptComponentModel
 
     def __init__(self, asset_key: AssetKey, script_path: Path):
         self._asset_key = asset_key

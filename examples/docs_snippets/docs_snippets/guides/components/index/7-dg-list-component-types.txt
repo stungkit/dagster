@@ -1,21 +1,16 @@
 dg list component-type
 
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
-┃ Component Type                                                      ┃ Summary          ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
-│ dagster_components.dagster.DefinitionsComponent                     │ Wraps an         │
-│                                                                     │ arbitrary set of │
-│                                                                     │ Dagster          │
-│                                                                     │ definitions.     │
-│ dagster_components.dagster.DefsModuleComponent                      │ Wraps a          │
-│                                                                     │ DefsModule to    │
-│                                                                     │ allow the        │
-│                                                                     │ addition of      │
-│                                                                     │ arbitrary        │
-│                                                                     │ attributes.      │
-│ dagster_components.dagster.PipesSubprocessScriptCollectionComponent │ Assets that wrap │
-│                                                                     │ Python scripts   │
-│                                                                     │ executed with    │
-│                                                                     │ Dagster's        │
-│                                                                     │ PipesSubprocess… │
-└─────────────────────────────────────────────────────────────────────┴──────────────────┘
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Component Type                                              ┃ Summary                  ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ dagster.components.DefinitionsComponent                     │ An arbitrary set of      │
+│                                                             │ dagster definitions.     │
+│ dagster.components.DefsFolderComponent                      │ A folder which may       │
+│                                                             │ contain multiple         │
+│                                                             │ submodules, each         │
+│                                                             │ which define components. │
+│ dagster.components.PipesSubprocessScriptCollectionComponent │ Assets that wrap Python  │
+│                                                             │ scripts executed with    │
+│                                                             │ Dagster's                │
+│                                                             │ PipesSubprocessClient.   │
+└─────────────────────────────────────────────────────────────┴──────────────────────────┘

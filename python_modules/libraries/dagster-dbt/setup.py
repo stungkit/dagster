@@ -54,6 +54,7 @@ setup(
     extras_require={
         "test": [
             "pytest-rerunfailures",
+            "pytest-order",
             "dbt-duckdb<1.9.2",  # concurrency issues
             "dagster-duckdb",
             "dagster-duckdb-pandas",
@@ -63,7 +64,10 @@ setup(
         "console_scripts": [
             "dagster-dbt-cloud = dagster_dbt.cloud.cli:app",
             "dagster-dbt = dagster_dbt.cli.app:app",
-        ]
+        ],
+        "dagster_dg.library": [
+            "dagster_dbt = dagster_dbt",
+        ],
     },
     zip_safe=False,
 )

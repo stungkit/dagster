@@ -1,10 +1,11 @@
 from collections.abc import Mapping
 from copy import copy
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import click
 from click.core import ParameterSource
+from dagster_shared import check
 from dagster_shared.serdes.objects import LibraryObjectKey, LibraryObjectSnap
 from typer.rich_utils import rich_format_help
 
@@ -15,6 +16,7 @@ from dagster_dg.cli.shared_options import (
 )
 from dagster_dg.component import RemoteLibraryObjectRegistry
 from dagster_dg.config import (
+    DgProjectPythonEnvironment,
     DgRawCliConfig,
     DgRawWorkspaceConfig,
     DgWorkspaceScaffoldProjectOptions,
@@ -25,6 +27,7 @@ from dagster_dg.config import (
 )
 from dagster_dg.context import DgContext
 from dagster_dg.scaffold import (
+    ScaffoldFormatOptions,
     scaffold_component_type,
     scaffold_library_object,
     scaffold_project,
@@ -46,20 +49,14 @@ DEFAULT_WORKSPACE_NAME = "dagster-workspace"
 
 # These commands are not dynamically generated, but perhaps should be.
 HARDCODED_COMMANDS = {"workspace", "project", "component-type"}
-# Temporary remapping of some core commands
-REMAPPED_COMMANDS = {
-    "dagster_components.dagster.asset": "dagster.asset",
-    "dagster_components.dagster.sensor": "dagster.sensor",
-    "dagster_components.dagster.schedule": "dagster.schedule",
-}
 
 
 # The `dg scaffold` command is special because its subcommands are dynamically generated
 # from the registered types in the project. Because the registered component types
-# depend on the built-in component library we are using, we cannot resolve them until we have the
-# built-in component library, which can be set via a global option, e.g.:
+# depend on the component modules we are using, we cannot resolve them until we have know these
+# component modules, which can be set via the `--use-component-module` option, e.g.
 #
-#     dg --builtin-component-lib dagster_components.test ...
+#     dg --use-component-module dagster_components.test ...
 #
 # To handle this, we define a custom click.Group subclass that loads the commands on demand.
 class ScaffoldGroup(DgClickGroup):
@@ -157,7 +154,11 @@ def scaffold_group(context: click.Context, help_: bool, **global_options: object
 # ########################
 
 
-@scaffold_group.command(name="workspace", cls=DgClickCommand)
+@scaffold_group.command(
+    name="workspace",
+    cls=ScaffoldSubCommand,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 @click.argument("name", type=str, default=DEFAULT_WORKSPACE_NAME)
 @dg_editable_dagster_options
 @dg_global_options
@@ -171,15 +172,14 @@ def scaffold_workspace_command(
 
     The scaffolded workspace folder has the following structure:
 
-    \b
-    ├── dagster-workspace
+    ├── <workspace_name>
     │   ├── projects
     |   |   └── <Dagster projects go here>
     |   ├── libraries
     |   |   └── <Shared packages go here>
     │   └── pyproject.toml
 
-    """  # noqa: D301
+    """
     workspace_config = DgRawWorkspaceConfig(
         scaffold_project_options=DgWorkspaceScaffoldProjectOptions.get_raw_from_cli(
             use_editable_dagster,
@@ -193,7 +193,11 @@ def scaffold_workspace_command(
 # ########################
 
 
-@scaffold_group.command(name="project", cls=DgClickCommand)
+@scaffold_group.command(
+    name="project",
+    cls=ScaffoldSubCommand,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 @click.argument("path", type=Path)
 @click.option(
     "--skip-venv",
@@ -208,6 +212,12 @@ def scaffold_workspace_command(
     help="Whether to automatically populate the component type cache for the project.",
     hidden=True,
 )
+@click.option(
+    "--python-environment",
+    default="persistent_uv",
+    type=click.Choice(["persistent_uv", "active"]),
+    help="Type of Python environment in which to launch subprocesses for this project.",
+)
 @dg_editable_dagster_options
 @dg_global_options
 @cli_telemetry_wrapper
@@ -216,30 +226,33 @@ def scaffold_project_command(
     skip_venv: bool,
     populate_cache: bool,
     use_editable_dagster: Optional[str],
+    python_environment: DgProjectPythonEnvironment,
     **global_options: object,
 ) -> None:
-    """Scaffold a Dagster project file structure and a uv-managed virtual environment scoped
-    to the project.
+    """Scaffold a Dagster project file structure and a uv-managed virtual environment scoped to
+    the project.
 
     This command can be run inside or outside of a workspace directory. If run inside a workspace,
     the project will be created within the workspace directory's project directory.
 
-    The project file structure defines a Python package with some pre-existing internal
-    structure:
+    The project file structure defines a Python package with some pre-existing internal structure:
 
-    \b
-    ├── <name>
-    │   ├── __init__.py
-    │   ├── defs
-    │   ├── definitions.py
-    │   └── lib
-    │       └── __init__.py
-    ├── <name>_tests
+    ├── src
+    │   └── <project_name>
+    │       ├── __init__.py
+    │       ├── definitions.py
+    │       ├── defs
+    │       │   └── __init__.py
+    │       └── lib
+    │           └── __init__.py
+    ├── <project_name>_tests
     │   └── __init__.py
     └── pyproject.toml
 
-    The `<name>.lib` directory holds Python objects that can be targeted by the `dg scaffold` command or have dg-inspectable metadata. Custom component types in the project live in `<name>.lib`. These types can be created with `dg scaffold component-type`.
-    """  # noqa: D301
+    The `src.<project_name>.defs` directory holds Python objects that can be targeted by the
+    `dg scaffold` command or have dg-inspectable metadata. Custom component types in the project
+    live in `src.<project_name>.lib`. These types can be created with `dg scaffold component-type`.
+    """
     cli_config = normalize_cli_config(global_options, click.get_current_context())
     dg_context = DgContext.from_file_discovery_and_command_line_config(Path.cwd(), cli_config)
 
@@ -256,6 +269,7 @@ def scaffold_project_command(
         use_editable_dagster=use_editable_dagster,
         skip_venv=skip_venv,
         populate_cache=populate_cache,
+        python_environment=python_environment,
     )
 
 
@@ -266,6 +280,7 @@ def _core_scaffold(
     instance_name: str,
     key_value_params,
     json_params,
+    scaffold_format: ScaffoldFormatOptions,
 ) -> None:
     dg_context = DgContext.for_project_environment(Path.cwd(), cli_config)
     registry = RemoteLibraryObjectRegistry.from_dg_context(dg_context)
@@ -299,6 +314,7 @@ def _core_scaffold(
         object_key.to_typename(),
         scaffold_params,
         dg_context,
+        scaffold_format,
     )
 
 
@@ -306,8 +322,8 @@ def _create_scaffold_subcommand(key: LibraryObjectKey, obj: LibraryObjectSnap) -
     # We need to "reset" the help option names to the default ones because we inherit the parent
     # value of context settings from the parent group, which has been customized.
     @click.command(
-        name=REMAPPED_COMMANDS.get(key.to_typename(), key.to_typename()),
         cls=ScaffoldSubCommand,
+        name=key.to_typename(),
         context_settings={"help_option_names": ["-h", "--help"]},
     )
     @click.argument("instance_name", type=str)
@@ -318,12 +334,19 @@ def _create_scaffold_subcommand(key: LibraryObjectKey, obj: LibraryObjectSnap) -
         help="JSON string of component parameters.",
         callback=parse_json_option,
     )
+    @click.option(
+        "--format",
+        type=click.Choice(["yaml", "python"], case_sensitive=False),
+        default="yaml",
+        help="Format of the component configuration (yaml or python)",
+    )
     @click.pass_context
     @cli_telemetry_wrapper
     def scaffold_command(
         cli_context: click.Context,
         instance_name: str,
         json_params: Mapping[str, Any],
+        format: str,  # noqa: A002 "format" name required for click magic
         **key_value_params: Any,
     ) -> None:
         f"""Scaffold a {key.name} object.
@@ -343,8 +366,20 @@ def _create_scaffold_subcommand(key: LibraryObjectKey, obj: LibraryObjectSnap) -
 
         It is an error to pass both --json-params and key-value pairs as options.
         """
+        check.invariant(
+            format in ["yaml", "python"],
+            "format must be either 'yaml' or 'python'",
+        )
         cli_config = get_config_from_cli_context(cli_context)
-        _core_scaffold(cli_context, cli_config, key, instance_name, key_value_params, json_params)
+        _core_scaffold(
+            cli_context,
+            cli_config,
+            key,
+            instance_name,
+            key_value_params,
+            json_params,
+            cast(ScaffoldFormatOptions, format),
+        )
 
     # If there are defined scaffold params, add them to the command
     if obj.scaffolder_schema:
@@ -362,13 +397,23 @@ def _create_scaffold_subcommand(key: LibraryObjectKey, obj: LibraryObjectSnap) -
 # ########################
 
 
-@scaffold_group.command(name="component-type", cls=DgClickCommand)
+@scaffold_group.command(
+    name="component-type",
+    cls=ScaffoldSubCommand,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+@click.option(
+    "--dataclass/--no-dataclass",
+    is_flag=True,
+    default=True,
+    help="Whether to automatically annotate the generated class with @dataclass.",
+)
 @click.argument("name", type=str)
 @dg_global_options
 @click.pass_context
 @cli_telemetry_wrapper
 def scaffold_component_type_command(
-    context: click.Context, name: str, **global_options: object
+    context: click.Context, name: str, dataclass: bool, **global_options: object
 ) -> None:
     """Scaffold of a custom Dagster component type.
 
@@ -386,4 +431,6 @@ def scaffold_component_type_command(
     if registry.has(component_key):
         exit_with_error(f"Component type`{component_key.to_typename()}` already exists.")
 
-    scaffold_component_type(dg_context, name, module_name)
+    scaffold_component_type(
+        dg_context=dg_context, class_name=name, module_name=module_name, dataclass=dataclass
+    )

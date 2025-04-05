@@ -1,3 +1,4 @@
+import json
 import os
 import shlex
 import shutil
@@ -17,6 +18,7 @@ from dagster_dg.cache import CachableDataType, DgCache
 from dagster_dg.component import RemoteLibraryObjectRegistry
 from dagster_dg.config import (
     DgConfig,
+    DgProjectPythonEnvironment,
     DgRawCliConfig,
     DgWorkspaceProjectSpec,
     discover_config_file,
@@ -197,7 +199,7 @@ class DgContext:
 
     # Use to derive a new context for a project while preserving existing settings
     def with_root_path(self, root_path: Path) -> Self:
-        if not root_path / "pyproject.toml":
+        if not ((root_path / "pyproject.toml").exists() or (root_path / "dg.toml").exists()):
             raise DgError(f"Cannot find `pyproject.toml` at {root_path}")
         return self.__class__.from_file_discovery_and_command_line_config(
             root_path, self.cli_opts or {}
@@ -300,6 +302,34 @@ class DgContext:
             raise DgError("`project_name` is only available in a Dagster project context")
         return self.root_path.name
 
+    def resolve_package_manager_executable(self) -> list[str]:
+        if self.use_dg_managed_environment:
+            return ["uv", "pip"]
+        else:
+            return [str(self.get_executable("python")), "-m", "pip"]
+
+    def get_module_version(self, module_name: str) -> str:
+        if not self.use_dg_managed_environment:
+            raise DgError("`get_module_version` is only available in a Dagster project context")
+
+        with pushd(self.root_path):
+            result = subprocess.check_output(
+                [
+                    *self.resolve_package_manager_executable(),
+                    "list",
+                    "--format",
+                    "json",
+                    "--python",
+                    get_venv_executable(Path(".venv")),
+                ],
+                env=strip_activated_venv_from_env_vars(os.environ),
+            )
+        modules = json.loads(result)
+        for module in modules:
+            if module["name"] == module_name:
+                return module["version"]
+        raise DgError(f"Module `{module_name}` not found")
+
     @property
     def project_python_executable(self) -> Path:
         if not self.is_project:
@@ -356,6 +386,12 @@ class DgContext:
         if not self.config.project:
             raise DgError("`code_location_name` is only available in a Dagster project context")
         return self.config.project.code_location_name or self.project_name
+
+    @property
+    def python_environment(self) -> DgProjectPythonEnvironment:
+        if not self.config.project:
+            raise DgError("`python_environment` is only available in a Dagster project context")
+        return self.config.project.python_environment
 
     # ########################
     # ##### COMPONENT LIBRARY METHODS
@@ -439,19 +475,27 @@ class DgContext:
 
     def ensure_uv_lock(self, path: Optional[Path] = None) -> None:
         path = path or self.root_path
+        if not (path / "uv.lock").exists():
+            self.ensure_uv_sync(path)
+
+    def ensure_uv_sync(self, path: Optional[Path] = None) -> None:
+        path = path or self.root_path
         with pushd(path):
             if not (path / "uv.lock").exists():
-                subprocess.run(
-                    ["uv", "sync"], check=True, env=strip_activated_venv_from_env_vars(os.environ)
+                subprocess.check_output(
+                    ["uv", "sync"],
+                    env=strip_activated_venv_from_env_vars(os.environ),
                 )
 
     @property
     def use_dg_managed_environment(self) -> bool:
-        return self.config.cli.use_dg_managed_environment and self.is_project
+        return bool(
+            self.config.project and self.config.project.python_environment == "persistent_uv"
+        )
 
     @property
     def has_venv(self) -> bool:
-        return resolve_local_venv(self.root_path) is not None
+        return self.use_dg_managed_environment and (resolve_local_venv(self.root_path) is not None)
 
     @cached_property
     def venv_path(self) -> Path:
@@ -485,7 +529,15 @@ class DgContext:
         if self.has_venv:
             return f"Python environment at {self.venv_path}"
         else:
-            return "ambient Python environment"
+            return "active Python environment"
+
+    @property
+    def config_file_path(self) -> Path:
+        return self.dg_toml_path if self.dg_toml_path.exists() else self.pyproject_toml_path
+
+    @property
+    def dg_toml_path(self) -> Path:
+        return self.root_path / "dg.toml"
 
     @property
     def pyproject_toml_path(self) -> Path:
@@ -498,13 +550,19 @@ class DgContext:
             )
         if not module_name.startswith(self.root_module_name):
             raise DgError(f"Module `{module_name}` is not part of the current project.")
-        path = self.root_path / Path(*module_name.split("."))
-        if path.exists():
-            return path
-        elif path.with_suffix(".py").exists():
-            return path.with_suffix(".py")
-        else:
-            raise DgError(f"Cannot find module `{module_name}` in the current project.")
+
+        # Attempt to resolve the path for a local module by looking in both `src` and the root
+        # level. Unfortunately there is no setting reliably present in pyproject.toml or setup.py
+        # that can be relied on to know in advance the package root (src or root level).
+        for path in [
+            self.root_path / "src" / Path(*module_name.split(".")),
+            self.root_path / Path(*module_name.split(".")),
+        ]:
+            if path.exists():
+                return path
+            elif path.with_suffix(".py").exists():
+                return path.with_suffix(".py")
+        raise DgError(f"Cannot find module `{module_name}` in the current project.")
 
 
 # ########################
@@ -513,7 +571,7 @@ class DgContext:
 
 
 def _validate_dagster_components_availability(context: DgContext) -> None:
-    if context.config.cli.require_local_venv:
+    if context.use_dg_managed_environment:
         if not context.has_venv:
             exit_with_error(NO_LOCAL_VENV_ERROR_MESSAGE)
         elif not get_venv_executable(context.venv_path, "dagster-components").exists():

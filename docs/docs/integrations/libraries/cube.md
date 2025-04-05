@@ -9,13 +9,12 @@ date: 2023-08-30
 apireflink: https://cube.dev/docs/orchestration-api/dagster
 partnerlink: https://cube.dev/
 communityIntegration: true
-logo: /integrations/cube.svg
 categories:
   - Other
 enabledBy:
 enables:
 tags: [community-supported]
-sidebar_custom_props: 
+sidebar_custom_props:
   logo: images/integrations/cube.svg
   community: true
 ---

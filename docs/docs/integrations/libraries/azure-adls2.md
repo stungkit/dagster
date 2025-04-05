@@ -8,13 +8,12 @@ date: 2022-11-07
 apireflink: https://docs.dagster.io/api/python-api/libraries/dagster-azure
 docslink:
 partnerlink: https://azure.microsoft.com/
-logo: /integrations/Azure.svg
 categories:
   - Storage
 enabledBy:
 enables:
 tags: [dagster-supported, storage]
-sidebar_custom_props: 
+sidebar_custom_props:
   logo: images/integrations/azure.svg
 ---
 

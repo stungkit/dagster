@@ -1,6 +1,5 @@
 dg list defs
 
-
 Assets
 ┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━┓
 ┃ Key                ┃ Group   ┃ Deps ┃ Kinds ┃ Description ┃

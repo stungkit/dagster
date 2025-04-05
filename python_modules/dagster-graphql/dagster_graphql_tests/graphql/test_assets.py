@@ -23,6 +23,7 @@ from dagster import (
 from dagster._core.definitions.events import (
     AssetMaterializationFailure,
     AssetMaterializationFailureReason,
+    AssetMaterializationFailureType,
 )
 from dagster._core.definitions.multi_dimensional_partitions import MultiPartitionKey
 from dagster._core.events import StepMaterializationData
@@ -444,23 +445,26 @@ GET_ASSET_OBSERVATIONS = """
         assetOrError(assetKey: $assetKey) {
             ... on Asset {
                 assetObservations {
-                    label
-                    description
-                    runOrError {
-                        ... on Run {
-                            jobName
-                        }
-                    }
-                    assetKey {
-                        path
-                    }
-                    metadataEntries {
+                    results {
                         label
                         description
-                        ... on TextMetadataEntry {
-                            text
+                        runOrError {
+                            ... on Run {
+                                jobName
+                            }
+                        }
+                        assetKey {
+                            path
+                        }
+                        metadataEntries {
+                            label
+                            description
+                            ... on TextMetadataEntry {
+                                text
+                            }
                         }
                     }
+
                 }
             }
         }
@@ -473,21 +477,23 @@ GET_LAST_ASSET_OBSERVATIONS = """
         assetOrError(assetKey: $assetKey) {
             ... on Asset {
                 assetObservations(limit: 1) {
-                    label
-                    description
-                    runOrError {
-                        ... on Run {
-                            jobName
-                        }
-                    }
-                    assetKey {
-                        path
-                    }
-                    metadataEntries {
+                    results {
                         label
                         description
-                        ... on TextMetadataEntry {
-                            text
+                        runOrError {
+                            ... on Run {
+                                jobName
+                            }
+                        }
+                        assetKey {
+                            path
+                        }
+                        metadataEntries {
+                            label
+                            description
+                            ... on TextMetadataEntry {
+                                text
+                            }
                         }
                     }
                 }
@@ -1931,7 +1937,7 @@ class TestAssetAwareEventLog(ExecutingGraphQLContextTestMatrix):
 
         assert result.data
         assert result.data["assetOrError"]
-        observations = result.data["assetOrError"]["assetObservations"]
+        observations = result.data["assetOrError"]["assetObservations"]["results"]
 
         assert observations
         assert len(observations) == 2
@@ -1957,7 +1963,7 @@ class TestAssetAwareEventLog(ExecutingGraphQLContextTestMatrix):
 
         assert result.data
         assert result.data["assetOrError"]
-        observations = result.data["assetOrError"]["assetObservations"]
+        observations = result.data["assetOrError"]["assetObservations"]["results"]
 
         assert observations
         assert len(observations) == 1
@@ -3663,7 +3669,8 @@ class TestAssetMaterializationHistory(ExecutingGraphQLContextTestMatrix):
                     asset_materialization_failure=AssetMaterializationFailure(
                         asset_key=asset_key,
                         partition=None,
-                        reason=AssetMaterializationFailureReason.COMPUTE_FAILED,
+                        failure_type=AssetMaterializationFailureType.FAILED,
+                        reason=AssetMaterializationFailureReason.FAILED_TO_MATERIALIZE,
                     ),
                 ),
             )

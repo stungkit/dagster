@@ -9,13 +9,12 @@ date: 2022-11-07
 apireflink: https://docs.dagster.io/api/python-api/libraries/dagster-docker
 docslink:
 partnerlink: https://www.docker.com/
-logo: /integrations/Docker.svg
 categories:
   - Compute
 enabledBy:
 enables:
 tags: [dagster-supported, compute]
-sidebar_custom_props: 
+sidebar_custom_props:
   logo: images/integrations/docker.svg
 ---
 

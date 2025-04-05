@@ -36,12 +36,14 @@ setup(
         "tomlkit",
         "click>=8",
         "typing_extensions>=4.4.0,<5",
+        "gql[requests]",
         "markdown",
         "jsonschema",
         "PyYAML>=5.1",
         "rich",
         "watchdog",
         "yaspin",
+        "python-dotenv",
         # We use some private APIs of typer so we hard-pin here. This shouldn't need to be
         # frequently updated since is designed to be used from an isolated environment.
         "typer==0.15.1",
@@ -57,7 +59,7 @@ setup(
     extras_require={
         "test": [
             "click",
-            "dagster-components",
+            "dagster",
             "psutil",
             "pydantic",
             "pytest",

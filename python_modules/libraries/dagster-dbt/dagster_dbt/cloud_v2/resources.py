@@ -1,10 +1,14 @@
+import os
 import re
 from collections.abc import Sequence
-from functools import lru_cache
+from contextlib import suppress
+from functools import cached_property, lru_cache
 from typing import NamedTuple, Optional, Union
 
 from dagster import (
     AssetCheckSpec,
+    AssetExecutionContext,
+    AssetsDefinition,
     AssetSpec,
     ConfigurableResource,
     Definitions,
@@ -14,23 +18,36 @@ from dagster import (
 from dagster._annotations import preview
 from dagster._config.pythonic_config.resource import ResourceDependency
 from dagster._core.definitions.definitions_load_context import StateBackedDefinitionsLoader
+from dagster._core.errors import DagsterInvalidPropertyError
 from dagster._record import record
 from dagster._utils.cached_method import cached_method
 from pydantic import Field
 
-from dagster_dbt.asset_utils import build_dbt_specs
+from dagster_dbt.asset_utils import (
+    DAGSTER_DBT_EXCLUDE_METADATA_KEY,
+    DAGSTER_DBT_SELECT_METADATA_KEY,
+    DBT_INDIRECT_SELECTION_ENV,
+    build_dbt_specs,
+    get_manifest_and_translator_from_dbt_assets,
+    get_subset_selection_for_context,
+)
+from dagster_dbt.cloud_v2.cli_invocation import DbtCloudCliInvocation
 from dagster_dbt.cloud_v2.client import DbtCloudWorkspaceClient
 from dagster_dbt.cloud_v2.run_handler import DbtCloudJobRunHandler
 from dagster_dbt.cloud_v2.types import (
+    DbtCloudAccount,
     DbtCloudEnvironment,
     DbtCloudJob,
     DbtCloudProject,
     DbtCloudWorkspaceData,
 )
-from dagster_dbt.dagster_dbt_translator import DagsterDbtTranslator
+from dagster_dbt.dagster_dbt_translator import DagsterDbtTranslator, validate_opt_translator
 
 DAGSTER_ADHOC_PREFIX = "DAGSTER_ADHOC_JOB__"
 DBT_CLOUD_RECONSTRUCTION_METADATA_KEY_PREFIX = "__dbt_cloud"
+
+DBT_CLOUD_DEFAULT_SELECT = "fqn:*"
+DBT_CLOUD_DEFAULT_EXCLUDE = ""
 
 
 def get_dagster_adhoc_job_name(
@@ -99,6 +116,44 @@ class DbtCloudWorkspace(ConfigurableResource):
         """
         return f"{self.project_id}-{self.environment_id}"
 
+    @cached_property
+    def account_name(self) -> Optional[str]:
+        """The name of the account for this dbt Cloud workspace.
+
+        Returns:
+            str: the name of the account for this dbt Cloud workspace.
+        """
+        account = DbtCloudAccount.from_account_details(
+            account_details=self.get_client().get_account_details()
+        )
+        return account.name
+
+    @cached_property
+    def project_name(self) -> Optional[str]:
+        """The name of the project for this dbt Cloud workspace.
+
+        Returns:
+            str: the name of the project for this dbt Cloud workspace.
+        """
+        project = DbtCloudProject.from_project_details(
+            project_details=self.get_client().get_project_details(project_id=self.project_id)
+        )
+        return project.name
+
+    @cached_property
+    def environment_name(self) -> Optional[str]:
+        """The name of the environment for this dbt Cloud workspace.
+
+        Returns:
+            str: the name of the environment for this dbt Cloud workspace.
+        """
+        environment = DbtCloudEnvironment.from_environment_details(
+            environment_details=self.get_client().get_environment_details(
+                environment_id=self.environment_id
+            )
+        )
+        return environment.name
+
     @cached_method
     def get_client(self) -> DbtCloudWorkspaceClient:
         """Get the dbt Cloud client to interact with this dbt Cloud workspace.
@@ -122,17 +177,11 @@ class DbtCloudWorkspace(ConfigurableResource):
             DbtCloudJob: Internal representation of the dbt Cloud job.
         """
         client = self.get_client()
-        project = DbtCloudProject.from_project_details(
-            project_details=client.get_project_details(project_id=self.project_id)
-        )
-        environment = DbtCloudEnvironment.from_environment_details(
-            environment_details=client.get_environment_details(environment_id=self.environment_id)
-        )
         expected_job_name = self.adhoc_job_name or get_dagster_adhoc_job_name(
-            project_id=project.id,
-            project_name=project.name,
-            environment_id=environment.id,
-            environment_name=environment.name,
+            project_id=self.project_id,
+            project_name=self.project_name,
+            environment_id=self.environment_id,
+            environment_name=self.environment_name,
         )
         jobs = [
             DbtCloudJob.from_job_details(job_details)
@@ -156,7 +205,7 @@ class DbtCloudWorkspace(ConfigurableResource):
             )
         )
 
-    def fetch_workspace_data(self) -> DbtCloudWorkspaceData:
+    def _fetch_workspace_data(self) -> DbtCloudWorkspaceData:
         job = self._get_or_create_dagster_adhoc_job()
         run_handler = DbtCloudJobRunHandler.run(
             job_id=job.id,
@@ -171,10 +220,21 @@ class DbtCloudWorkspace(ConfigurableResource):
             manifest=run_handler.get_manifest(),
         )
 
+    def fetch_workspace_data(self) -> DbtCloudWorkspaceData:
+        return DbtCloudWorkspaceDefsLoader(
+            workspace=self,
+            translator=DagsterDbtTranslator(),
+            select=DBT_CLOUD_DEFAULT_SELECT,
+            exclude=DBT_CLOUD_DEFAULT_EXCLUDE,
+        ).get_or_fetch_state()
+
     # Cache spec retrieval for a specific translator class.
     @lru_cache(maxsize=1)
     def load_specs(
-        self, dagster_dbt_translator: Optional[DagsterDbtTranslator] = None
+        self,
+        select: str,
+        exclude: str,
+        dagster_dbt_translator: Optional[DagsterDbtTranslator] = None,
     ) -> Sequence[Union[AssetSpec, AssetCheckSpec]]:
         dagster_dbt_translator = dagster_dbt_translator or DagsterDbtTranslator()
 
@@ -182,6 +242,8 @@ class DbtCloudWorkspace(ConfigurableResource):
             defs = DbtCloudWorkspaceDefsLoader(
                 workspace=initialized_workspace,
                 translator=dagster_dbt_translator,
+                select=select,
+                exclude=exclude,
             ).build_defs()
             asset_specs = check.is_list(
                 defs.assets,
@@ -198,36 +260,118 @@ class DbtCloudWorkspace(ConfigurableResource):
             return [*asset_specs, *asset_check_specs]
 
     def load_asset_specs(
-        self, dagster_dbt_translator: Optional[DagsterDbtTranslator] = None
+        self,
+        select: str,
+        exclude: str,
+        dagster_dbt_translator: Optional[DagsterDbtTranslator] = None,
     ) -> Sequence[AssetSpec]:
         return [
             spec
-            for spec in self.load_specs(dagster_dbt_translator=dagster_dbt_translator)
+            for spec in self.load_specs(
+                dagster_dbt_translator=dagster_dbt_translator,
+                select=select,
+                exclude=exclude,
+            )
             if isinstance(spec, AssetSpec)
         ]
 
     def load_check_specs(
-        self, dagster_dbt_translator: Optional[DagsterDbtTranslator] = None
+        self,
+        select: str,
+        exclude: str,
+        dagster_dbt_translator: Optional[DagsterDbtTranslator] = None,
     ) -> Sequence[AssetCheckSpec]:
         return [
             spec
-            for spec in self.load_specs(dagster_dbt_translator=dagster_dbt_translator)
+            for spec in self.load_specs(
+                dagster_dbt_translator=dagster_dbt_translator, select=select, exclude=exclude
+            )
             if isinstance(spec, AssetCheckSpec)
         ]
+
+    def cli(
+        self,
+        args: Sequence[str],
+        dagster_dbt_translator: Optional[DagsterDbtTranslator] = None,
+        context: Optional[AssetExecutionContext] = None,
+    ) -> DbtCloudCliInvocation:
+        """Creates a dbt cli invocation with the dbt Cloud client."""
+        dagster_dbt_translator = validate_opt_translator(dagster_dbt_translator)
+        dagster_dbt_translator = dagster_dbt_translator or DagsterDbtTranslator()
+
+        client = self.get_client()
+        workspace_data = self.fetch_workspace_data()
+        job_id = workspace_data.job_id
+        manifest = workspace_data.manifest
+
+        assets_def: Optional[AssetsDefinition] = None
+        with suppress(DagsterInvalidPropertyError):
+            assets_def = context.assets_def if context else assets_def
+
+        selection_args: list[str] = []
+        indirect_selection_args: list[str] = []
+        if context and assets_def is not None:
+            manifest, dagster_dbt_translator = get_manifest_and_translator_from_dbt_assets(
+                [assets_def]
+            )
+
+            indirect_selection = os.getenv(DBT_INDIRECT_SELECTION_ENV, None)
+
+            selection_args, indirect_selection_override = get_subset_selection_for_context(
+                context=context,
+                manifest=manifest,
+                select=context.op.tags.get(DAGSTER_DBT_SELECT_METADATA_KEY),
+                exclude=context.op.tags.get(DAGSTER_DBT_EXCLUDE_METADATA_KEY),
+                dagster_dbt_translator=dagster_dbt_translator,
+                current_dbt_indirect_selection_env=indirect_selection,
+            )
+
+            # set dbt indirect selection if needed to execute specific dbt tests due to asset check
+            # selection
+            indirect_selection = (
+                indirect_selection_override if indirect_selection_override else indirect_selection
+            )
+            indirect_selection_args = (
+                [f"--indirect-selection {indirect_selection}"] if indirect_selection else []
+            )
+
+        full_dbt_args = [*args, *selection_args, *indirect_selection_args]
+
+        # We pass the manifest instead of the workspace data
+        # because we use the manifest included in the asset definitions
+        # when this method is called inside a function decorated with `@dbt_cloud_assets`
+        return DbtCloudCliInvocation.run(
+            job_id=job_id,
+            args=full_dbt_args,
+            client=client,
+            manifest=manifest,
+            dagster_dbt_translator=dagster_dbt_translator,
+            context=context,
+        )
 
 
 @preview
 def load_dbt_cloud_asset_specs(
-    workspace: DbtCloudWorkspace, dagster_dbt_translator: Optional[DagsterDbtTranslator] = None
+    workspace: DbtCloudWorkspace,
+    dagster_dbt_translator: Optional[DagsterDbtTranslator] = None,
+    select: str = DBT_CLOUD_DEFAULT_SELECT,
+    exclude: str = DBT_CLOUD_DEFAULT_EXCLUDE,
 ) -> Sequence[AssetSpec]:
-    return workspace.load_asset_specs(dagster_dbt_translator=dagster_dbt_translator)
+    return workspace.load_asset_specs(
+        dagster_dbt_translator=dagster_dbt_translator, select=select, exclude=exclude
+    )
 
 
 @preview
 def load_dbt_cloud_check_specs(
-    workspace: DbtCloudWorkspace, dagster_dbt_translator: Optional[DagsterDbtTranslator] = None
+    workspace: DbtCloudWorkspace,
+    dagster_dbt_translator: Optional[DagsterDbtTranslator] = None,
+    select: str = DBT_CLOUD_DEFAULT_SELECT,
+    exclude: str = DBT_CLOUD_DEFAULT_EXCLUDE,
 ) -> Sequence[AssetCheckSpec]:
-    return workspace.load_check_specs(dagster_dbt_translator=dagster_dbt_translator)
+    return workspace.load_check_specs(
+        dagster_dbt_translator=dagster_dbt_translator, select=select, exclude=exclude
+    )
 
 
 @preview
@@ -235,20 +379,22 @@ def load_dbt_cloud_check_specs(
 class DbtCloudWorkspaceDefsLoader(StateBackedDefinitionsLoader[DbtCloudWorkspaceData]):
     workspace: DbtCloudWorkspace
     translator: DagsterDbtTranslator
+    select: str
+    exclude: str
 
     @property
     def defs_key(self) -> str:
         return f"{DBT_CLOUD_RECONSTRUCTION_METADATA_KEY_PREFIX}.{self.workspace.unique_id}"
 
     def fetch_state(self) -> DbtCloudWorkspaceData:
-        return self.workspace.fetch_workspace_data()
+        return self.workspace._fetch_workspace_data()  # noqa
 
     def defs_from_state(self, state: DbtCloudWorkspaceData) -> Definitions:
         all_asset_specs, all_check_specs = build_dbt_specs(
             manifest=state.manifest,
             translator=self.translator,
-            select="fqn:*",
-            exclude="",
+            select=self.select,
+            exclude=self.exclude,
             io_manager_key=None,
             project=None,
         )

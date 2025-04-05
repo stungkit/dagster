@@ -101,8 +101,6 @@ API documentation is built separately using Sphinx&mdash;if you change any `.rst
 yarn build-api-docs
 ```
 
-The [docs style checklist](https://github.com/dagster-io/dagster/blob/master/docs/DOC_CHECKLIST.md) includes a set of style guidelines to adhere to when adding or modifying docs.
-
 For the full guidelines for writing and debugging documentation, please refer to the [docs/README.md](https://github.com/dagster-io/dagster/blob/master/docs/README.md) and [docs/CONTRIBUTING.md](https://github.com/dagster-io/dagster/blob/master/docs/CONTRIBUTING.md) documents.
 
 ## Picking a GitHub Issue
@@ -120,4 +118,3 @@ In the PR template, please describe the change, including the motivation/context
 A Core reviewer will review your PR in around one business day and provide feedback on any changes it requires to be approved. Once approved and all the tests (including Buildkite!) pass, the reviewer will click the Squash and merge button in GitHub 🥳.
 
 Your PR is now merged into Dagster! We’ll shout out your contribution in the weekly release notes.
-
