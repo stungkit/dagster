@@ -74,7 +74,7 @@ def setup_dlt_component(
         Path(component_path / "load.py").write_text(
             textwrap.dedent("\n".join(inspect.getsource(load_py_contents).split("\n")[1:]))
         )
-        (component_path / "component.yaml").write_text(yaml.safe_dump(component_body))
+        (component_path / "defs.yaml").write_text(yaml.safe_dump(component_body))
 
         defs_root = importlib.import_module("foo_bar.defs.ingest")
         project_root = Path.cwd()
@@ -367,7 +367,7 @@ def test_scaffold_bare_component():
         )
         assert result.exit_code == 0
         assert Path("src/foo_bar/defs/my_barebones_dlt_component/loads.py").exists()
-        assert Path("src/foo_bar/defs/my_barebones_dlt_component/component.yaml").exists()
+        assert Path("src/foo_bar/defs/my_barebones_dlt_component/defs.yaml").exists()
 
         defs_root = importlib.import_module("foo_bar.defs.my_barebones_dlt_component")
         project_root = Path.cwd()
@@ -385,7 +385,14 @@ def test_scaffold_bare_component():
         }
 
 
-def test_scaffold_component_with_source_and_destination():
+@pytest.mark.parametrize(
+    "source, destination",
+    [
+        ("github", "snowflake"),
+        ("sql_database", "duckdb"),
+    ],
+)
+def test_scaffold_component_with_source_and_destination(source: str, destination: str):
     runner = CliRunner()
 
     with setup_dlt_ready_project() as project_path, environ({"SOURCES__ACCESS_TOKEN": "fake"}):
@@ -399,12 +406,12 @@ def test_scaffold_component_with_source_and_destination():
                 "--scaffold-format",
                 "yaml",
                 "--json-params",
-                '{"source": "github", "destination": "snowflake"}',
+                f'{{"source": "{source}", "destination": "{destination}"}}',
             ],
         )
         assert result.exit_code == 0, result.output
         assert Path("src/foo_bar/defs/my_barebones_dlt_component/loads.py").exists()
-        assert Path("src/foo_bar/defs/my_barebones_dlt_component/component.yaml").exists()
+        assert Path("src/foo_bar/defs/my_barebones_dlt_component/defs.yaml").exists()
 
         defs_root = importlib.import_module("foo_bar.defs.my_barebones_dlt_component")
         project_root = Path.cwd()
@@ -414,8 +421,8 @@ def test_scaffold_component_with_source_and_destination():
             component = get_underlying_component(context)
             assert isinstance(component, DltLoadCollectionComponent)
 
-        # should be many loads, not hardcoding in case dlt changes
-        assert len(component.loads) > 1
+        # scaffolder generates a silly sample load right now because the complex parsing logic is flaky
+        assert len(component.loads) == 1
 
 
 def test_execute_component(dlt_pipeline: Pipeline):
