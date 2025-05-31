@@ -140,6 +140,9 @@ def test_project_prepare_cli(dbt_path: Path) -> None:
         assert result.exit_code == 0
 
         projects = get_projects_from_dbt_component(p)
+
+        assert projects
+
         for p in projects:
             assert p.manifest_path.exists()
 
@@ -435,3 +438,11 @@ project: "{{ project_root }}/dbt"
 project:
   project_dir: "{{ project_root }}/dbt"
         """)
+
+
+def test_disable_prep_if_dev(dbt_path: Path):
+    c = DbtProjectComponent.resolve_from_yaml(f"""
+project: {dbt_path!s}
+prepare_if_dev: False
+    """)
+    assert not c.prepare_if_dev

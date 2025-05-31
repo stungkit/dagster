@@ -2,14 +2,13 @@ tree my_project
 
 my_project
 ├── __init__.py
-├── definitions.py
-├── defs
-│   ├── __init__.py
-│   └── my_sling_sync
-│       ├── component.py
-│       ├── component.yaml
-│       └── replication.yaml
-└── lib
-    └── __init__.py
+├── components
+│   └── __init__.py
+└── defs
+    ├── __init__.py
+    └── my_sling_sync
+        ├── component.py
+        ├── defs.yaml
+        └── replication.yaml
 
-4 directories, 7 files
+4 directories, 6 files

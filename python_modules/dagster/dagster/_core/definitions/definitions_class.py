@@ -1,7 +1,8 @@
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Optional, Union
+from typing import TYPE_CHECKING, Annotated, Any, Callable, NamedTuple, Optional, Union
 
+from dagster_shared.record import ImportFrom
 from typing_extensions import Self
 
 import dagster._check as check
@@ -44,9 +45,8 @@ from dagster._utils.cached_method import cached_method
 from dagster._utils.warnings import disable_dagster_warnings
 
 if TYPE_CHECKING:
-    from dagster._core.definitions.run_config import RunConfig
-    from dagster._core.execution.execute_in_process_result import ExecuteInProcessResult
     from dagster._core.storage.asset_value_loader import AssetValueLoader
+    from dagster.components.core.tree import ComponentTree
 
 
 @public
@@ -116,22 +116,6 @@ def _io_manager_needs_replacement(job: JobDefinition, resource_defs: Mapping[str
         job.resource_defs.get("io_manager") == default_job_io_manager
         and "io_manager" in resource_defs
     )
-
-
-def _jobs_which_will_have_io_manager_replaced(
-    jobs: Optional[Iterable[Union[JobDefinition, UnresolvedAssetJobDefinition]]],
-    resource_defs: Mapping[str, Any],
-) -> list[Union[JobDefinition, UnresolvedAssetJobDefinition]]:
-    """Returns whether any jobs will have their I/O manager replaced by an `io_manager` override from
-    the top-level `resource_defs` provided to `Definitions` in 1.3. We will warn users if this is
-    the case.
-    """
-    jobs = jobs or []
-    return [
-        job
-        for job in jobs
-        if isinstance(job, JobDefinition) and _io_manager_needs_replacement(job, resource_defs)
-    ]
 
 
 def _attach_resources_to_jobs_and_instigator_jobs(
@@ -255,6 +239,7 @@ def _create_repository_using_definitions_args(
     loggers: Optional[Mapping[str, LoggerDefinition]] = None,
     asset_checks: Optional[Iterable[AssetsDefinition]] = None,
     metadata: Optional[RawMetadataMapping] = None,
+    component_tree: Optional["ComponentTree"] = None,
 ) -> RepositoryDefinition:
     # First, dedupe all definition types.
     sensors = dedupe_object_refs(sensors)
@@ -282,8 +267,9 @@ def _create_repository_using_definitions_args(
         name=name,
         default_executor_def=executor_def,
         default_logger_defs=loggers,
-        _top_level_resources=resource_defs,
         metadata=metadata,
+        _top_level_resources=resource_defs,
+        _component_tree=component_tree,
     )
     def created_repo():
         return [
@@ -379,6 +365,11 @@ class Definitions(IHaveNew):
             Arbitrary metadata for the Definitions. Not displayed in the UI but accessible on
             the Definitions instance at runtime.
 
+        component_tree (Optional[ComponentTree]):
+            Information about the Components that were used to construct part of this
+            Definitions object.
+
+
     Example usage:
 
     .. code-block:: python
@@ -421,6 +412,7 @@ class Definitions(IHaveNew):
     # After we fix the bug, we should remove AssetsDefinition from the set of accepted types.
     asset_checks: Optional[Iterable[AssetsDefinition]] = None
     metadata: Mapping[str, MetadataValue]
+    component_tree: Optional[Annotated["ComponentTree", ImportFrom("dagster.components.core.tree")]]
 
     def __new__(
         cls,
@@ -437,6 +429,7 @@ class Definitions(IHaveNew):
         loggers: Optional[Mapping[str, LoggerDefinition]] = None,
         asset_checks: Optional[Iterable[AssetsDefinition]] = None,
         metadata: Optional[RawMetadataMapping] = None,
+        component_tree: Optional["ComponentTree"] = None,
     ):
         return super().__new__(
             cls,
@@ -449,6 +442,7 @@ class Definitions(IHaveNew):
             loggers=loggers,
             asset_checks=asset_checks,
             metadata=normalize_metadata(check.opt_mapping_param(metadata, "metadata")),
+            component_tree=component_tree,
         )
 
     @public
@@ -583,6 +577,7 @@ class Definitions(IHaveNew):
             loggers=self.loggers,
             asset_checks=self.asset_checks,
             metadata=self.metadata,
+            component_tree=self.component_tree,
         )
 
     def get_asset_graph(self) -> AssetGraph:
@@ -633,6 +628,7 @@ class Definitions(IHaveNew):
         jobs = []
         asset_checks = []
         metadata = {}
+        component_tree = None
 
         resources = {}
         resource_key_indexes: dict[str, int] = {}
@@ -676,6 +672,14 @@ class Definitions(IHaveNew):
                 executor = def_set.executor
                 executor_index = i
 
+            if def_set.component_tree:
+                if component_tree is not None:
+                    raise DagsterInvariantViolationError(
+                        "Can not merge Definitions that both contain component_tree."
+                    )
+
+                component_tree = def_set.component_tree
+
         return Definitions(
             assets=assets,
             schedules=schedules,
@@ -686,6 +690,7 @@ class Definitions(IHaveNew):
             loggers=loggers,
             asset_checks=asset_checks,
             metadata=metadata,
+            component_tree=component_tree,
         )
 
     @public
@@ -769,6 +774,18 @@ class Definitions(IHaveNew):
                 )
 
         """
+        return self.map_asset_specs_inner(
+            func=func,
+            selection=selection,
+            ignore_non_spec_asset_types=False,
+        )
+
+    def map_asset_specs_inner(
+        self,
+        func: Callable[[AssetSpec], AssetSpec],
+        selection: Optional[CoercibleToAssetSelection],
+        ignore_non_spec_asset_types: bool,
+    ) -> "Definitions":
         target_keys = None
         if selection:
             if isinstance(selection, str):
@@ -779,7 +796,7 @@ class Definitions(IHaveNew):
         non_spec_asset_types = {
             type(d) for d in self.assets or [] if not isinstance(d, (AssetsDefinition, AssetSpec))
         }
-        if non_spec_asset_types:
+        if non_spec_asset_types and not ignore_non_spec_asset_types:
             raise DagsterInvariantViolationError(
                 "Can only map over AssetSpec or AssetsDefinition objects. "
                 "Received objects of types: "
@@ -799,102 +816,5 @@ class Definitions(IHaveNew):
         ]
         return replace(self, assets=assets)
 
-    def execute_job_in_process(
-        self,
-        job_name: str,
-        run_config: Optional[Union[Mapping[str, Any], "RunConfig"]] = None,
-        instance: Optional["DagsterInstance"] = None,
-        partition_key: Optional[str] = None,
-        raise_on_error: bool = True,
-        op_selection: Optional[Sequence[str]] = None,
-        asset_selection: Optional[Sequence[AssetKey]] = None,
-        run_id: Optional[str] = None,
-        input_values: Optional[Mapping[str, object]] = None,
-        tags: Optional[Mapping[str, str]] = None,
-        resources: Optional[Mapping[str, object]] = None,
-    ) -> "ExecuteInProcessResult":
-        from dagster._core.definitions.job_base import RepoBackedJob
-        from dagster._core.execution.execute_in_process import (
-            core_execute_in_process,
-            merge_run_tags,
-            type_check_and_normalize_args,
-        )
-
-        run_config, op_selection, asset_selection, resource_defs, partition_key, input_values = (
-            type_check_and_normalize_args(
-                run_config=run_config,
-                partition_key=partition_key,
-                op_selection=op_selection,
-                asset_selection=asset_selection,
-                input_values=input_values,
-                resources=resources,
-            )
-        )
-        job = check.not_none(get_job_from_defs(job_name, self))
-        if isinstance(job, UnresolvedAssetJobDefinition):
-            raise DagsterInvariantViolationError(
-                "Cannot execute an unresolved asset job. Please resolve the job by calling "
-                "`resolve_to_job` on the job definition."
-            )
-
-        job_def = job.as_ephemeral_job(
-            resource_defs=resource_defs,
-            input_values=check.opt_mapping_param(
-                input_values, "input_values", key_type=str, value_type=object
-            ),
-            op_selection=op_selection,
-            asset_selection=asset_selection,
-        )
-        new_job_list = [job for job in (self.jobs or []) if job.name != job_name] + [job_def]
-        schedules = [
-            schedule.with_updated_job(job_def)
-            if isinstance(schedule, ScheduleDefinition)
-            and schedule.target.has_job_def
-            and schedule.job.name == job_name
-            else schedule
-            for schedule in (self.schedules or [])
-        ]
-        sensors = []
-        for sensor in self.sensors or []:
-            if has_job_defs_attached(sensor) and any(job.name == job_name for job in sensor.jobs):
-                sensors.append(
-                    sensor.with_updated_jobs(
-                        [job for job in sensor.jobs if job.name != job_name] + [job_def]
-                    )
-                )
-            else:
-                sensors.append(sensor)
-        new_defs_obj = replace(self, jobs=new_job_list, schedules=schedules, sensors=sensors)
-        resolved_repo = new_defs_obj.get_repository_def()
-        wrapped_job = RepoBackedJob(job_name=job_name, repository_def=resolved_repo)
-        return core_execute_in_process(
-            job=wrapped_job,
-            run_config=run_config,
-            instance=instance,
-            output_capturing_enabled=True,
-            raise_on_error=raise_on_error,
-            run_tags=merge_run_tags(
-                job_def=job_def,
-                partition_key=partition_key,
-                tags=tags,
-                asset_selection=asset_selection,
-                instance=instance,
-                run_config=run_config,
-            ),
-            run_id=run_id,
-            asset_selection=frozenset(asset_selection),
-        )
-
-
-def get_job_from_defs(
-    name: str, defs: Definitions
-) -> Optional[Union[JobDefinition, UnresolvedAssetJobDefinition]]:
-    """Get the job from the definitions by its name."""
-    return next(
-        iter(job for job in (defs.jobs or []) if job.name == name),
-        None,
-    )
-
-
-def has_job_defs_attached(sensor_def: SensorDefinition) -> bool:
-    return any(target.has_job_def for target in sensor_def.targets)
+    def with_resources(self, resources: Optional[Mapping[str, Any]]) -> "Definitions":
+        return Definitions.merge(self, Definitions(resources=resources)) if resources else self

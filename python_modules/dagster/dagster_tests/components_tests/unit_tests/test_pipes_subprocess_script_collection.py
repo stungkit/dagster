@@ -1,8 +1,7 @@
 import importlib
 from pathlib import Path
 
-from dagster import AssetKey
-from dagster.components import load_defs
+from dagster import AssetKey, load_defs
 
 LOCATION_PATH = Path(__file__).parent.parent / "code_locations" / "python_script_location"
 
@@ -27,7 +26,14 @@ def test_load_from_path() -> None:
         AssetKey("up1_dash"),
         AssetKey("up2_dash"),
         AssetKey("override_key_dash"),
+        AssetKey("foo"),
+        AssetKey("bar"),
+        AssetKey("foo_def_py"),
+        AssetKey("bar_def_py"),
+        AssetKey("from_defs_one"),
+        AssetKey("from_defs_two"),
     }
+    assert defs.component_tree
 
 
 def test_load_from_location_path() -> None:
