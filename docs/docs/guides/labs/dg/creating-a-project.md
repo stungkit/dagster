@@ -1,6 +1,6 @@
 ---
-title: 'Creating a project with dg'
-description: Dagster dg allows you to create a special type of Python package, called a project, that defines a Dagster code location.
+title: 'Creating a dg project'
+description: dg allows you to create a special type of Python package, called a project, that defines a Dagster code location.
 sidebar_label: 'Creating a project'
 sidebar_position: 100
 ---
@@ -10,36 +10,26 @@ import InstallUv from '@site/docs/partials/\_InstallUv.md';
 
 <DgComponentsPreview />
 
-`dg` allows you to create a special type of Python package, called a _project_, that defines a [Dagster code location](/guides/deploy/code-locations/managing-code-locations-with-definitions).
-
-:::note
-
-Dagster projects created with `dg` are compatible with Dagster Components. For more information, see the [Dagster Components documentation](/guides/labs/components).
-
-:::
+The `create-dagster` CLI allows you to create a special type of Python package, called a _project_, that defines a [Dagster code location](/deployment/code-locations/managing-code-locations-with-definitions).
 
 ## Prerequisites
 
-Before creating a project with `dg`, you must [install `dg`](/guides/labs/dg#installation).
+Before creating a project, you must [install `create-dagster`](/guides/labs/dg#installing-the-create-dagster-cli). If you're using `uv`, you can run `create-dagster` using `uvx`, without needing to install it first.
 
 ## Creating a project
 
 <Tabs>
   <TabItem value="uv" label="uv">
-    ```
-    dg init my-project
-    ```
+    ``` uvx create-dagster project my-project ```
   </TabItem>
-  <TabItem value="pip" label="pip">
-    ```
-    dg init my-project
-    ```
+  <TabItem value="non-uv" label="Homebrew, curl, or pip">
+    ``` create-dagster project my-project ```
   </TabItem>
 </Tabs>
 
 ## Project structure
 
-The `dg init` command creates a directory with a standard Python package structure with some additions:
+The `create-dagster project` command creates a directory with a standard Python package structure with some additions:
 
 <Tabs groupId="package-manager">
   <TabItem value="uv" label="uv">
@@ -69,4 +59,3 @@ To use `tree`, install it with `brew install tree` (Mac), or follow the [install
 - `pyproject.toml` is a standard Python package configuration file. In addition
   to the regular Python package metadata, it contains a `tool.dg` section
   for `dg`-specific settings.
-- `uv.lock` is the [lockfile](https://docs.astral.sh/uv/concepts/projects/layout/#the-lockfile) for the Python package manager [`uv`](https://docs.astral.sh/uv/). `dg` projects use `uv` by default. For more information, see [`uv` integration](/guides/labs/dg/python-environment-management-and-uv-integration).

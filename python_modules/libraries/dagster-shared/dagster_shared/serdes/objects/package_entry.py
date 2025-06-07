@@ -9,7 +9,6 @@ from typing_extensions import TypeAlias
 
 from dagster_shared.record import record
 from dagster_shared.serdes.serdes import whitelist_for_serdes
-from dagster_shared.yaml_utils.sample_yaml import generate_sample_yaml
 
 
 def _generate_invalid_component_typename_error_message(typename: str) -> str:
@@ -86,6 +85,7 @@ class ScaffoldTargetTypeData(PluginObjectFeatureData):
 @record
 class PluginObjectSnap:
     key: PluginObjectKey
+    aliases: Sequence[PluginObjectKey]
     summary: Optional[str]
     description: Optional[str]
     owners: Optional[Sequence[str]]
@@ -119,6 +119,11 @@ class PluginObjectSnap:
     def component_schema(self) -> Optional[dict[str, Any]]:
         component_data = self.get_feature_data("component")
         return component_data.schema if component_data else None
+
+    @property
+    def all_keys(self) -> Sequence[PluginObjectKey]:
+        """Return all keys associated with this plugin object, including aliases."""
+        return [self.key, *self.aliases]
 
 
 @whitelist_for_serdes
@@ -196,6 +201,8 @@ def json_for_component_type(
     entry: PluginObjectSnap,
     component_type_data: ComponentFeatureData,
 ) -> ComponentTypeJson:
+    from dagster_shared.yaml_utils.sample_yaml import generate_sample_yaml
+
     typename = key.to_typename()
     sample_yaml = generate_sample_yaml(typename, component_type_data.schema or {})
     return ComponentTypeJson(

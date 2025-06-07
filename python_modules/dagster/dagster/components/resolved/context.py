@@ -6,9 +6,6 @@ from pathlib import Path
 from typing import Any, Optional, TypeVar, Union, overload
 
 from dagster_shared.yaml_utils.source_position import SourcePositionTree
-from jinja2 import Undefined
-from jinja2.exceptions import UndefinedError
-from jinja2.nativetypes import NativeTemplate
 from pydantic import BaseModel
 
 from dagster._annotations import preview, public
@@ -44,6 +41,10 @@ class ResolutionContext:
     scope: Mapping[str, Any]
     path: list[Union[str, int]] = []
     source_position_tree: Optional[SourcePositionTree] = None
+    # dict where you can stash arbitrary objects. Used to store references to ComponentLoadContext
+    # We are structuring this way to make it easier to use Resolved outside of the context of
+    # the component system in the future
+    stash: dict[str, Any] = {}
 
     def at_path(self, path_part: Union[str, int]):
         return copy(self, path=[*self.path, path_part])
@@ -54,6 +55,9 @@ class ResolutionContext:
             scope={"env": env_scope, "automation_condition": automation_condition_scope()},
             source_position_tree=source_position_tree,
         )
+
+    def with_stashed_value(self, key: str, value: Any) -> "ResolutionContext":
+        return copy(self, stash={**self.stash, key: value})
 
     def with_scope(self, **additional_scope) -> "ResolutionContext":
         return copy(self, scope={**self.scope, **additional_scope})
@@ -119,7 +123,15 @@ class ResolutionContext:
 
     def _resolve_inner_value(self, val: Any) -> Any:
         """Resolves a single value, if it is a templated string."""
-        if isinstance(val, str):
+        # defer for import performance
+        from jinja2 import Undefined
+        from jinja2.exceptions import UndefinedError
+        from jinja2.nativetypes import NativeTemplate
+
+        if (
+            isinstance(val, str)
+            and val  # evaluating empty string returns None so skip to preserve empty string values
+        ):
             try:
                 val = NativeTemplate(val).render(**self.scope)
                 if isinstance(val, Undefined):

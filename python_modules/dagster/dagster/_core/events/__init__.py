@@ -61,6 +61,7 @@ from dagster._core.execution.plan.outputs import StepOutputData
 from dagster._core.log_manager import DagsterLogManager
 from dagster._core.storage.compute_log_manager import CapturedLogContext, LogRetrievalShellCommand
 from dagster._core.storage.dagster_run import DagsterRun, DagsterRunStatus
+from dagster._core.storage.tags import PARTITION_NAME_TAG
 from dagster._serdes import NamedTupleSerializer, whitelist_for_serdes
 from dagster._utils.error import SerializableErrorInfo, serializable_error_info_from_exc_info
 from dagster._utils.timing import format_duration
@@ -1097,6 +1098,13 @@ class DagsterEvent(
             event_type=DagsterEventType.ASSET_CHECK_EVALUATION,
             step_context=step_context,
             event_specific_data=asset_check_evaluation,
+            message=f"Asset check '{asset_check_evaluation.check_name}' on '{asset_check_evaluation.asset_key.to_user_string()}' "
+            + ("passed." if asset_check_evaluation.passed else "did not pass.")
+            + (
+                ""
+                if asset_check_evaluation.description is None
+                else f" Description: '{asset_check_evaluation.description}'"
+            ),
         )
 
     @staticmethod
@@ -1146,6 +1154,7 @@ class DagsterEvent(
             event_data = RunEnqueuedData(
                 code_location_name=loc_name,
                 repository_name=repo_name,
+                partition_key=run.tags.get(PARTITION_NAME_TAG),
             )
         else:
             event_data = None
@@ -1813,13 +1822,21 @@ class ObjectStoreOperationResultData(
 class RunEnqueuedData(
     NamedTuple(
         "_RunEnqueuedData",
-        [
-            ("code_location_name", str),
-            ("repository_name", str),
-        ],
+        [("code_location_name", str), ("repository_name", str), ("partition_key", Optional[str])],
     )
 ):
-    pass
+    def __new__(
+        cls,
+        code_location_name: str,
+        repository_name: str,
+        partition_key: Optional[str] = None,
+    ):
+        return super().__new__(
+            cls,
+            code_location_name=check.str_param(code_location_name, "code_location_name"),
+            repository_name=check.str_param(repository_name, "repository_name"),
+            partition_key=check.opt_str_param(partition_key, "partition_key"),
+        )
 
 
 @whitelist_for_serdes(

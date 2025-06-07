@@ -7,32 +7,31 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 import pytest
 import yaml
-from click.testing import CliRunner
-from dagster import AssetKey
+from dagster import AssetKey, ComponentLoadContext
 from dagster._core.definitions.asset_spec import AssetSpec
 from dagster._core.definitions.assets import AssetsDefinition
 from dagster._core.definitions.definitions_class import Definitions
 from dagster._core.definitions.events import AssetMaterialization
 from dagster._core.definitions.materialize import materialize
+from dagster._core.definitions.metadata.source_code import (
+    CodeReferencesMetadataValue,
+    LocalFileCodeReference,
+)
 from dagster._core.definitions.result import MaterializeResult
 from dagster._core.execution.context.asset_execution_context import AssetExecutionContext
 from dagster._core.instance_for_test import instance_for_test
 from dagster._core.test_utils import ensure_dagster_tests_import
 from dagster._utils import alter_sys_path
 from dagster._utils.env import environ
-from dagster.components import ComponentLoadContext
-from dagster.components.cli import cli
 from dagster.components.resolved.context import ResolutionException
 from dagster.components.resolved.core_models import AssetAttributesModel
+from dagster.components.testing import get_underlying_component, scaffold_defs_sandbox
+from dagster_shared import check
 from dagster_sling import SlingReplicationCollectionComponent, SlingResource
 
 ensure_dagster_tests_import()
 
-from dagster_tests.components_tests.utils import (
-    build_component_defs_for_test,
-    get_underlying_component,
-    temp_code_location_bar,
-)
+from dagster_tests.components_tests.utils import build_component_defs_for_test
 
 if TYPE_CHECKING:
     from dagster._core.definitions.assets import AssetsDefinition
@@ -55,7 +54,7 @@ def _modify_yaml(path: Path) -> Iterator[dict[str, Any]]:
 def temp_sling_component_instance(
     replication_specs: Optional[list[dict[str, Any]]] = None,
 ) -> Iterator[tuple[SlingReplicationCollectionComponent, Definitions]]:
-    """Sets up a temporary directory with a replication.yaml and component.yaml file that reference
+    """Sets up a temporary directory with a replication.yaml and defs.yaml file that reference
     the proper temp path.
     """
     with (
@@ -71,8 +70,8 @@ def temp_sling_component_instance(
                 placeholder_data = data["streams"].pop("<PLACEHOLDER>")
                 data["streams"][f"file://{temp_dir}/input.csv"] = placeholder_data
 
-            with _modify_yaml(component_path / "component.yaml") as data:
-                # If replication specs were provided, overwrite the default one in the component.yaml
+            with _modify_yaml(component_path / "defs.yaml") as data:
+                # If replication specs were provided, overwrite the default one in the defs.yaml
                 if replication_specs:
                     data["attributes"]["replications"] = replication_specs
 
@@ -92,12 +91,21 @@ def test_python_attributes() -> None:
         op = replications[0].op
         assert op is None
 
-        assert defs.get_asset_graph().get_all_asset_keys() == {
+        assert defs.resolve_asset_graph().get_all_asset_keys() == {
             AssetKey("input_csv"),
             AssetKey("input_duckdb"),
         }
         # inherited from directory name
-        assert defs.get_assets_def("input_duckdb").op.name == "replication"
+        assert defs.resolve_assets_def("input_duckdb").op.name == "replication"
+        refs = check.inst(
+            defs.resolve_assets_def("input_duckdb").metadata_by_key[AssetKey("input_duckdb")][
+                "dagster/code_references"
+            ],
+            CodeReferencesMetadataValue,
+        )
+        assert len(refs.code_references) == 1
+        assert isinstance(refs.code_references[0], LocalFileCodeReference)
+        assert refs.code_references[0].file_path.endswith("replication.yaml")
 
 
 def test_python_attributes_op_name() -> None:
@@ -109,11 +117,11 @@ def test_python_attributes_op_name() -> None:
         op = replications[0].op
         assert op
         assert op.name == "my_op"
-        assert defs.get_asset_graph().get_all_asset_keys() == {
+        assert defs.resolve_asset_graph().get_all_asset_keys() == {
             AssetKey("input_csv"),
             AssetKey("input_duckdb"),
         }
-        assert defs.get_assets_def("input_duckdb").op.name == "my_op"
+        assert defs.resolve_assets_def("input_duckdb").op.name == "my_op"
 
 
 def test_python_attributes_op_tags() -> None:
@@ -125,7 +133,7 @@ def test_python_attributes_op_tags() -> None:
         op = replications[0].op
         assert op
         assert op.tags == {"tag1": "value1"}
-        assert defs.get_assets_def("input_duckdb").op.tags == {"tag1": "value1"}
+        assert defs.resolve_assets_def("input_duckdb").op.tags == {"tag1": "value1"}
 
 
 def test_python_params_include_metadata() -> None:
@@ -137,7 +145,7 @@ def test_python_params_include_metadata() -> None:
         include_metadata = replications[0].include_metadata
         assert include_metadata == ["column_metadata", "row_count"]
 
-        input_duckdb = defs.get_assets_def("input_duckdb")
+        input_duckdb = defs.resolve_assets_def("input_duckdb")
 
         with instance_for_test() as instance:
             result = materialize([input_duckdb], instance=instance)
@@ -157,7 +165,7 @@ def test_load_from_path() -> None:
         assert resource.connections[0].type == "duckdb"
         assert resource.connections[0].password == "password"
 
-        assert defs.get_asset_graph().get_all_asset_keys() == {
+        assert defs.resolve_asset_graph().get_all_asset_keys() == {
             AssetKey("input_csv"),
             AssetKey(["foo", "input_duckdb"]),
         }
@@ -174,7 +182,7 @@ def test_sling_subclass() -> None:
         DebugSlingReplicationComponent,
         {"sling": {}, "replications": [{"path": str(REPLICATION_PATH)}]},
     )
-    assert defs.get_asset_graph().get_all_asset_keys() == {
+    assert defs.resolve_asset_graph().get_all_asset_keys() == {
         AssetKey("input_csv"),
         AssetKey("input_duckdb"),
     }
@@ -261,7 +269,7 @@ def test_translation(
         if attributes.get("key_prefix"):
             key = key.with_prefix(attributes["key_prefix"])
 
-        assets_def: AssetsDefinition = defs.get_assets_def(key)
+        assets_def: AssetsDefinition = defs.resolve_assets_def(key)
     if assertion:
         assert assertion(assets_def.get_asset_spec(key))
 
@@ -283,23 +291,9 @@ def test_translation_is_comprehensive():
 
 
 def test_scaffold_sling():
-    runner = CliRunner()
-
-    with temp_code_location_bar():
-        result = runner.invoke(
-            cli,
-            [
-                "scaffold",
-                "object",
-                "dagster_sling.SlingReplicationCollectionComponent",
-                "bar/components/qux",
-                "--scaffold-format",
-                "yaml",
-            ],
-        )
-        assert result.exit_code == 0
-        assert Path("bar/components/qux/replication.yaml").exists()
-        assert Path("bar/components/qux/component.yaml").exists()
+    with scaffold_defs_sandbox(component_cls=SlingReplicationCollectionComponent) as defs_sandbox:
+        assert (defs_sandbox.defs_folder_path / "defs.yaml").exists()
+        assert (defs_sandbox.defs_folder_path / "replication.yaml").exists()
 
 
 def test_spec_is_available_in_scope() -> None:
@@ -311,7 +305,7 @@ def test_spec_is_available_in_scope() -> None:
             }
         ]
     ) as (_, defs):
-        assets_def: AssetsDefinition = defs.get_assets_def("input_duckdb")
+        assets_def: AssetsDefinition = defs.resolve_assets_def("input_duckdb")
         assert assets_def.get_asset_spec(AssetKey("input_duckdb")).metadata["asset_key"] == [
             "input_duckdb"
         ]
@@ -346,5 +340,5 @@ def test_udf_map_spec(map_fn: Callable[[AssetSpec], Any]) -> None:
         },
     )
 
-    assets_def: AssetsDefinition = defs.get_assets_def(AssetKey("input_duckdb"))
+    assets_def: AssetsDefinition = defs.resolve_assets_def(AssetKey("input_duckdb"))
     assert assets_def.get_asset_spec(AssetKey("input_duckdb")).tags["is_custom_spec"] == "yes"

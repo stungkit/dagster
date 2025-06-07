@@ -2,7 +2,7 @@ import shutil
 import sys
 import tempfile
 from collections.abc import Iterator, Mapping
-from contextlib import contextmanager, nullcontext
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -51,7 +51,6 @@ JAFFLE_SHOP_KEYS = {
 }
 
 
-@contextmanager
 @pytest.fixture(scope="module")
 def dbt_path() -> Iterator[Path]:
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -86,8 +85,8 @@ def test_python_params(dbt_path: Path, backfill_policy: Optional[str]) -> None:
             },
         },
     )
-    assert defs.get_asset_graph().get_all_asset_keys() == JAFFLE_SHOP_KEYS
-    assets_def = defs.get_assets_def("stg_customers")
+    assert defs.resolve_asset_graph().get_all_asset_keys() == JAFFLE_SHOP_KEYS
+    assets_def = defs.resolve_assets_def("stg_customers")
     assert assets_def.op.name == "some_op"
     assert assets_def.op.tags["tag1"] == "value"
 
@@ -117,9 +116,9 @@ def test_python_params(dbt_path: Path, backfill_policy: Optional[str]) -> None:
 
 def test_load_from_path(dbt_path: Path) -> None:
     with load_test_component_defs(dbt_path.parent.parent.parent) as defs:
-        assert defs.get_asset_graph().get_all_asset_keys() == JAFFLE_SHOP_KEYS
+        assert defs.resolve_asset_graph().get_all_asset_keys() == JAFFLE_SHOP_KEYS
 
-        for asset_node in defs.get_asset_graph().asset_nodes:
+        for asset_node in defs.resolve_asset_graph().asset_nodes:
             assert asset_node.tags["foo"] == "bar"
 
             assert asset_node.metadata["something"] == 1
@@ -140,6 +139,9 @@ def test_project_prepare_cli(dbt_path: Path) -> None:
         assert result.exit_code == 0
 
         projects = get_projects_from_dbt_component(p)
+
+        assert projects
+
         for p in projects:
             assert p.manifest_path.exists()
 
@@ -158,7 +160,7 @@ def test_dbt_subclass_additional_scope_fn(dbt_path: Path) -> None:
             "translation": {"tags": "{{ get_tags_for_node(node) }}"},
         },
     )
-    assets_def = defs.get_assets_def(AssetKey("stg_customers"))
+    assets_def = defs.resolve_assets_def(AssetKey("stg_customers"))
     assert assets_def.get_asset_spec(AssetKey("stg_customers")).tags["model_id"] == "stg-customers"
 
 
@@ -250,9 +252,9 @@ def test_asset_attributes(
             key = AssetKey(["cool_prefix", "stg_customers"])
         else:
             key = AssetKey("stg_customers")
-            assert defs.get_asset_graph().get_all_asset_keys() == JAFFLE_SHOP_KEYS
+            assert defs.resolve_asset_graph().get_all_asset_keys() == JAFFLE_SHOP_KEYS
 
-        assets_def = defs.get_assets_def(key)
+        assets_def = defs.resolve_assets_def(key)
         if assertion:
             assert assertion(assets_def.get_asset_spec(key))
 
@@ -278,7 +280,7 @@ def test_subselection(dbt_path: Path) -> None:
         DbtProjectComponent,
         {"project": str(dbt_path), "select": "raw_customers"},
     )
-    assert defs.get_asset_graph().get_all_asset_keys() == {AssetKey("raw_customers")}
+    assert defs.resolve_asset_graph().get_all_asset_keys() == {AssetKey("raw_customers")}
 
 
 def test_exclude(dbt_path: Path) -> None:
@@ -286,7 +288,9 @@ def test_exclude(dbt_path: Path) -> None:
         DbtProjectComponent,
         {"project": str(dbt_path), "exclude": "customers"},
     )
-    assert defs.get_asset_graph().get_all_asset_keys() == JAFFLE_SHOP_KEYS - {AssetKey("customers")}
+    assert defs.resolve_asset_graph().get_all_asset_keys() == JAFFLE_SHOP_KEYS - {
+        AssetKey("customers")
+    }
 
 
 DEPENDENCY_ON_DBT_PROJECT_LOCATION_PATH = (
@@ -304,8 +308,8 @@ def test_dependency_on_dbt_project():
     project.preparer.prepare(project)
 
     defs = build_component_defs(DEPENDENCY_ON_DBT_PROJECT_LOCATION_PATH / "defs")
-    assert AssetKey("downstream_of_customers") in defs.get_asset_graph().get_all_asset_keys()
-    downstream_of_customers_def = defs.get_assets_def("downstream_of_customers")
+    assert AssetKey("downstream_of_customers") in defs.resolve_asset_graph().get_all_asset_keys()
+    downstream_of_customers_def = defs.resolve_assets_def("downstream_of_customers")
     assert set(downstream_of_customers_def.asset_deps[AssetKey("downstream_of_customers")]) == {
         AssetKey("customers")
     }
@@ -319,7 +323,7 @@ def test_spec_is_available_in_scope(dbt_path: Path) -> None:
             "translation": {"metadata": {"asset_key": "{{ spec.key.path }}"}},
         },
     )
-    assets_def = defs.get_assets_def(AssetKey("stg_customers"))
+    assets_def = defs.resolve_assets_def(AssetKey("stg_customers"))
     assert assets_def.get_asset_spec(AssetKey("stg_customers")).metadata["asset_key"] == [
         "stg_customers"
     ]
@@ -352,7 +356,7 @@ def test_udf_map_spec(dbt_path: Path, map_fn: Callable[[AssetSpec], Any]) -> Non
             "translation": "{{ map_spec(spec) }}",
         },
     )
-    assets_def = defs.get_assets_def(AssetKey("stg_customers"))
+    assets_def = defs.resolve_assets_def(AssetKey("stg_customers"))
     assert assets_def.get_asset_spec(AssetKey("stg_customers")).tags["is_custom_spec"] == "yes"
 
 
@@ -389,7 +393,7 @@ def test_python_interface(dbt_path: Path):
         project=DbtProject(dbt_path),
         translation=lambda spec, _: spec.replace_attributes(tags={"python": "rules"}),
     ).build_defs(context)
-    assets_def = defs.get_assets_def(AssetKey("stg_customers"))
+    assets_def = defs.resolve_assets_def(AssetKey("stg_customers"))
     assert assets_def.get_asset_spec(AssetKey("stg_customers")).tags["python"] == "rules"
 
 
@@ -435,3 +439,11 @@ project: "{{ project_root }}/dbt"
 project:
   project_dir: "{{ project_root }}/dbt"
         """)
+
+
+def test_disable_prep_if_dev(dbt_path: Path):
+    c = DbtProjectComponent.resolve_from_yaml(f"""
+project: {dbt_path!s}
+prepare_if_dev: False
+    """)
+    assert not c.prepare_if_dev
