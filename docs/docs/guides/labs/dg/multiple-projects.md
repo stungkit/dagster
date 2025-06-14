@@ -2,7 +2,7 @@
 title: 'Managing multiple projects with dg'
 sidebar_label: 'Managing multiple projects'
 sidebar_position: 300
-description: Manage multiple isolated Dagster projects using dg, each with unique environments, by creating a workspace directory with dg init.
+description: Manage multiple isolated Dagster projects using dg, each with unique environments, by creating a workspace directory with create-dagster project.
 ---
 
 import DgComponentsPreview from '@site/docs/partials/\_DgComponentsPreview.md';
@@ -11,44 +11,52 @@ import DgComponentsPreview from '@site/docs/partials/\_DgComponentsPreview.md';
 
 :::note
 
-If you're just getting started, we recommend [scaffolding a single project](/guides/labs/dg/creating-a-project) instead of a workspace with multiple projects.
+If you're just getting started, we recommend [creating a single project](/guides/labs/dg/creating-a-project) instead of a workspace with multiple projects.
 
 :::
 
-If you need to collaborate with multiple teams, or work with conflicting dependencies that require isolation from each other, you can scaffold a workspace directory that contains multiple projects, each with their own separate Python environment.
+If you need to collaborate with multiple teams, or work with conflicting dependencies that require isolation from each other, you can scaffold a workspace directory that contains multiple projects, each with their own separate Python environment, while still being able to access all of your assets across every project in a single instance of the Dagster UI or `dg` CLI.
 
-A workspace directory contains a root `dg.toml` with workspace-level settings, and a `projects` directory with one or more projects.
+A workspace directory contains a root `dg.toml` with workspace-level settings, and a `projects` directory with one or more projects. It also contains a Python environment in a `deployments/local` folder that can be used for running `dg` commands locally against the workspace.
+
+When a `dg` command runs in a workspace, it will create a subprocess for each project using that project's virtual environment, and communicate with each process through an API layer. The diagram below demonstrates a workspace with two projects, as well as their virtual environments.
+
+![Diagram showing the virtual environments used by a workspace and 2 projects](/images/guides/build/projects-and-components/setting-up-a-workspace/workspace-venvs.png)
+
+## 1. Create a new workspace and first project
+
+To scaffold a new workspace called `dagster-workspace`, run `uvx create-dagster workspace` and respond yes to the prompt to run `uv sync` after scaffolding:
+
+<CliInvocationExample path="docs_snippets/docs_snippets/guides/dg/workspace/1-dg-scaffold-workspace.txt" />
+
+The scaffolded workspace includes a `projects` folder, which is currently empty, and a `deployments` folder, which includes a `local` folder with a `pyproject.toml` file that specifies an environment for running `dg` commands locally against your workspace.
+
+Next, enter the directory and activate the virtual environment for the `local` environment:
+
+<CliInvocationExample path="docs_snippets/docs_snippets/guides/dg/workspace/2-activate-workspace-venv.txt" />
 
 :::note
 
-A workspace does not define a Python environment by default. Instead, Python environments are defined per project.
+You'll need to activate this virtual environment anytime you open a new terminal session and want to run a `dg` command against the workspace.
 
 :::
 
-## Scaffold a new workspace and first project
+Now we'll create a project inside our workspace called `project-1`. Run `uvx create-dagster project` with the path of the project:
 
-To scaffold a new workspace with an initial project called `project-1`, run `dg init` with the `--workspace` option and `--python-environment uv_managed` option. You will be prompted for the name of the project:
+<CliInvocationExample path="docs_snippets/docs_snippets/guides/dg/workspace/3-dg-scaffold-project.txt" />
 
-<CliInvocationExample path="docs_snippets/docs_snippets/guides/dg/workspace/1-dg-init.txt" />
+This will create a new Python environment for this project and associate that project with the workspace.
 
-:::note
-
-Currently `dg` workspaces only support projects using `uv` with `project.python_environment.uv_managed = true`. This means that the Python environment for the workspace is managed by `uv`, and subprocesses are launched by `uv run`, ignoring the activated virtual environment. If all projects in a workspace do not conform to this, you will likely encounter errors.
-
-:::
-
-This will create a new directory called `dagster-workspace` with a `projects` subdirectory that contains `project-1`. It will also set up a new `uv`-managed Python environment for this project.
-
-### Review workspace structure
+### Workspace structure
 
 The new workspace has the following structure:
 
-<CliInvocationExample path="docs_snippets/docs_snippets/guides/dg/workspace/2-tree.txt" />
+<CliInvocationExample path="docs_snippets/docs_snippets/guides/dg/workspace/4-tree.txt" />
 
 The `dg.toml` file for the `dagster-workspace` folder contains a `directory_type = "workspace"` setting that marks this directory as a workspace:
 
 <CodeExample
-  path="docs_snippets/docs_snippets/guides/dg/workspace/3-dg.toml"
+  path="docs_snippets/docs_snippets/guides/dg/workspace/5-dg.toml"
   language="TOML"
   title="dagster-workspace/dg.toml"
 />
@@ -63,27 +71,27 @@ The `project-1` directory contains a `pyproject.toml` file with a
 `tool.dg.directory_type = "project"` section that defines it as a `dg` project:
 
 <CodeExample
-  path="docs_snippets/docs_snippets/guides/dg/workspace/4-project-pyproject.toml"
+  path="docs_snippets/docs_snippets/guides/dg/workspace/6-project-pyproject.toml"
   language="TOML"
   title="dagster-workspace/projects/project-1/pyproject.toml"
 />
 
-## Add a second project to the workspace
+## 3. Add a second project to the workspace
 
 As noted above, environments are scoped per project. `dg` commands will only use the environment of `project-1` when you are inside the `project-1` directory.
 
 Let's create another project:
 
-<CliInvocationExample path="docs_snippets/docs_snippets/guides/dg/workspace/5-scaffold-project.txt" />
+<CliInvocationExample path="docs_snippets/docs_snippets/guides/dg/workspace/7-scaffold-project.txt" />
 
-Now we have two projects. We can list them with:
+Now there are two projects. You can list them with:
 
-<CliInvocationExample path="docs_snippets/docs_snippets/guides/dg/workspace/6-project-list.txt" />
+<CliInvocationExample path="docs_snippets/docs_snippets/guides/dg/workspace/8-project-list.txt" />
 
-## Load workspace with `dg`
+The workspace now has the following structure:
 
-Finally, let's load up our two projects with `dg dev`. `dg dev` will automatically recognize the projects in your workspace and launch them in their respective environments. Let's run `dg dev` back in the workspace root directory and load up the Dagster UI in a browser:
+Finally, let's load up our two projects with `dg dev`. When we run `dg dev` from the workspace root, it will automatically recognize the projects in your workspace and launch each project in a separate process in its virtual environment found in the `.venv` folder in the project.
 
-<CliInvocationExample contents="cd ../.. && dg dev" />
+<CliInvocationExample contents="dg dev" />
 
 ![](/images/guides/build/projects-and-components/setting-up-a-workspace/two-projects.png)

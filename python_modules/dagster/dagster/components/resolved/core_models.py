@@ -1,5 +1,4 @@
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import Annotated, Any, Callable, Literal, Optional, Union
 
 from dagster_shared.record import record
@@ -15,9 +14,14 @@ from dagster._core.definitions.declarative_automation.automation_condition impor
     AutomationCondition,
 )
 from dagster._core.definitions.definitions_class import Definitions
+from dagster._core.definitions.partition import PartitionsDefinition, StaticPartitionsDefinition
+from dagster._core.definitions.time_window_partitions import (
+    DailyPartitionsDefinition,
+    HourlyPartitionsDefinition,
+)
 from dagster.components.resolved.base import Resolvable, resolve_fields
 from dagster.components.resolved.context import ResolutionContext
-from dagster.components.resolved.model import Injectable, Injected, Model, Resolver
+from dagster.components.resolved.model import Injected, Model, Resolver
 
 
 def _resolve_asset_key(context: ResolutionContext, key: str) -> AssetKey:
@@ -28,6 +32,52 @@ def _resolve_asset_key(context: ResolutionContext, key: str) -> AssetKey:
 
 
 PostProcessorFn: TypeAlias = Callable[[Definitions], Definitions]
+
+
+class HourlyPartitionsDefinitionModel(Resolvable, Model):
+    type: Literal["hourly"] = "hourly"
+    start_date: str
+    end_date: Optional[str] = None
+    timezone: Optional[str] = None
+    minute_offset: int = 0
+
+
+class DailyPartitionsDefinitionModel(Resolvable, Model):
+    type: Literal["daily"] = "daily"
+    start_date: str
+    end_date: Optional[str] = None
+    timezone: Optional[str] = None
+    minute_offset: int = 0
+    hour_offset: int = 0
+
+
+class StaticPartitionsDefinitionModel(Resolvable, Model):
+    type: Literal["static"] = "static"
+    partition_keys: Sequence[str]
+
+
+def resolve_partitions_def(context: ResolutionContext, model) -> Optional[PartitionsDefinition]:
+    if model is None:
+        return None
+
+    elif model.type == "hourly":
+        return HourlyPartitionsDefinition(
+            start_date=model.start_date,
+            end_date=model.end_date,
+            timezone=model.timezone,
+            minute_offset=model.minute_offset,
+        )
+    elif model.type == "daily":
+        return DailyPartitionsDefinition(
+            start_date=model.start_date,
+            end_date=model.end_date,
+            timezone=model.timezone,
+            minute_offset=model.minute_offset,
+        )
+    elif model.type == "static":
+        return StaticPartitionsDefinition(partition_keys=model.partition_keys)
+    else:
+        raise ValueError(f"Invalid partitions definition type: {model.type}")
 
 
 class SingleRunBackfillPolicyModel(Resolvable, Model):
@@ -56,10 +106,11 @@ def resolve_backfill_policy(
     raise ValueError(f"Invalid backfill policy: {backfill_policy}")
 
 
-@dataclass
-class OpSpec(Resolvable):
+class OpSpec(Model, Resolvable):
     name: Optional[str] = None
-    tags: Optional[dict[str, str]] = None
+    tags: Optional[dict[str, Any]] = None
+    description: Optional[str] = None
+    pool: Optional[str] = None
     backfill_policy: Annotated[
         Optional[BackfillPolicy],
         Resolver(
@@ -73,7 +124,7 @@ def _expect_injected(context, val):
     return check.opt_inst_param(val, "val", AutomationCondition)
 
 
-ResolvedAssetKey = Annotated[
+ResolvedAssetKey: TypeAlias = Annotated[
     AssetKey,
     Resolver(
         _resolve_asset_key,
@@ -102,7 +153,6 @@ class SharedAssetKwargs(Resolvable):
     metadata: Annotated[
         Mapping[str, Any],
         Resolver.default(
-            can_inject=True,
             description="Additional metadata for the asset.",
         ),
     ] = {}
@@ -136,7 +186,6 @@ class SharedAssetKwargs(Resolvable):
     tags: Annotated[
         Mapping[str, str],
         Resolver.default(
-            can_inject=True,
             description="Tags for filtering and organizing.",
             examples=[{"tier": "prod", "team": "analytics"}],
         ),
@@ -153,6 +202,18 @@ class SharedAssetKwargs(Resolvable):
         Resolver.default(
             model_field_type=Optional[str],
             description="The condition under which the asset will be automatically materialized.",
+        ),
+    ] = None
+    partitions_def: Annotated[
+        Optional[PartitionsDefinition],
+        Resolver(
+            resolve_partitions_def,
+            description="The partitions definition for the asset.",
+            model_field_type=Union[
+                HourlyPartitionsDefinitionModel,
+                DailyPartitionsDefinitionModel,
+                StaticPartitionsDefinitionModel,
+            ],
         ),
     ] = None
 
@@ -205,7 +266,7 @@ class AssetCheckSpecKwargs(Resolvable):
     additional_deps: Optional[Sequence[ResolvedAssetKey]] = None
     description: Optional[str] = None
     blocking: bool = False
-    metadata: Injectable[Optional[Mapping[str, Any]]] = None
+    metadata: Optional[Mapping[str, Any]] = None
     automation_condition: Optional[Injected[AutomationCondition]] = None
 
 
@@ -302,7 +363,7 @@ def apply_post_processor_to_defs(
 ) -> Definitions:
     check.inst(model, AssetPostProcessorModel.model())
 
-    return defs.map_asset_specs(
+    return defs.map_resolved_asset_specs(
         selection=model.target,
         func=lambda spec: apply_post_processor_to_spec(model, spec, context),
     )
@@ -324,3 +385,16 @@ AssetPostProcessor: TypeAlias = Annotated[
         model_field_type=AssetPostProcessorModel.model(),
     ),
 ]
+
+
+def post_process_defs(defs: Definitions, post_processors: Optional[list[AssetPostProcessor]]):
+    for post_processor in post_processors or []:
+        defs = post_processor(defs)
+    return defs
+
+
+CORE_MODEL_SUGGESTIONS = {
+    AssetKey: "ResolvedAssetKey",
+    AssetSpec: "ResolvedAssetSpec",
+    AssetCheckSpec: "ResolvedAssetCheckSpec",
+}

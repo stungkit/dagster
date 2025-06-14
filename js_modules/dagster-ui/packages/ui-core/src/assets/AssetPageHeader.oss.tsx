@@ -1,6 +1,6 @@
 // eslint-disable-next-line no-restricted-imports
 import {BreadcrumbProps, Breadcrumbs} from '@blueprintjs/core';
-import {Box, Colors, Heading, Icon, MiddleTruncate, PageHeader} from '@dagster-io/ui-components';
+import {Box, Colors, Icon, MiddleTruncate, PageHeader, Subtitle1} from '@dagster-io/ui-components';
 import * as React from 'react';
 import {useContext} from 'react';
 import {Link, useHistory, useLocation} from 'react-router-dom';
@@ -39,7 +39,7 @@ export const AssetPageHeader = ({
   const copyableString = assetKey.path.join('/');
 
   const location = useLocation();
-  const filterStateQueryString = getAssetSelectionQueryString(location.search);
+  const assetSelection = getAssetSelectionQueryString(location.search);
 
   const breadcrumbs = React.useMemo(() => {
     const keyPathItems: BreadcrumbProps[] = [];
@@ -59,24 +59,32 @@ export const AssetPageHeader = ({
     // and we can then remove the basePath for individual rendered breadcrumbs, which we are
     // able to control.
     const headerItems = headerBreadcrumbs.map((item) => {
+      const url = new URL(item.href ?? '', window.location.origin);
+      if (assetSelection) {
+        url.searchParams.set('asset-selection', assetSelection);
+      }
       return {
         ...item,
         href: item.href
-          ? history.createHref({pathname: item.href, search: filterStateQueryString})
+          ? history.createHref({pathname: url.pathname, search: url.search})
           : undefined,
       };
     });
 
     // Attach the filter state querystring to key path items.
     const keyPathItemsWithSearch = keyPathItems.map((item) => {
+      const url = new URL(item.href ?? '', window.location.origin);
+      if (assetSelection) {
+        url.searchParams.set('asset-selection', assetSelection);
+      }
       return {
         ...item,
-        href: history.createHref({pathname: item.href, search: filterStateQueryString}),
+        href: history.createHref({pathname: url.pathname, search: url.search}),
       };
     });
 
     return [...headerItems, ...keyPathItemsWithSearch];
-  }, [assetKey.path, headerBreadcrumbs, filterStateQueryString, history]);
+  }, [assetKey.path, headerBreadcrumbs, assetSelection, history]);
 
   return (
     <PageHeader
@@ -120,7 +128,7 @@ export const AssetPageHeader = ({
   );
 };
 
-const TruncatedHeading = styled(Heading)`
+const TruncatedHeading = styled(Subtitle1)`
   max-width: 300px;
   overflow: hidden;
 `;
