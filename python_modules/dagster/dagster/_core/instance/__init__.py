@@ -1749,6 +1749,8 @@ class DagsterInstance(DynamicPartitionsStore):
         # find the set of planned assets and checks
         to_reexecute: set[EntityKey] = set()
         for step in execution_plan_snapshot.steps:
+            if step.key not in execution_plan_snapshot.step_keys_to_execute:
+                continue
             to_reexecute_for_step = {
                 key
                 for key in step.entity_keys
@@ -3620,17 +3622,17 @@ class DagsterInstance(DynamicPartitionsStore):
     def streamline_read_asset_health_supported(self) -> bool:
         return False
 
-    def get_asset_check_health_state_for_asset(
-        self, asset_key: AssetKey
-    ) -> Optional[AssetCheckHealthState]:
+    def get_asset_check_health_state_for_assets(
+        self, asset_keys: Sequence[AssetKey]
+    ) -> Optional[Mapping[AssetKey, Optional[AssetCheckHealthState]]]:
         return None
 
-    def get_asset_freshness_health_state_for_asset(
-        self, asset_key: AssetKey
-    ) -> Optional[AssetFreshnessHealthState]:
+    def get_asset_freshness_health_state_for_assets(
+        self, asset_keys: Sequence[AssetKey]
+    ) -> Optional[Mapping[AssetKey, Optional[AssetFreshnessHealthState]]]:
         return None
 
-    def get_asset_materialization_health_state_for_asset(
-        self, asset_key: AssetKey
-    ) -> Optional["AssetMaterializationHealthState"]:
+    def get_asset_materialization_health_state_for_assets(
+        self, asset_keys: Sequence[AssetKey]
+    ) -> Optional[Mapping[AssetKey, Optional["AssetMaterializationHealthState"]]]:
         return None
