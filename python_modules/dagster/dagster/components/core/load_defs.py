@@ -3,13 +3,19 @@ from pathlib import Path
 from types import ModuleType
 from typing import Optional
 
+from dagster_shared import check
 from dagster_shared.serdes.objects.package_entry import json_for_all_components
+from dagster_shared.utils.config import (
+    get_canonical_defs_module_name,
+    load_toml_as_dict,
+    locate_dg_config_in_folder,
+)
 
 from dagster._annotations import deprecated, preview, public
 from dagster._core.definitions.definitions_class import Definitions
-from dagster._core.errors import DagsterInvalidDefinitionError
 from dagster._utils.warnings import suppress_dagster_warnings
-from dagster.components.core.context import ComponentLoadContext, use_component_load_context
+from dagster.components.core.context import ComponentLoadContext
+from dagster.components.core.tree import ComponentTree
 
 PLUGIN_COMPONENT_TYPES_JSON_METADATA_KEY = "plugin_component_types_json"
 
@@ -43,8 +49,12 @@ def get_project_root(defs_root: ModuleType) -> Path:
         FileNotFoundError: If no project root with pyproject.toml or setup.py is found.
     """
     # Get the module's file path
-
     module_path = getattr(defs_root, "__file__", None)
+    if module_path is None:
+        # For modules without __file__ attribute (e.g. namespace packages), try to get path from __path__
+        module_paths = getattr(defs_root, "__path__", None)
+        if module_paths and len(module_paths) > 0:
+            module_path = module_paths[0]
     if not module_path:
         raise FileNotFoundError(f"Module {defs_root} has no __file__ attribute")
 
@@ -60,35 +70,103 @@ def get_project_root(defs_root: ModuleType) -> Path:
     raise FileNotFoundError("No project root with pyproject.toml or setup.py found")
 
 
-# Public method so optional Nones are fine
 @public
 @preview(emit_runtime_warning=False)
 @suppress_dagster_warnings
-def load_defs(defs_root: ModuleType, project_root: Optional[Path] = None) -> Definitions:
+def load_from_defs_folder(*, project_root: Path) -> Definitions:
+    """Constructs a Definitions object, loading all Dagster defs in the project's
+    defs folder.
+
+    Args:
+        project_root (Path): The path to the dg project root.
+    """
+    root_config_path = locate_dg_config_in_folder(project_root)
+    toml_config = load_toml_as_dict(
+        check.not_none(
+            root_config_path,
+            additional_message=f"No config file found at project root {project_root}",
+        )
+    )
+
+    if root_config_path and root_config_path.stem == "dg":
+        project = toml_config.get("project", {})
+    else:
+        project = toml_config.get("tool", {}).get("dg", {}).get("project", {})
+
+    root_module_name = project.get("root_module")
+    defs_module_name = project.get("defs_module")
+    check.invariant(
+        defs_module_name or root_module_name,
+        f"Either defs_module or root_module must be set in the project config {root_config_path}",
+    )
+    defs_module_name = get_canonical_defs_module_name(defs_module_name, root_module_name)
+
+    defs_module = importlib.import_module(defs_module_name)
+
+    return load_defs(
+        defs_module, project_root=project_root, terminate_autoloading_on_keyword_files=False
+    )
+
+
+# Public method so optional Nones are fine
+@public
+@preview(emit_runtime_warning=False)
+@deprecated(
+    breaking_version="1.10.21",
+    additional_warn_text="Use load_from_defs_folder instead.",
+)
+@suppress_dagster_warnings
+def load_defs(
+    defs_root: ModuleType,
+    project_root: Optional[Path] = None,
+    terminate_autoloading_on_keyword_files: bool = True,
+) -> Definitions:
     """Constructs a Definitions object, loading all Dagster defs in the given module.
 
     Args:
         defs_root (Path): The path to the defs root, typically `package.defs`.
         project_root (Optional[Path]): path to the project root directory.
+        terminate_autoloading_on_keyword_files (bool): Whether to terminate the defs
+            autoloading process when encountering a definitions.py or component.py file.
+            Defaults to True.
     """
-    from dagster.components.core.defs_module import get_component
-    from dagster.components.core.package_entry import discover_entry_point_package_objects
-    from dagster.components.core.snapshot import get_package_entry_snap
+    from dagster.components.core.defs_module import DefsFolderComponent, get_component
 
     project_root = project_root if project_root else get_project_root(defs_root)
 
     # create a top-level DefsModule component from the root module
-    context = ComponentLoadContext.for_module(defs_root, project_root)
-    with use_component_load_context(context):
-        root_component = get_component(context)
-        if root_component is None:
-            raise DagsterInvalidDefinitionError("Could not resolve root module to a component.")
+    context = ComponentLoadContext.for_module(
+        defs_root, project_root, terminate_autoloading_on_keyword_files
+    )
 
-        library_objects = discover_entry_point_package_objects()
-        snaps = [get_package_entry_snap(key, obj) for key, obj in library_objects.items()]
-        components_json = json_for_all_components(snaps)
+    # Despite the argument being named defs_root, load_defs supports loading arbitrary components
+    # directly, so use get_component instead of DefsFolderComponent.get
+    root_component = check.not_none(
+        get_component(context), "Could not resolve root module to a component."
+    )
 
-        return Definitions.merge(
-            root_component.build_defs(context),
-            Definitions(metadata={PLUGIN_COMPONENT_TYPES_JSON_METADATA_KEY: components_json}),
-        )
+    # If we did get a folder component back, assume its the root tree
+    tree = (
+        ComponentTree(defs_module=defs_root, project_root=project_root)
+        if isinstance(root_component, DefsFolderComponent)
+        else None
+    )
+
+    return Definitions.merge(
+        root_component.build_defs(context),
+        get_library_json_enriched_defs(tree),
+    )
+
+
+def get_library_json_enriched_defs(tree: Optional[ComponentTree]) -> Definitions:
+    from dagster.components.core.package_entry import discover_entry_point_package_objects
+    from dagster.components.core.snapshot import get_package_entry_snap
+
+    registry_objects = discover_entry_point_package_objects()
+    snaps = [get_package_entry_snap(key, obj) for key, obj in registry_objects.items()]
+    components_json = json_for_all_components(snaps)
+
+    return Definitions(
+        metadata={PLUGIN_COMPONENT_TYPES_JSON_METADATA_KEY: components_json},
+        component_tree=tree,
+    )

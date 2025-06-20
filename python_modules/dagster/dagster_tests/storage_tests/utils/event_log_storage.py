@@ -302,7 +302,7 @@ def _synthesize_events(
             loggers=_default_loggers(_append_event),
             resources=_default_resources(),
             executor=in_process_executor,
-        ).get_implicit_job_def_for_assets([k for a in ops_fn_or_assets for k in a.keys])
+        ).resolve_implicit_job_def_def_for_assets([k for a in ops_fn_or_assets for k in a.keys])
         assert job_def
         a_job = job_def
     else:  # op_fn
@@ -527,6 +527,9 @@ class TestEventLogStorage:
 
     def watch_timeout(self):
         return 5
+
+    def can_wipe_asset_partitions(self) -> bool:
+        return True
 
     @contextmanager
     def mock_tags_to_index(self, storage):
@@ -1406,7 +1409,7 @@ class TestEventLogStorage:
 
         asset_job = Definitions(
             assets=[asset_one, never_runs_asset],
-        ).get_implicit_global_asset_job_def()
+        ).resolve_implicit_global_asset_job_def()
 
         # test with only one asset selected
         result = asset_job.execute_in_process(
@@ -1432,7 +1435,7 @@ class TestEventLogStorage:
 
         asset_job = Definitions(
             assets=[asset_one, never_runs_asset],
-        ).get_implicit_global_asset_job_def()
+        ).resolve_implicit_global_asset_job_def()
 
         result = asset_job.execute_in_process(instance=instance, raise_on_error=False)
         run_id = result.run_id
@@ -2776,7 +2779,7 @@ class TestEventLogStorage:
         assert asset_key.to_string() == '["path", "to", "asset_4"]'
         assert asset_key.path == ["path", "to", "asset_4"]
 
-    def test_asset_wipe(self, storage, instance):
+    def test_asset_wipe(self, storage, instance, test_run_id):
         one_run_id = make_new_run_id()
         two_run_id = make_new_run_id()
         _synthesize_events(lambda: one_asset_op(), run_id=one_run_id, instance=instance)
@@ -2784,7 +2787,28 @@ class TestEventLogStorage:
 
         asset_keys = storage.all_asset_keys()
         assert len(asset_keys) == 3
+
         assert storage.has_asset_key(AssetKey("asset_1"))
+
+        for asset_key in asset_keys:
+            event_to_store = DagsterEvent.build_asset_failed_to_materialize_event(
+                job_name="the_job",
+                step_key="the_step",
+                asset_materialization_failure=AssetMaterializationFailure(
+                    asset_key=asset_key,
+                    partition=None,
+                    failure_type=AssetMaterializationFailureType.FAILED,
+                    reason=AssetMaterializationFailureReason.FAILED_TO_MATERIALIZE,
+                ),
+            )
+            instance.report_dagster_event(event_to_store, test_run_id)
+
+        if storage.can_store_asset_failure_events:
+            for asset_key in asset_keys:
+                all_failed_records_result = storage.fetch_failed_materializations(
+                    records_filter=asset_key, limit=10
+                )
+                assert len(all_failed_records_result.records) == 1
 
         log_count = len(storage.get_logs_for_run(one_run_id))
         for asset_key in asset_keys:
@@ -2795,6 +2819,12 @@ class TestEventLogStorage:
         assert not storage.has_asset_key(AssetKey("asset_1"))
         assert log_count == len(storage.get_logs_for_run(one_run_id))
 
+        for asset_key in asset_keys:
+            all_failed_records_result = storage.fetch_failed_materializations(
+                records_filter=asset_key, limit=10
+            )
+            assert len(all_failed_records_result.records) == 0
+
         one_run_id = make_new_run_id()
         _synthesize_events(
             lambda: one_asset_op(),
@@ -2804,6 +2834,48 @@ class TestEventLogStorage:
         asset_keys = storage.all_asset_keys()
         assert len(asset_keys) == 1
         assert storage.has_asset_key(AssetKey("asset_1"))
+
+    def test_asset_wiped_event(self, instance):
+        @asset
+        def asset_to_wipe():
+            return 1
+
+        materialize([asset_to_wipe], instance=instance)
+        materializations = instance.fetch_materializations(asset_to_wipe.key, limit=100).records
+        assert len(materializations) == 1
+
+        instance.wipe_assets([asset_to_wipe.key])
+        materializations = instance.fetch_materializations(asset_to_wipe.key, limit=100).records
+        assert len(materializations) == 0
+        wipe_events = instance.get_event_records(
+            EventRecordsFilter(event_type=DagsterEventType.ASSET_WIPED)
+        )
+        assert len(wipe_events) == 1
+        assert wipe_events[0].event_log_entry.dagster_event.asset_key == AssetKey("asset_to_wipe")
+        assert wipe_events[0].event_log_entry.dagster_event_type == DagsterEventType.ASSET_WIPED
+        assert wipe_events[0].event_log_entry.dagster_event.asset_wiped_data.partition_keys is None
+
+    def test_asset_partitioned_wiped_event(self, instance):
+        if not self.can_wipe_asset_partitions():
+            pytest.skip("wiping asset partitions is not supported for this storage")
+
+        @asset(partitions_def=StaticPartitionsDefinition(["a", "b", "c"]))
+        def asset_to_wipe():
+            return 1
+
+        materialize([asset_to_wipe], instance=instance, partition_key="a")
+        materializations = instance.fetch_materializations(asset_to_wipe.key, limit=100).records
+        assert len(materializations) == 1
+
+        instance.wipe_asset_partitions(asset_to_wipe.key, ["a"])
+
+        wipe_events = instance.get_event_records(
+            EventRecordsFilter(event_type=DagsterEventType.ASSET_WIPED)
+        )
+        assert len(wipe_events) == 1
+        assert wipe_events[0].event_log_entry.dagster_event.asset_key == AssetKey("asset_to_wipe")
+        assert wipe_events[0].event_log_entry.dagster_event_type == DagsterEventType.ASSET_WIPED
+        assert wipe_events[0].event_log_entry.dagster_event.asset_wiped_data.partition_keys == ["a"]
 
     def test_asset_secondary_index(self, storage, instance):
         _synthesize_events(lambda: one_asset_op(), instance=instance)
@@ -4383,7 +4455,7 @@ class TestEventLogStorage:
         result = _execute_job_and_store_events(
             instance,
             storage,
-            defs.get_job_def("one_asset_job"),
+            defs.resolve_job_def("one_asset_job"),
             run_id=run_id_1,
         )
         records = storage.get_asset_records([my_asset_key])
@@ -4444,7 +4516,7 @@ class TestEventLogStorage:
         result = _execute_job_and_store_events(
             instance,
             storage,
-            defs.get_job_def("two_asset_job"),
+            defs.resolve_job_def("two_asset_job"),
             run_id=run_id_2,
         )
         records = storage.get_asset_records([my_asset_key])
@@ -4554,7 +4626,7 @@ class TestEventLogStorage:
         asset_key = AssetKey("never_materializes_asset")
         never_materializes_job = Definitions(
             assets=[never_materializes_asset],
-        ).get_implicit_global_asset_job_def()
+        ).resolve_implicit_global_asset_job_def()
 
         result = _execute_job_and_store_events(
             instance, storage, never_materializes_job, run_id=run_id_1

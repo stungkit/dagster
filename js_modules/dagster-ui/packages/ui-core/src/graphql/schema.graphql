@@ -50,6 +50,8 @@ enum DagsterEventType {
   STEP_EXPECTATION_RESULT
   ASSET_CHECK_EVALUATION_PLANNED
   ASSET_CHECK_EVALUATION
+  ASSET_HEALTH_CHANGED
+  ASSET_WIPED
   RUN_ENQUEUED
   RUN_DEQUEUED
   RUN_STARTING
@@ -618,15 +620,6 @@ type Asset {
     afterTimestampMillis: String
     limit: Int
   ): [ObservationEvent!]!
-  assetMaterializationHistory(
-    partitions: [String!]
-    partitionInLast: Int
-    beforeTimestampMillis: String
-    afterTimestampMillis: String
-    limit: Int
-    eventTypeSelector: MaterializationHistoryEventTypeSelector
-    cursor: String
-  ): MaterializationHistoryConnection!
   assetEventHistory(
     partitions: [String!]
     partitionInLast: Int
@@ -638,14 +631,15 @@ type Asset {
   ): AssetResultEventHistoryConnection!
   definition: AssetNode
   latestEventSortKey: ID
+  assetHealth: AssetHealth
 }
 
-type MaterializationHistoryConnection {
-  results: [AssetMaterializationEventType!]!
+type AssetResultEventHistoryConnection {
+  results: [AssetResultEventType!]!
   cursor: String!
 }
 
-union AssetMaterializationEventType = FailedToMaterializeEvent | MaterializationEvent
+union AssetResultEventType = FailedToMaterializeEvent | MaterializationEvent | ObservationEvent
 
 type FailedToMaterializeEvent implements MessageEvent & StepEvent & DisplayableEvent {
   runId: String!
@@ -678,19 +672,6 @@ enum AssetMaterializationFailureType {
   FAILED
   SKIPPED
 }
-
-enum MaterializationHistoryEventTypeSelector {
-  MATERIALIZATION
-  FAILED_TO_MATERIALIZE
-  ALL
-}
-
-type AssetResultEventHistoryConnection {
-  results: [AssetResultEventType!]!
-  cursor: String!
-}
-
-union AssetResultEventType = FailedToMaterializeEvent | MaterializationEvent | ObservationEvent
 
 enum AssetEventHistoryEventTypeSelector {
   MATERIALIZATION
@@ -949,11 +930,17 @@ type FreshnessPolicy {
   lastEvaluationTimestamp: String
 }
 
-union InternalFreshnessPolicy = TimeWindowFreshnessPolicy
+union InternalFreshnessPolicy = TimeWindowFreshnessPolicy | CronFreshnessPolicy
 
 type TimeWindowFreshnessPolicy {
   failWindowSeconds: Int!
   warnWindowSeconds: Int
+}
+
+type CronFreshnessPolicy {
+  deadlineCron: String!
+  lowerBoundDeltaSeconds: Int!
+  timezone: String!
 }
 
 type AutoMaterializePolicy {
@@ -3585,7 +3572,12 @@ type Query {
   ): ExecutionPlanOrError!
   runConfigSchemaOrError(selector: PipelineSelector!, mode: String): RunConfigSchemaOrError!
   instance: Instance!
-  assetsOrError(prefix: [String!], cursor: String, limit: Int): AssetsOrError!
+  assetsOrError(
+    prefix: [String!]
+    assetKeys: [AssetKeyInput!]
+    cursor: String
+    limit: Int
+  ): AssetsOrError!
   assetRecordsOrError(prefix: [String!], cursor: String, limit: Int): AssetRecordsOrError!
   assetOrError(assetKey: AssetKeyInput!): AssetOrError!
   assetNodes(

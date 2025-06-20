@@ -420,7 +420,9 @@ const SelectionListItem = React.memo(
   },
 );
 
-const SelectionTile = React.memo(
+SelectionListItem.displayName = 'SelectionListItem';
+
+export const SelectionTile = React.memo(
   ({
     item,
     assetsByAssetKey,
@@ -443,3 +445,5 @@ const SelectionTile = React.memo(
     );
   },
 );
+
+SelectionTile.displayName = 'SelectionTile';

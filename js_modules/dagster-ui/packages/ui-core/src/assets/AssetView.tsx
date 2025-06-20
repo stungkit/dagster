@@ -279,7 +279,8 @@ const AssetViewImpl = ({assetKey, headerBreadcrumbs, writeAssetVisit, currentPat
   );
 
   if (definitionQueryResult.data?.assetOrError.__typename === 'AssetNotFoundError') {
-    let nextPath = `/assets/${currentPath.join('/')}?view=folder${getAssetSelectionQueryString()}`;
+    const assetSelection = getAssetSelectionQueryString();
+    let nextPath = `/assets/${currentPath.join('/')}?view=folder${assetSelection ? `&asset-selection=${assetSelection}` : ''}`;
     if (featureEnabled(FeatureFlag.flagUseNewObserveUIs)) {
       // The new UI doesn't have folders. So instead set the asset selection to filter to assets prefixed with the current path.
       nextPath = `/assets?asset-selection=key:"${currentPath.join('/')}/*"`;
@@ -299,6 +300,7 @@ const AssetViewImpl = ({assetKey, headerBreadcrumbs, writeAssetVisit, currentPat
         headerBreadcrumbs={headerBreadcrumbs}
         tags={
           <AssetViewPageHeaderTags
+            assetKey={assetKey}
             definition={cachedOrLiveDefinition}
             liveData={liveData}
             onShowUpstream={() => setParams({...params, view: 'lineage', lineageScope: 'upstream'})}
@@ -477,6 +479,11 @@ export const ASSET_VIEW_DEFINITION_QUERY = gql`
         failWindowSeconds
         warnWindowSeconds
       }
+      ... on CronFreshnessPolicy {
+        deadlineCron
+        lowerBoundDeltaSeconds
+        timezone
+      }
     }
     backfillPolicy {
       description
@@ -543,10 +550,12 @@ const HistoricalViewAlert = ({asOf, hasDefinition}: {asOf: string; hasDefinition
 };
 
 const AssetViewPageHeaderTags = ({
+  assetKey,
   definition,
   liveData,
   onShowUpstream,
 }: {
+  assetKey: AssetKey;
   definition: AssetViewDefinitionNodeFragment | AssetTableDefinitionFragment | null | undefined;
   liveData?: LiveDataForNodeWithStaleData;
   onShowUpstream: () => void;
@@ -555,20 +564,22 @@ const AssetViewPageHeaderTags = ({
   // When the old code below is removed, some of these components may no longer be used.
   return (
     <>
-      {definition ? (
-        <Box flex={{direction: 'row', gap: 6, alignItems: 'center'}}>
-          <AssetHealthSummary assetKey={definition.assetKey} />
-          <StaleReasonsTag
-            liveData={liveData}
-            assetKey={definition.assetKey}
-            onClick={onShowUpstream}
-          />
-          <ChangedReasonsTag
-            changedReasons={definition.changedReasons}
-            assetKey={definition.assetKey}
-          />
-        </Box>
-      ) : null}
+      <Box flex={{direction: 'row', gap: 6, alignItems: 'center'}}>
+        <AssetHealthSummary assetKey={assetKey} />
+        {definition ? (
+          <Box>
+            <StaleReasonsTag
+              liveData={liveData}
+              assetKey={definition.assetKey}
+              onClick={onShowUpstream}
+            />
+            <ChangedReasonsTag
+              changedReasons={definition.changedReasons}
+              assetKey={definition.assetKey}
+            />
+          </Box>
+        ) : null}
+      </Box>
       {!definition?.isMaterializable ? <Tag>External Asset</Tag> : undefined}
     </>
   );

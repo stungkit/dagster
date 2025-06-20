@@ -96,12 +96,6 @@ When an upstream dependency of a Tableau asset fails to materialize or to pass t
 
 <CodeExample path="docs_snippets/docs_snippets/integrations/tableau/add-tableau-data-quality-warning.py" />
 
-### Customizing how Tableau assets are materialized
-
-Instead of using the out-of-the-box <PyObject section="libraries" module="dagster_tableau" object="build_tableau_materializable_assets_definition" /> utility, you can build your own assets definition that trigger the refresh of your Tableau data sources. This allows you to customize how the refresh is triggered or to run custom code before or after the refresh.
-
-<CodeExample path="docs_snippets/docs_snippets/integrations/tableau/materialize-tableau-assets-advanced.py" />
-
 ### Customize upstream dependencies
 
 By default, Dagster sets upstream dependencies when generating asset specs for your Tableau assets. To do so, Dagster parses information about assets that are upstream of specific Tableau sheets and dashboards from the Tableau workspace itself. You can customize how upstream dependencies are set on your Tableau assets by passing an instance of the custom <PyObject section="libraries" module="dagster_tableau" object="DagsterTableauTranslator" /> to the <PyObject section="libraries" module="dagster_tableau" object="load_tableau_asset_specs" /> function.
@@ -109,9 +103,9 @@ By default, Dagster sets upstream dependencies when generating asset specs for y
 The below example defines `my_upstream_asset` as an upstream dependency of `my_tableau_sheet`:
 
 <CodeExample
-    startAfter="start_upstream_asset"
-    endBefore="end_upstream_asset"
-    path="docs_snippets/docs_snippets/integrations/tableau/customize_upstream_dependencies.py"
+  startAfter="start_upstream_asset"
+  endBefore="end_upstream_asset"
+  path="docs_snippets/docs_snippets/integrations/tableau/customize_upstream_dependencies.py"
 />
 
 Note that `super()` is called in each of the overridden methods to generate the default asset spec. It is best practice to generate the default asset spec before customizing it.
@@ -121,4 +115,4 @@ Note that `super()` is called in each of the overridden methods to generate the 
 - [`dagster-tableau` API reference](/api/libraries/dagster-tableau)
 - [Asset definitions](/guides/build/assets/)
 - [Resources](/guides/build/external-resources/)
-- [Using environment variables and secrets](/guides/deploy/using-environment-variables-and-secrets)
+- [Using environment variables and secrets](/guides/operate/configuration/using-environment-variables-and-secrets)

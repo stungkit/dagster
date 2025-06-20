@@ -2,11 +2,12 @@ import importlib
 from pathlib import Path
 
 import pytest
-from dagster import AssetKey, Definitions
+from dagster import AssetKey, Definitions, load_defs, load_from_defs_folder
 from dagster._core.errors import DagsterInvalidDefinitionError
 from dagster._utils.env import environ
 from dagster.components.core.context import ComponentLoadContext
 from dagster.components.core.defs_module import CompositeYamlComponent, DefsFolderComponent
+from dagster.components.testing import get_underlying_component
 from dagster_shared import check
 from pydantic import ValidationError
 
@@ -14,15 +15,12 @@ from dagster_tests.components_tests.integration_tests.component_loader import (
     chdir as chdir,
     sync_load_test_component_defs,
 )
-from dagster_tests.components_tests.utils import (
-    create_project_from_components,
-    get_underlying_component,
-)
+from dagster_tests.components_tests.utils import create_project_from_components
 
 
 @pytest.mark.parametrize("defs", ["definitions/explicit_file_relative_imports"], indirect=True)
 def test_definitions_component_with_explicit_file_relative_imports(defs: Definitions) -> None:
-    assert {spec.key for spec in defs.get_all_asset_specs()} == {
+    assert {spec.key for spec in defs.resolve_all_asset_specs()} == {
         AssetKey("asset_in_some_file"),
         AssetKey("asset_in_some_other_file"),
     }
@@ -30,7 +28,7 @@ def test_definitions_component_with_explicit_file_relative_imports(defs: Definit
 
 @pytest.mark.parametrize("defs", ["definitions/explicit_file_relative_imports_init"], indirect=True)
 def test_definitions_component_with_explicit_file_relative_imports_init(defs: Definitions) -> None:
-    assert {spec.key for spec in defs.get_all_asset_specs()} == {
+    assert {spec.key for spec in defs.resolve_all_asset_specs()} == {
         AssetKey("asset_in_init_file"),
         AssetKey("asset_in_some_other_file"),
     }
@@ -42,7 +40,7 @@ def test_definitions_component_with_explicit_file_relative_imports_init(defs: De
 def test_definitions_component_with_explicit_file_relative_imports_complex(
     defs: Definitions,
 ) -> None:
-    assert {spec.key for spec in defs.get_all_asset_specs()} == {
+    assert {spec.key for spec in defs.resolve_all_asset_specs()} == {
         AssetKey("asset_in_some_file"),
         AssetKey("asset_in_submodule"),
     }
@@ -52,7 +50,7 @@ def test_definitions_component_validation_error() -> None:
     with pytest.raises(ValidationError) as e:
         sync_load_test_component_defs("definitions/validation_error_file")
 
-    assert "component.yaml:4" in str(e.value)
+    assert "defs.yaml:4" in str(e.value)
 
 
 def test_definitions_component_with_multiple_definitions_objects() -> None:
@@ -64,12 +62,12 @@ def test_definitions_component_with_multiple_definitions_objects() -> None:
 
 @pytest.mark.parametrize("defs", ["definitions/single_file"], indirect=True)
 def test_autoload_single_file(defs: Definitions) -> None:
-    assert {spec.key for spec in defs.get_all_asset_specs()} == {AssetKey("an_asset")}
+    assert {spec.key for spec in defs.resolve_all_asset_specs()} == {AssetKey("an_asset")}
 
 
 @pytest.mark.parametrize("defs", ["definitions/multiple_files"], indirect=True)
 def test_autoload_multiple_files(defs: Definitions) -> None:
-    assert {spec.key for spec in defs.get_all_asset_specs()} == {
+    assert {spec.key for spec in defs.resolve_all_asset_specs()} == {
         AssetKey("asset_in_some_file"),
         AssetKey("asset_in_other_file"),
     }
@@ -77,12 +75,12 @@ def test_autoload_multiple_files(defs: Definitions) -> None:
 
 @pytest.mark.parametrize("defs", ["definitions/empty"], indirect=True)
 def test_autoload_empty(defs: Definitions) -> None:
-    assert len(defs.get_all_asset_specs()) == 0
+    assert len(defs.resolve_all_asset_specs()) == 0
 
 
 @pytest.mark.parametrize("defs", ["definitions/definitions_object_relative_imports"], indirect=True)
 def test_autoload_definitions_object(defs: Definitions) -> None:
-    assert {spec.key for spec in defs.get_all_asset_specs()} == {
+    assert {spec.key for spec in defs.resolve_all_asset_specs()} == {
         AssetKey("asset_in_some_file"),
         AssetKey("asset_in_other_file"),
     }
@@ -90,7 +88,7 @@ def test_autoload_definitions_object(defs: Definitions) -> None:
 
 @pytest.mark.parametrize("defs", ["definitions/definitions_at_levels"], indirect=True)
 def test_autoload_definitions_nested(defs: Definitions) -> None:
-    assert {spec.key for spec in defs.get_all_asset_specs()} == {
+    assert {spec.key for spec in defs.resolve_all_asset_specs()} == {
         AssetKey("top_level"),
         AssetKey("defs_obj_inner"),
         AssetKey("defs_obj_outer"),
@@ -143,7 +141,7 @@ def test_autoload_definitions_nested_with_config() -> None:
     }
     with environ({"MY_ENV_VAR": ENV_VAL}):
         defs = sync_load_test_component_defs("definitions/definitions_at_levels_with_config")
-        specs_by_key = {spec.key: spec for spec in defs.get_all_asset_specs()}
+        specs_by_key = {spec.key: spec for spec in defs.resolve_all_asset_specs()}
         assert tags_by_spec.keys() == specs_by_key.keys()
         for key, tags in tags_by_spec.items():
             assert specs_by_key[key].tags == tags
@@ -163,3 +161,56 @@ def test_ignored_empty_dir():
                 for child in comp.components:
                     if isinstance(child, DefsFolderComponent):
                         assert child.children
+
+
+@pytest.mark.parametrize("defs", ["definitions/backcompat_components"], indirect=True)
+def test_autoload_backcompat_components(defs: Definitions) -> None:
+    assert {spec.key for spec in defs.resolve_all_asset_specs()} == {AssetKey("foo")}
+
+
+@pytest.mark.parametrize(
+    "terminate_autoloading_on_keyword_files, expected_keys",
+    [
+        (
+            True,
+            {
+                AssetKey("asset_in_definitions_py"),
+                AssetKey("asset_in_component_py"),
+                AssetKey("top_level"),
+            },
+        ),
+        (
+            False,
+            {
+                # asset_in_component_py is not included
+                AssetKey("asset_in_definitions_py"),
+                AssetKey("top_level"),
+                AssetKey("asset_in_inner"),
+                AssetKey("asset_only_in_asset_py_with_component_py"),
+                AssetKey("defs_obj_outer"),
+                AssetKey("not_included"),
+            },
+        ),
+    ],
+)
+def test_autoload_definitions_new_flag(
+    terminate_autoloading_on_keyword_files: bool, expected_keys: set[AssetKey]
+) -> None:
+    if not terminate_autoloading_on_keyword_files:
+        defs = load_from_defs_folder(
+            project_root=Path(__file__).parent
+            / "integration_test_defs"
+            / "definitions"
+            / "special_names_at_levels",
+        )
+    else:
+        # Flag is not present on load_defs_folder
+        module = importlib.import_module(
+            "dagster_tests.components_tests.integration_tests.integration_test_defs.definitions.special_names_at_levels.special_names_at_levels"
+        )
+        defs = load_defs(
+            module,
+            project_root=Path(__file__).parent,
+        )
+
+    assert {spec.key for spec in defs.resolve_all_asset_specs()} == expected_keys
