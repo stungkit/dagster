@@ -16,9 +16,9 @@ from dagster import (
     Definitions,
     DependencyDefinition,
     DimensionPartitionMapping,
-    FreshnessPolicy,
     Jitter,
     LastPartitionMapping,
+    LegacyFreshnessPolicy,
     MultiPartitionMapping,
     NodeInvocation,
     OpDefinition,
@@ -31,13 +31,18 @@ from dagster import (
     asset,
     materialize,
 )
+from dagster._core.definitions.dependency import BlockingAssetChecksDependencyDefinition
 from dagster._core.definitions.tags import build_kind_tag, has_kind
 from dagster._core.definitions.utils import DEFAULT_IO_MANAGER_KEY
 from dagster._core.execution.context.compute import AssetExecutionContext
 from dagster._core.types.dagster_type import DagsterType, Nothing
 from dagster_dbt.asset_decorator import dbt_assets
 from dagster_dbt.asset_specs import build_dbt_asset_specs
-from dagster_dbt.asset_utils import DUPLICATE_ASSET_KEY_ERROR_MESSAGE
+from dagster_dbt.asset_utils import (
+    DBT_DEFAULT_EXCLUDE,
+    DBT_DEFAULT_SELECT,
+    DUPLICATE_ASSET_KEY_ERROR_MESSAGE,
+)
 from dagster_dbt.core.resource import DbtCliResource
 from dagster_dbt.dagster_dbt_translator import DagsterDbtTranslator, DagsterDbtTranslatorSettings
 from dbt.version import __version__ as dbt_version
@@ -212,19 +217,19 @@ def test_selections(
     exclude: Optional[str],
     expected_dbt_resource_names: set[str],
 ) -> None:
-    select = select or "fqn:*"
+    select = select or DBT_DEFAULT_SELECT
 
     expected_asset_keys = {AssetKey(key) for key in expected_dbt_resource_names}
     expected_specs = build_dbt_asset_specs(
         manifest=test_jaffle_shop_manifest,
         select=select,
-        exclude=exclude,
+        exclude=exclude or DBT_DEFAULT_EXCLUDE,
     )
 
     @dbt_assets(
         manifest=test_jaffle_shop_manifest,
         select=select,
-        exclude=exclude,
+        exclude=exclude or DBT_DEFAULT_EXCLUDE,
     )
     def my_dbt_assets(): ...
 
@@ -241,7 +246,7 @@ def _get_snapshot_id(manifest, _):
     )
     def my_dbt_assets(): ...
 
-    job = Definitions(assets=[my_dbt_assets]).get_implicit_global_asset_job_def()
+    job = Definitions(assets=[my_dbt_assets]).resolve_implicit_global_asset_job_def()
     return job.get_job_snapshot_id()
 
 
@@ -334,7 +339,7 @@ def test_backfill_policy(
     expected_backfill_policy: BackfillPolicy,
 ) -> None:
     class CustomDagsterDbtTranslator(DagsterDbtTranslator):
-        def get_freshness_policy(self, _: Mapping[str, Any]) -> Optional[FreshnessPolicy]:  # pyright: ignore[reportIncompatibleMethodOverride]
+        def get_freshness_policy(self, _: Mapping[str, Any]) -> Optional[LegacyFreshnessPolicy]:  # pyright: ignore[reportIncompatibleMethodOverride]
             # Disable freshness policies when using static partitions
             return None
 
@@ -600,6 +605,20 @@ def test_with_description_replacements(test_jaffle_shop_manifest: dict[str, Any]
         assert expected_specs_by_key[asset_key].description == expected_description
 
 
+def test_with_subclassed_init(test_jaffle_shop_manifest: dict[str, Any]) -> None:
+    class CustomDagsterDbtTranslator(DagsterDbtTranslator):
+        def __init__(self):
+            pass
+
+    @dbt_assets(
+        manifest=test_jaffle_shop_manifest, dagster_dbt_translator=CustomDagsterDbtTranslator()
+    )
+    def my_dbt_assets(): ...
+
+    expected_specs = build_dbt_asset_specs(manifest=test_jaffle_shop_manifest)
+    assert my_dbt_assets.keys == {spec.key for spec in expected_specs}
+
+
 def test_with_metadata_replacements(test_jaffle_shop_manifest: dict[str, Any]) -> None:
     expected_metadata = {"customized": "metadata"}
 
@@ -730,10 +749,10 @@ def test_all_assets_have_a_distinct_code_version(test_jaffle_shop_manifest: dict
 
 
 def test_with_freshness_policy_replacements(test_jaffle_shop_manifest: dict[str, Any]) -> None:
-    expected_freshness_policy = FreshnessPolicy(maximum_lag_minutes=60)
+    expected_freshness_policy = LegacyFreshnessPolicy(maximum_lag_minutes=60)
 
     class CustomDagsterDbtTranslator(DagsterDbtTranslator):
-        def get_freshness_policy(self, _: Mapping[str, Any]) -> Optional[FreshnessPolicy]:  # pyright: ignore[reportIncompatibleMethodOverride]
+        def get_freshness_policy(self, _: Mapping[str, Any]) -> Optional[LegacyFreshnessPolicy]:  # pyright: ignore[reportIncompatibleMethodOverride]
             return expected_freshness_policy
 
     expected_specs_by_key = {
@@ -749,9 +768,9 @@ def test_with_freshness_policy_replacements(test_jaffle_shop_manifest: dict[str,
     )
     def my_dbt_assets(): ...
 
-    for asset_key, freshness_policy in my_dbt_assets.freshness_policies_by_key.items():
+    for asset_key, freshness_policy in my_dbt_assets.legacy_freshness_policies_by_key.items():
         assert freshness_policy == expected_freshness_policy
-        assert expected_specs_by_key[asset_key].freshness_policy == expected_freshness_policy
+        assert expected_specs_by_key[asset_key].legacy_freshness_policy == expected_freshness_policy
 
 
 def test_with_auto_materialize_policy_replacements(
@@ -866,7 +885,9 @@ def test_dbt_meta_auto_materialize_policy(test_meta_config_manifest: dict[str, A
 
 
 def test_dbt_meta_freshness_policy(test_meta_config_manifest: dict[str, Any]) -> None:
-    expected_freshness_policy = FreshnessPolicy(maximum_lag_minutes=60.0, cron_schedule="* * * * *")
+    expected_freshness_policy = LegacyFreshnessPolicy(
+        maximum_lag_minutes=60.0, cron_schedule="* * * * *"
+    )
     expected_specs_by_key = {
         spec.key: spec for spec in build_dbt_asset_specs(manifest=test_meta_config_manifest)
     }
@@ -874,12 +895,12 @@ def test_dbt_meta_freshness_policy(test_meta_config_manifest: dict[str, Any]) ->
     @dbt_assets(manifest=test_meta_config_manifest)
     def my_dbt_assets(): ...
 
-    freshness_policies = my_dbt_assets.freshness_policies_by_key.items()
+    freshness_policies = my_dbt_assets.legacy_freshness_policies_by_key.items()
     assert freshness_policies
 
     for asset_key, freshness_policy in freshness_policies:
         assert freshness_policy == expected_freshness_policy
-        assert expected_specs_by_key[asset_key].freshness_policy == expected_freshness_policy
+        assert expected_specs_by_key[asset_key].legacy_freshness_policy == expected_freshness_policy
 
 
 def test_dbt_meta_asset_key(test_meta_config_manifest: dict[str, Any]) -> None:
@@ -1092,7 +1113,7 @@ def test_dbt_with_python_interleaving(
         assets=[my_dbt_assets, python_augmented_customers],
         resources={"dbt": DbtCliResource(project_dir=os.fspath(test_dbt_python_interleaving_path))},
     )
-    global_job = defs.get_implicit_global_asset_job_def()
+    global_job = defs.resolve_implicit_global_asset_job_def()
     # my_dbt_assets gets split up
     assert global_job.dependencies == {
         # no dependencies for the first invocation of my_dbt_assets
@@ -1103,11 +1124,41 @@ def test_dbt_with_python_interleaving(
         },
         # the second invocation of my_dbt_assets depends on the first, and the python step
         NodeInvocation(name="my_dbt_assets"): {
-            "__subset_input__stg_orders": DependencyDefinition(
-                node="my_dbt_assets_2", output="stg_orders"
+            "__subset_input__stg_orders": BlockingAssetChecksDependencyDefinition(
+                asset_check_dependencies=[
+                    DependencyDefinition(
+                        node="my_dbt_assets_2",
+                        output="stg_orders_accepted_values_stg_orders_status__placed__shipped__completed__return_pending__returned",
+                    ),
+                    DependencyDefinition(
+                        node="my_dbt_assets_2",
+                        output="stg_orders_not_null_stg_orders_order_id",
+                    ),
+                    DependencyDefinition(
+                        node="my_dbt_assets_2",
+                        output="stg_orders_unique_stg_orders_order_id",
+                    ),
+                ],
+                other_dependency=DependencyDefinition(node="my_dbt_assets_2", output="stg_orders"),
             ),
-            "__subset_input__stg_payments": DependencyDefinition(
-                node="my_dbt_assets_2", output="stg_payments"
+            "__subset_input__stg_payments": BlockingAssetChecksDependencyDefinition(
+                asset_check_dependencies=[
+                    DependencyDefinition(
+                        node="my_dbt_assets_2",
+                        output="stg_payments_accepted_values_stg_payments_payment_method__credit_card__coupon__bank_transfer__gift_card",
+                    ),
+                    DependencyDefinition(
+                        node="my_dbt_assets_2",
+                        output="stg_payments_not_null_stg_payments_payment_id",
+                    ),
+                    DependencyDefinition(
+                        node="my_dbt_assets_2",
+                        output="stg_payments_unique_stg_payments_payment_id",
+                    ),
+                ],
+                other_dependency=DependencyDefinition(
+                    node="my_dbt_assets_2", output="stg_payments"
+                ),
             ),
             "dagster_python_augmented_customers": DependencyDefinition(
                 node="dagster__python_augmented_customers", output="result"
@@ -1136,8 +1187,11 @@ def test_dbt_with_python_interleaving(
     assert len(result.asset_materializations_for_node("my_dbt_assets")) == 2
 
 
-def test_dbt_with_semantic_models(test_dbt_semantic_models_manifest: dict[str, Any]) -> None:
-    @dbt_assets(manifest=test_dbt_semantic_models_manifest)
+@pytest.mark.parametrize("select", ["fqn:*", "tag:test"])
+def test_dbt_with_semantic_models_and_saved_queries(
+    test_dbt_semantic_models_manifest: dict[str, Any], select: str
+) -> None:
+    @dbt_assets(manifest=test_dbt_semantic_models_manifest, select=select)
     def my_dbt_assets(context: AssetExecutionContext, dbt: DbtCliResource):
         yield from dbt.cli(["build"], context=context).stream()
 

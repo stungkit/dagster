@@ -132,6 +132,7 @@ setup(
             "rapidfuzz",
             "flaky",
             "psutil",
+            "ruff==0.11.5",
         ],
         "test-components": [
             "tomlkit",
@@ -168,12 +169,10 @@ setup(
     entry_points={
         "console_scripts": [
             "dagster = dagster.cli:main",
-            "dagster-components = dagster.components.cli:main",
             "dagster-daemon = dagster.daemon.cli:main",
         ],
-        "dagster_dg.plugin": [
+        "dagster_dg_cli.registry_modules": [
             "dagster = dagster",
-            "dagster.components = dagster.components",
         ],
     },
 )

@@ -44,10 +44,11 @@ setup(
     extras_require={
         "test": [
             "duckdb",
+            "dagster-dg-cli",
         ]
     },
     entry_points={
-        "dagster_dg.plugin": [
+        "dagster_dg_cli.registry_modules": [
             "dagster_sling = dagster_sling",
         ],
     },

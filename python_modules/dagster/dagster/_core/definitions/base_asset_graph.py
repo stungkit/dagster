@@ -21,7 +21,8 @@ from dagster._core.definitions.asset_check_spec import AssetCheckKey
 from dagster._core.definitions.asset_key import AssetKey, EntityKey, T_EntityKey
 from dagster._core.definitions.backfill_policy import BackfillPolicy
 from dagster._core.definitions.events import AssetKeyPartitionKey
-from dagster._core.definitions.freshness_policy import FreshnessPolicy
+from dagster._core.definitions.freshness import InternalFreshnessPolicy
+from dagster._core.definitions.freshness_policy import LegacyFreshnessPolicy
 from dagster._core.definitions.metadata import ArbitraryMetadataMapping
 from dagster._core.definitions.partition import PartitionsDefinition, PartitionsSubset
 from dagster._core.definitions.partition_key_range import PartitionKeyRange
@@ -152,7 +153,27 @@ class BaseAssetNode(BaseEntityNode[AssetKey]):
 
     @property
     @abstractmethod
-    def freshness_policy(self) -> Optional[FreshnessPolicy]: ...
+    def legacy_freshness_policy(self) -> Optional[LegacyFreshnessPolicy]: ...
+
+    @property
+    @abstractmethod
+    def freshness_policy(self) -> Optional[InternalFreshnessPolicy]:
+        """WARNING: This field is not backwards compatible for policies created prior to 1.11.0.
+        For backwards compatibility, use freshness_policy_or_from_metadata instead.
+        """
+        ...
+
+    @property
+    def freshness_policy_or_from_metadata(self) -> Optional[InternalFreshnessPolicy]:
+        """Prior to 1.11.0, freshness policy was stored in the node metadata. Freshness policy is a first-class attribute of the asset starting in 1.11.0.
+
+        This field is backwards compatible since it checks for the policy in both the top-level attribute and the node metadata.
+        """
+        from dagster._core.definitions.freshness import InternalFreshnessPolicy
+
+        return self.freshness_policy or InternalFreshnessPolicy.from_asset_spec_metadata(
+            self.metadata
+        )
 
     @property
     @abstractmethod
@@ -279,23 +300,31 @@ class BaseAssetGraph(ABC, Generic[T_AssetNode]):
     def get_all_asset_keys(self) -> AbstractSet[AssetKey]:
         return set(self._asset_nodes_by_key)
 
+    # since this is an ABC and @cached_property has class level locking on py < 3.12
+    # use property & cached_method instead
+
     @property
+    @cached_method
     def materializable_asset_keys(self) -> AbstractSet[AssetKey]:
         return {key for key, node in self._asset_nodes_by_key.items() if node.is_materializable}
 
     @property
+    @cached_method
     def observable_asset_keys(self) -> AbstractSet[AssetKey]:
         return {key for key, node in self._asset_nodes_by_key.items() if node.is_observable}
 
     @property
+    @cached_method
     def external_asset_keys(self) -> AbstractSet[AssetKey]:
         return {key for key, node in self._asset_nodes_by_key.items() if node.is_external}
 
     @property
+    @cached_method
     def executable_asset_keys(self) -> AbstractSet[AssetKey]:
         return {key for key, node in self._asset_nodes_by_key.items() if node.is_executable}
 
     @property
+    @cached_method
     def unexecutable_asset_keys(self) -> AbstractSet[AssetKey]:
         return {key for key, node in self._asset_nodes_by_key.items() if not node.is_executable}
 
@@ -646,19 +675,19 @@ class BaseAssetGraph(ABC, Generic[T_AssetNode]):
         ...
 
     @cached_method
-    def get_downstream_freshness_policies(
+    def get_downstream_legacy_freshness_policies(
         self, *, asset_key: AssetKey
-    ) -> AbstractSet[FreshnessPolicy]:
+    ) -> AbstractSet[LegacyFreshnessPolicy]:
         asset = self.get(asset_key)
         downstream_policies = set().union(
             *(
-                self.get_downstream_freshness_policies(asset_key=child_key)
+                self.get_downstream_legacy_freshness_policies(asset_key=child_key)
                 for child_key in self.get(asset_key).child_keys
                 if child_key != asset_key
             )
         )
-        if asset.partitions_def is None and asset.freshness_policy is not None:
-            downstream_policies.add(asset.freshness_policy)
+        if asset.partitions_def is None and asset.legacy_freshness_policy is not None:
+            downstream_policies.add(asset.legacy_freshness_policy)
 
         return downstream_policies
 

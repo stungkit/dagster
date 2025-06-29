@@ -26,7 +26,6 @@ import {AssetKind} from '../graph/KindTags';
 import {AssetKeyInput} from '../graphql/types';
 import {RepositoryLink} from '../nav/RepositoryLink';
 import {TimestampDisplay} from '../schedules/TimestampDisplay';
-import {testId} from '../testing/testId';
 import {HeaderCell, HeaderRow, Row, RowCell} from '../ui/VirtualizedTable';
 
 const TEMPLATE_COLUMNS = '1.3fr 1fr 80px';
@@ -67,17 +66,15 @@ export const VirtualizedAssetRow = (props: AssetRowProps) => {
   } = props;
 
   const liveData = useLiveDataOrLatestMaterializationDebounced(path, type);
-  let linkUrl = assetDetailsPathForKey(
+  const assetSelection = getAssetSelectionQueryString();
+  const linkUrl = assetDetailsPathForKey(
     {path},
     {
       view: type === 'folder' ? 'folder' : undefined,
+      // Forward asset selection if visiting a folder
+      'asset-selection': type === 'folder' ? assetSelection : undefined,
     },
   );
-
-  if (type === 'folder') {
-    // Forward filters
-    linkUrl += getAssetSelectionQueryString();
-  }
 
   const onChange = (e: React.FormEvent<HTMLInputElement>) => {
     if (onToggleChecked && e.target instanceof HTMLInputElement) {
@@ -90,11 +87,15 @@ export const VirtualizedAssetRow = (props: AssetRowProps) => {
   const kinds = definition?.kinds;
 
   return (
-    <Row $height={height} $start={start} data-testid={testId(`row-${tokenForAssetKey({path})}`)}>
+    <Row $height={height} $start={start}>
       <RowGrid border="bottom" $showRepoColumn={showRepoColumn}>
         {showCheckboxColumn ? (
           <RowCell>
-            <Checkbox checked={checked} onChange={onChange} />
+            <Checkbox
+              checked={checked}
+              onChange={onChange}
+              data-testid={`checkbox-${tokenForAssetKey({path})}`}
+            />
           </RowCell>
         ) : null}
         <RowCell>

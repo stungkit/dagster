@@ -69,7 +69,9 @@ def get_asset_backfill_run_chunk_size():
     return int(os.getenv("DAGSTER_ASSET_BACKFILL_RUN_CHUNK_SIZE", "25"))
 
 
-MATERIALIZATION_CHUNK_SIZE = 1000
+MATERIALIZATION_CHUNK_SIZE = int(
+    os.getenv("DAGSTER_ASSET_BACKFILL_MATERIALIZATION_CHUNK_SIZE", "1000")
+)
 
 
 class AssetBackfillStatus(Enum):
@@ -684,6 +686,9 @@ def _get_requested_asset_graph_subset_from_run_requests(
                     for asset_key in cast("Sequence[AssetKey]", run_request.asset_selection)
                 },
                 asset_graph,
+                # don't need expensive checks for whether the partition keys are still in the subset
+                # when just determining what was previously requested in this backfill
+                validate_time_range=False,
             )
 
     return requested_subset
@@ -1287,7 +1292,7 @@ def get_asset_backfill_iteration_materialized_subset(
         cursor = None
         has_more = True
         while has_more:
-            result = instance_queryer.instance.fetch_materializations(
+            materializations_result = instance_queryer.instance.fetch_materializations(
                 AssetRecordsFilter(
                     asset_key=asset_key,
                     after_storage_id=asset_backfill_data.latest_storage_id,
@@ -1295,22 +1300,33 @@ def get_asset_backfill_iteration_materialized_subset(
                 cursor=cursor,
                 limit=MATERIALIZATION_CHUNK_SIZE,
             )
-            records_in_backfill = [
-                record
-                for record in result.records
-                if instance_queryer.run_has_tag(
-                    run_id=record.run_id, tag_key=BACKFILL_ID_TAG, tag_value=backfill_id
+
+            cursor = materializations_result.cursor
+            has_more = materializations_result.has_more
+
+            run_ids = [record.run_id for record in materializations_result.records if record.run_id]
+            if run_ids:
+                run_records = instance_queryer.instance.get_run_records(
+                    filters=RunsFilter(run_ids=run_ids),
                 )
-            ]
-            recently_materialized_asset_partitions |= AssetGraphSubset.from_asset_partition_set(
-                {
-                    AssetKeyPartitionKey(asset_key, record.partition_key)
-                    for record in records_in_backfill
-                },
-                asset_graph,
-            )
-            cursor = result.cursor
-            has_more = result.has_more
+                run_ids_in_backfill = {
+                    run_record.dagster_run.run_id
+                    for run_record in run_records
+                    if run_record.dagster_run.tags.get(BACKFILL_ID_TAG) == backfill_id
+                }
+
+                materialization_records_in_backfill = [
+                    record
+                    for record in materializations_result.records
+                    if record.run_id in run_ids_in_backfill
+                ]
+                recently_materialized_asset_partitions |= AssetGraphSubset.from_asset_partition_set(
+                    {
+                        AssetKeyPartitionKey(asset_key, record.partition_key)
+                        for record in materialization_records_in_backfill
+                    },
+                    asset_graph,
+                )
             yield None
 
     updated_materialized_subset = (
@@ -1826,8 +1842,8 @@ def get_can_run_with_parent_subsets(
             ],
         )
     if (
-        parent_node.resolve_to_singular_repo_scoped_node().repository_handle  # type: ignore
-        != candidate_node.resolve_to_singular_repo_scoped_node().repository_handle  # type: ignore
+        parent_node.resolve_to_singular_repo_scoped_node().repository_handle
+        != candidate_node.resolve_to_singular_repo_scoped_node().repository_handle
     ):
         return (
             asset_graph_view.get_empty_subset(key=candidate_asset_key),

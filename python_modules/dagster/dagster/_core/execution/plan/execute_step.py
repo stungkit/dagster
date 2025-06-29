@@ -1,4 +1,5 @@
 import inspect
+from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from typing import Any, Optional, Union, cast
 
@@ -37,8 +38,9 @@ from dagster._core.definitions.multi_dimensional_partitions import (
     MultiPartitionKey,
     get_tags_from_multi_partition_key,
 )
-from dagster._core.definitions.result import AssetResult
+from dagster._core.definitions.result import AssetResult, MaterializeResult
 from dagster._core.definitions.source_asset import SYSTEM_METADATA_KEY_SOURCE_ASSET_OBSERVATION
+from dagster._core.definitions.utils import NoValueSentinel
 from dagster._core.errors import (
     DagsterAssetCheckFailedError,
     DagsterExecutionHandleOutputError,
@@ -68,9 +70,6 @@ from dagster._utils.warnings import beta_warning, disable_dagster_warnings
 
 class AssetResultOutput(Output):
     """This is a marker subclass that represents an Output that was produced from an AssetResult."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
 
 def _process_asset_results_to_events(
@@ -102,8 +101,12 @@ def _process_user_event(
             yield from _process_user_event(step_context, check_result)
 
         with disable_dagster_warnings():
+            if isinstance(user_event, MaterializeResult):
+                value = user_event.value
+            else:
+                value = None
             yield AssetResultOutput(
-                value=None,
+                value=value,
                 output_name=output_name,
                 metadata=user_event.metadata,
                 data_version=user_event.data_version,
@@ -132,15 +135,7 @@ def _process_user_event(
                 f"AssetCheckResult for check '{spec.name}' for asset '{spec.asset_key.to_user_string()}' was yielded which is not selected. Letting it through."
             )
         yield asset_check_evaluation
-        if (
-            not asset_check_evaluation.passed
-            and asset_check_evaluation.severity == AssetCheckSeverity.ERROR
-            and spec.blocking
-        ):
-            raise DagsterAssetCheckFailedError(
-                f"Blocking check '{spec.name}' for asset '{spec.asset_key.to_user_string()}' failed with"
-                " ERROR severity."
-            )
+
     else:
         yield user_event
 
@@ -502,6 +497,8 @@ def core_dagster_event_sequence_for_step(
             compute_context,
         )
 
+        failed_blocking_asset_check_evaluations = []
+
         # It is important for this loop to be indented within the
         # timer block above in order for time to be recorded accurately.
         for user_event in _step_output_error_checked_user_event_sequence(
@@ -520,11 +517,31 @@ def core_dagster_event_sequence_for_step(
             elif isinstance(user_event, AssetObservation):
                 yield DagsterEvent.asset_observation(step_context, user_event)
             elif isinstance(user_event, AssetCheckEvaluation):
+                if (
+                    not user_event.passed
+                    and user_event.severity == AssetCheckSeverity.ERROR
+                    and user_event.blocking
+                ):
+                    failed_blocking_asset_check_evaluations.append(user_event)
                 yield DagsterEvent.asset_check_evaluation(step_context, user_event)
             elif isinstance(user_event, ExpectationResult):
                 yield DagsterEvent.step_expectation_result(step_context, user_event)
             else:
                 check.failed(f"Unexpected event {user_event}, should have been caught earlier")
+
+    if failed_blocking_asset_check_evaluations:
+        grouped_by_asset_key: dict[AssetKey, list[AssetCheckEvaluation]] = defaultdict(list)
+        for failed_check in failed_blocking_asset_check_evaluations:
+            grouped_by_asset_key.setdefault(failed_check.asset_key, []).append(failed_check)
+
+        grouped_by_asset_key_str = "\n".join(
+            f"{asset_key.to_user_string()}: {','.join(failed_check.check_name for failed_check in checks)}"
+            for asset_key, checks in grouped_by_asset_key.items()
+        )
+
+        raise DagsterAssetCheckFailedError(
+            f"{len(failed_blocking_asset_check_evaluations)} blocking asset check{'s' if len(failed_blocking_asset_check_evaluations) > 1 else ''} failed with ERROR severity:\n{grouped_by_asset_key_str}"
+        )
 
     yield DagsterEvent.step_success_event(
         step_context, StepSuccessData(duration_ms=timer_result.millis)
@@ -748,11 +765,24 @@ def _store_output(
     # don't store asset check outputs, asset observation outputs, asset result outputs, or Nothing
     # type outputs
     step_output = step_context.step.step_output_named(step_output_handle.output_name)
+
     if (
         step_output.properties.asset_check_key
         or (step_context.output_observes_source_asset(step_output_handle.output_name))
-        or isinstance(output, AssetResultOutput)
         or output_context.dagster_type.is_nothing
+        or (
+            # FIXME: currently, when an output type is unset, this quickly gets coerced to the Any type,
+            # making it impossible to distinguish between a user declaring that they expect an output
+            # of any type, and a user not declaring any expectation at all.
+            #
+            # For now, we assume that if the output type is Any AND the user has not explicitly set a
+            # value for their materialize result, that they do not expect the IO manager to be invoked.
+            # In contrast, if the user does explicitly set the output value to any value (including None),
+            # the IO manager *will* be invoked.
+            output_context.dagster_type.is_any
+            and isinstance(output, AssetResultOutput)
+            and output.value is NoValueSentinel
+        )
     ):
         yield from _log_materialization_or_observation_events_for_asset(
             step_context=step_context,

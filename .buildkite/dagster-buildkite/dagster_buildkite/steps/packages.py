@@ -240,7 +240,11 @@ EXAMPLE_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         # snippets in all python versions since we are testing the core code exercised by the
         # snippets against all supported python versions.
         unsupported_python_versions=AvailablePythonVersion.get_all_except_default(),
-        pytest_tox_factors=["all", "integrations", "docs_snapshot_test"],
+        pytest_tox_factors=[
+            "all",
+            "integrations",
+            "docs_snapshot_test",
+        ],
         always_run_if=has_dg_changes,
     ),
     PackageSpec(
@@ -451,7 +455,7 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         "python_modules/libraries/dagster-dbt",
         pytest_tox_factors=[
             f"{deps_factor}-{command_factor}"
-            for deps_factor in ["dbt17", "dbt18", "dbt19"]
+            for deps_factor in ["dbt17", "dbt18", "dbt19", "dbt110"]
             for command_factor in ["cloud", "core-main", "core-derived-metadata"]
         ],
     ),
@@ -464,6 +468,11 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         unsupported_python_versions=[
             # airflow
             AvailablePythonVersion.V3_12,
+        ],
+        env_vars=[
+            "AIRLIFT_MWAA_TEST_ENV_NAME",
+            "AIRLIFT_MWAA_TEST_PROFILE",
+            "AIRLIFT_MWAA_TEST_REGION",
         ],
     ),
     PackageSpec(
@@ -494,8 +503,16 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         ],
     ),
     PackageSpec(
-        "python_modules/libraries/dagster-dg",
+        "python_modules/libraries/dagster-dg-cli",
         pytest_tox_factors=["general", "docs", "plus"],
+    ),
+    PackageSpec(
+        "python_modules/libraries/dagster-dg-cli",
+        name="dagster-dg-cli-mcp",
+        pytest_tox_factors=["mcp"],
+        unsupported_python_versions=[
+            AvailablePythonVersion.V3_9,
+        ],
     ),
     PackageSpec(
         "python_modules/libraries/dagster-aws",

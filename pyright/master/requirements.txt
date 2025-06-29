@@ -29,6 +29,7 @@
 -e docs/sphinx/_ext/dagster-sphinx
 -e python_modules/automation
 -e python_modules/dagster[pyright,test]
+-e python_modules/libraries/create-dagster
 -e python_modules/dagit
 -e python_modules/dagster-graphql
 -e python_modules/dagster-test
@@ -51,7 +52,8 @@
 -e python_modules/libraries/dagster-deltalake-pandas/
 -e python_modules/libraries/dagster-deltalake-polars/
 -e python_modules/libraries/dagster-dlt/
--e python_modules/libraries/dagster-dg[test]
+-e python_modules/libraries/dagster-dg-core[test]
+-e python_modules/libraries/dagster-dg-cli
 -e python_modules/libraries/dagster-cloud-cli[test]
 -e python_modules/libraries/dagster-docker/
 -e python_modules/libraries/dagster-duckdb/
@@ -145,9 +147,9 @@ fastapi>=0.115.6 # producing a bizarrely early version of fastapi without this
 -e python_modules/libraries/dagster-airlift/perf-harness
 -e examples/airlift-migration-tutorial
 -e examples/use_case_repository[dev]
--e examples/docs_projects/project_atproto_dashboard
--e examples/docs_projects/project_dagster_modal_pipes
--e examples/docs_projects/project_prompt_eng
+# -e examples/docs_projects/project_atproto_dashboard
+# -e examples/docs_projects/project_dagster_modal_pipes
+# -e examples/docs_projects/project_prompt_eng
 # -e examples/docs_projects/project_ask_ai_dagster
 # -e examples/docs_projects/project_llm_fine_tune
--e examples/docs_projects/project_components_pdf_extraction
+# -e examples/docs_projects/project_components_pdf_extraction

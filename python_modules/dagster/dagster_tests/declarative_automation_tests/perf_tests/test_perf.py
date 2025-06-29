@@ -31,7 +31,7 @@ def run_declarative_automation_perf_simulation(instance: DagsterInstance) -> Non
         & AutomationCondition.all_deps_blocking_checks_passed(),
     )
     defs = Definitions(assets=assets)
-    asset_job = defs.get_implicit_global_asset_job_def()
+    asset_job = defs.resolve_implicit_global_asset_job_def()
 
     cursor = None
     start = time.time()
@@ -49,7 +49,7 @@ def run_declarative_automation_perf_simulation(instance: DagsterInstance) -> Non
         # simulate the new events that would come from the requested runs
         run_requests = build_run_requests(
             entity_subsets=[r.true_subset for r in result.results],
-            asset_graph=defs.get_asset_graph(),
+            asset_graph=defs.resolve_asset_graph(),
             run_tags={},
             emit_backfills=False,
         )

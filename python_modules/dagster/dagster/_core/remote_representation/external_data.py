@@ -4,7 +4,6 @@ business logic or clever indexing. Use the classes in external.py
 for that.
 """
 
-import inspect
 import json
 import os
 from abc import ABC, abstractmethod
@@ -28,7 +27,11 @@ from dagster._config.pythonic_config import (
     ConfigurableIOManagerFactoryResourceDefinition,
     ConfigurableResourceFactoryResourceDefinition,
 )
-from dagster._config.pythonic_config.resource import coerce_to_resource, is_coercible_to_resource
+from dagster._config.pythonic_config.resource import (
+    coerce_to_resource,
+    get_resource_type_name,
+    is_coercible_to_resource,
+)
 from dagster._config.snap import ConfigFieldSnap, ConfigSchemaSnapshot, snap_from_config_type
 from dagster._core.definitions import (
     AssetSelection,
@@ -62,7 +65,7 @@ from dagster._core.definitions.dependency import (
 )
 from dagster._core.definitions.events import AssetKey
 from dagster._core.definitions.freshness import InternalFreshnessPolicy
-from dagster._core.definitions.freshness_policy import FreshnessPolicy
+from dagster._core.definitions.freshness_policy import LegacyFreshnessPolicy
 from dagster._core.definitions.metadata import (
     MetadataFieldSerializer,
     MetadataMapping,
@@ -93,13 +96,20 @@ from dagster._core.origin import RepositoryPythonOrigin
 from dagster._core.snap import JobSnap
 from dagster._core.snap.mode import ResourceDefSnap, build_resource_def_snap
 from dagster._core.storage.io_manager import IOManagerDefinition
-from dagster._core.storage.tags import COMPUTE_KIND_TAG
+from dagster._core.storage.tags import COMPUTE_KIND_TAG, TAGS_INCLUDE_IN_REMOTE_JOB_REF
 from dagster._core.utils import is_valid_email
 from dagster._record import IHaveNew, record, record_custom
 from dagster._serdes import whitelist_for_serdes
 from dagster._time import datetime_from_timestamp
 from dagster._utils.error import SerializableErrorInfo
 from dagster._utils.warnings import suppress_dagster_warnings
+from dagster.components.core.defs_module import (
+    CompositeComponent,
+    CompositeYamlComponent,
+    DagsterDefsComponent,
+    DefsFolderComponent,
+)
+from dagster.components.core.tree import ComponentTree
 
 DEFAULT_MODE_NAME = "default"
 DEFAULT_PRESET_NAME = "default"
@@ -121,7 +131,10 @@ SYSTEM_METADATA_KEY_ASSET_EXECUTION_TYPE = "dagster/asset_execution_type"
         "job_datas": "external_pipeline_datas",
         "job_refs": "external_job_refs",
     },
-    skip_when_empty_fields={"pools"},
+    skip_when_empty_fields={
+        "pools",
+        "component_tree",
+    },
 )
 @record_custom
 class RepositorySnap(IHaveNew):
@@ -136,6 +149,7 @@ class RepositorySnap(IHaveNew):
     asset_check_nodes: Optional[Sequence["AssetCheckNodeSnap"]]
     metadata: Optional[MetadataMapping]
     utilized_env_vars: Optional[Mapping[str, Sequence["EnvVarConsumer"]]]
+    component_tree: Optional["ComponentTreeSnap"]
 
     def __new__(
         cls,
@@ -150,6 +164,7 @@ class RepositorySnap(IHaveNew):
         asset_check_nodes: Optional[Sequence["AssetCheckNodeSnap"]] = None,
         metadata: Optional[MetadataMapping] = None,
         utilized_env_vars: Optional[Mapping[str, Sequence["EnvVarConsumer"]]] = None,
+        component_tree: Optional["ComponentTreeSnap"] = None,
     ):
         return super().__new__(
             cls,
@@ -164,6 +179,7 @@ class RepositorySnap(IHaveNew):
             asset_check_nodes=asset_check_nodes,
             metadata=metadata or {},
             utilized_env_vars=utilized_env_vars,
+            component_tree=component_tree,
         )
 
     @classmethod
@@ -226,6 +242,11 @@ class RepositorySnap(IHaveNew):
 
         resource_job_usage_map: ResourceJobUsageMap = _get_resource_job_usage(jobs)
 
+        component_snap = None
+        component_tree = repository_def.get_component_tree()
+        if component_tree:
+            component_snap = ComponentTreeSnap.from_tree(component_tree)
+
         return cls(
             name=repository_def.name,
             schedules=sorted(
@@ -281,6 +302,7 @@ class RepositorySnap(IHaveNew):
                 ]
                 for env_var, res_names in repository_def.get_env_vars_by_top_level_resource().items()
             },
+            component_tree=component_snap,
         )
 
     def has_job_data(self):
@@ -456,6 +478,7 @@ class JobRefSnap:
     snapshot_id: str
     active_presets: Sequence["PresetSnap"]
     parent_snapshot_id: Optional[str]
+    preview_tags: Optional[Mapping[str, str]] = None
 
     @classmethod
     def from_job_def(cls, job_def: JobDefinition) -> Self:
@@ -466,7 +489,11 @@ class JobRefSnap:
             snapshot_id=job_def.get_job_snapshot_id(),
             parent_snapshot_id=None,
             active_presets=active_presets_from_job_def(job_def),
+            preview_tags=get_preview_tags(job_def),
         )
+
+    def get_preview_tags(self) -> Mapping[str, str]:
+        return self.preview_tags or {}
 
 
 @whitelist_for_serdes(
@@ -1250,28 +1277,7 @@ class ResourceSnap(IHaveNew):
         }
 
         resource_type_def = resource_def
-
-        # use the resource function name as the resource type if it's a function resource
-        # (ie direct instantiation of ResourceDefinition or IOManagerDefinition)
-        if type(resource_type_def) in (ResourceDefinition, IOManagerDefinition):
-            original_resource_fn = (
-                resource_type_def._hardcoded_resource_type  # noqa: SLF001
-                if resource_type_def._hardcoded_resource_type  # noqa: SLF001
-                else resource_type_def.resource_fn
-            )
-            module_name = check.not_none(inspect.getmodule(original_resource_fn)).__name__
-            resource_type = f"{module_name}.{original_resource_fn.__name__}"
-        # if it's a Pythonic resource, get the underlying Pythonic class name
-        elif isinstance(
-            resource_type_def,
-            (
-                ConfigurableResourceFactoryResourceDefinition,
-                ConfigurableIOManagerFactoryResourceDefinition,
-            ),
-        ):
-            resource_type = _get_class_name(resource_type_def.configurable_resource_cls)
-        else:
-            resource_type = _get_class_name(type(resource_type_def))
+        resource_type = get_resource_type_name(resource_type_def)
 
         dagster_maintained = (
             resource_type_def._is_dagster_maintained()  # noqa: SLF001
@@ -1379,6 +1385,8 @@ class BackcompatTeamOwnerFieldDeserializer(FieldSerializer):
         "execution_set_identifier": "atomic_execution_unit_id",
         "description": "op_description",
         "partitions": "partitions_def_data",
+        "legacy_freshness_policy": "freshness_policy",
+        "freshness_policy": "new_freshness_policy",
     },
     field_serializers={
         "metadata": MetadataFieldSerializer,
@@ -1411,7 +1419,8 @@ class AssetNodeSnap(IHaveNew):
     metadata: Mapping[str, MetadataValue]
     tags: Optional[Mapping[str, str]]
     group_name: str
-    freshness_policy: Optional[FreshnessPolicy]
+    legacy_freshness_policy: Optional[LegacyFreshnessPolicy]
+    freshness_policy: Optional[InternalFreshnessPolicy]
     is_source: bool
     is_observable: bool
     # If a set of assets can't be materialized independently from each other, they will all
@@ -1445,7 +1454,8 @@ class AssetNodeSnap(IHaveNew):
         metadata: Optional[Mapping[str, MetadataValue]] = None,
         tags: Optional[Mapping[str, str]] = None,
         group_name: Optional[str] = None,
-        freshness_policy: Optional[FreshnessPolicy] = None,
+        legacy_freshness_policy: Optional[LegacyFreshnessPolicy] = None,
+        freshness_policy: Optional[InternalFreshnessPolicy] = None,
         is_source: Optional[bool] = None,
         is_observable: bool = False,
         execution_set_identifier: Optional[str] = None,
@@ -1522,7 +1532,9 @@ class AssetNodeSnap(IHaveNew):
             # Newer code always passes a string group name when constructing these, but we assign
             # the default here for backcompat.
             group_name=group_name or DEFAULT_GROUP_NAME,
-            freshness_policy=freshness_policy,
+            legacy_freshness_policy=legacy_freshness_policy,
+            freshness_policy=freshness_policy
+            or InternalFreshnessPolicy.from_asset_spec_metadata(metadata),
             is_source=is_source,
             is_observable=is_observable,
             execution_set_identifier=execution_set_identifier,
@@ -1553,10 +1565,6 @@ class AssetNodeSnap(IHaveNew):
             return self.auto_materialize_policy.to_automation_condition()
         else:
             return None
-
-    @property
-    def internal_freshness_policy(self) -> Optional[InternalFreshnessPolicy]:
-        return InternalFreshnessPolicy.from_asset_spec_metadata(self.metadata)
 
 
 ResourceJobUsageMap: TypeAlias = dict[str, list[ResourceJobUsageEntry]]
@@ -1750,6 +1758,7 @@ def asset_node_snaps_from_repo(repo: RepositoryDefinition) -> Sequence[AssetNode
                 metadata=asset_node.metadata,
                 tags=asset_node.tags,
                 group_name=asset_node.group_name,
+                legacy_freshness_policy=asset_node.legacy_freshness_policy,
                 freshness_policy=asset_node.freshness_policy,
                 is_source=asset_node.is_external,
                 is_observable=asset_node.is_observable,
@@ -1860,6 +1869,10 @@ def active_presets_from_job_def(job_def: JobDefinition) -> Sequence[PresetSnap]:
         ]
 
 
+def get_preview_tags(job_def: JobDefinition) -> Mapping[str, str]:
+    return {k: v for k, v in job_def.tags.items() if k in TAGS_INCLUDE_IN_REMOTE_JOB_REF}
+
+
 def resolve_automation_condition_args(
     automation_condition: Optional[AutomationCondition],
 ) -> tuple[Optional[AutomationCondition], Optional[AutomationConditionSnapshot]]:
@@ -1913,3 +1926,43 @@ def extract_serialized_job_snap_from_serialized_job_data_snap(serialized_job_dat
             pass
 
     return _extract_safe(serialized_job_data_snap)
+
+
+@whitelist_for_serdes
+@record
+class ComponentInstanceSnap:
+    key: str
+    full_type_name: str
+
+
+@whitelist_for_serdes
+@record
+class ComponentTreeSnap:
+    # expect a compact repr for containers & defs components to be added for tree UI
+    leaf_instances: Sequence[ComponentInstanceSnap]
+
+    @staticmethod
+    def from_tree(tree: ComponentTree) -> "ComponentTreeSnap":
+        leaves = []
+
+        for comp_path, comp_inst in check.inst(
+            tree.load_root_component(), DefsFolderComponent
+        ).iterate_path_component_pairs():
+            if not isinstance(
+                comp_inst,
+                (
+                    DefsFolderComponent,
+                    CompositeYamlComponent,
+                    CompositeComponent,
+                    DagsterDefsComponent,
+                ),
+            ):
+                cls = comp_inst.__class__
+                leaves.append(
+                    ComponentInstanceSnap(
+                        key=comp_path.get_relative_key(tree.defs_module_path),
+                        full_type_name=f"{cls.__module__}.{cls.__qualname__}",
+                    )
+                )
+
+        return ComponentTreeSnap(leaf_instances=leaves)

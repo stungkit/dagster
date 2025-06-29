@@ -1,4 +1,3 @@
-import importlib
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cached_property
@@ -6,14 +5,14 @@ from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Union, cast
 
+from dagster import Resolvable
 from dagster._core.definitions.asset_key import AssetKey
 from dagster._core.definitions.asset_spec import AssetSpec
 from dagster._core.definitions.definitions_class import Definitions
 from dagster._core.execution.context.asset_execution_context import AssetExecutionContext
-from dagster.components import Resolvable
 from dagster.components.component.component import Component
 from dagster.components.core.context import ComponentLoadContext
-from dagster.components.core.defs_module import DefsFolderComponent
+from dagster.components.core.tree import ComponentTree
 from dagster.components.resolved.core_models import AssetAttributesModel, OpSpec, ResolutionContext
 from dagster.components.resolved.model import Resolver
 from dagster.components.scaffold.scaffold import scaffold_with
@@ -21,7 +20,12 @@ from dagster.components.utils import TranslatorResolvingInfo
 from typing_extensions import TypeAlias
 
 from dagster_dbt.asset_decorator import dbt_assets
-from dagster_dbt.asset_utils import get_asset_key_for_model, get_node
+from dagster_dbt.asset_utils import (
+    DBT_DEFAULT_EXCLUDE,
+    DBT_DEFAULT_SELECT,
+    get_asset_key_for_model,
+    get_node,
+)
 from dagster_dbt.components.dbt_project.scaffolder import DbtProjectComponentScaffolder
 from dagster_dbt.core.resource import DbtCliResource
 from dagster_dbt.dagster_dbt_translator import DagsterDbtTranslator, DagsterDbtTranslatorSettings
@@ -61,6 +65,7 @@ ResolvedTranslationFn: TypeAlias = Annotated[
     TranslationFn,
     Resolver(
         resolve_translation,
+        inject_before_resolve=False,
         model_field_type=Union[str, AssetAttributesModel],
     ),
 ]
@@ -137,9 +142,10 @@ class DbtProjectComponent(Component, Resolvable):
     project: ResolvedDbtProject
     op: Optional[OpSpec] = None
     translation: Optional[ResolvedTranslationFn] = None
-    select: str = "fqn:*"
-    exclude: Optional[str] = None
+    select: str = DBT_DEFAULT_SELECT
+    exclude: str = DBT_DEFAULT_EXCLUDE
     translation_settings: Optional[DagsterDbtComponentsTranslatorSettings] = None
+    prepare_if_dev: bool = True
 
     @cached_property
     def translator(self):
@@ -153,7 +159,7 @@ class DbtProjectComponent(Component, Resolvable):
         return DbtCliResource(self.project)
 
     def get_asset_selection(
-        self, select: str, exclude: Optional[str] = None
+        self, select: str, exclude: str = DBT_DEFAULT_EXCLUDE
     ) -> DbtManifestAssetSelection:
         return DbtManifestAssetSelection.build(
             manifest=self.project.manifest_path,
@@ -163,7 +169,8 @@ class DbtProjectComponent(Component, Resolvable):
         )
 
     def build_defs(self, context: ComponentLoadContext) -> Definitions:
-        self.project.prepare_if_dev()
+        if self.prepare_if_dev:
+            self.project.prepare_if_dev()
 
         @dbt_assets(
             manifest=self.project.manifest_path,
@@ -230,17 +237,8 @@ class ProxyDagsterDbtTranslator(DagsterDbtTranslator):
 
 
 def get_projects_from_dbt_component(components: Path) -> list[DbtProject]:
-    # defer imports for optional deps
-    from dagster_dg.context import DgContext
-
-    projects = []
-    dg_context = DgContext.for_project_environment(components, command_line_config={})
-    context = ComponentLoadContext.for_module(
-        importlib.import_module(dg_context.defs_module_name),
-        project_root=dg_context.root_path,
+    project_components = ComponentTree.load(components).get_all_components(
+        of_type=DbtProjectComponent
     )
-    folder = DefsFolderComponent.get(context)
-    for component in folder.iterate_components():
-        if isinstance(component, DbtProjectComponent):
-            projects.append(component.project)
-    return projects
+
+    return [component.project for component in project_components]
