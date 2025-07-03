@@ -39,7 +39,7 @@ const config: Config = {
           keywords: {boost: 75},
           content: {boost: 2},
         },
-        excludeRoutes: ['/api/python-api/**/*', '/about/changelog', '/guides/migrate/version-migration'],
+        excludeRoutes: ['/api/python-api/**/*', '/about/changelog', '/migration/upgrading'],
       },
     ],
   ],
@@ -89,7 +89,7 @@ const config: Config = {
       },
       items: [
         {
-          label: 'Docs',
+          label: 'User guide',
           type: 'doc',
           docId: 'intro',
           position: 'left',
@@ -101,15 +101,21 @@ const config: Config = {
           position: 'left',
         },
         {
-          label: 'Integrations',
+          label: 'Deployment',
           type: 'doc',
-          docId: 'integrations/libraries/index',
+          docId: 'deployment/index',
           position: 'left',
         },
         {
-          label: 'Dagster+',
+          label: 'Migration',
           type: 'doc',
-          docId: 'dagster-plus/index',
+          docId: 'migration/index',
+          position: 'left',
+        },
+        {
+          label: 'Integrations',
+          type: 'doc',
+          docId: 'integrations/libraries/index',
           position: 'left',
         },
         {
@@ -201,7 +207,7 @@ const config: Config = {
           lastVersion: 'current',
           versions: {
             current: {
-              label: 'Latest (1.10.15)',
+              label: 'Latest (1.11.1)',
               path: '/',
             },
           },

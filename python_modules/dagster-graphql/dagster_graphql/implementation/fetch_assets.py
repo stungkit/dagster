@@ -8,26 +8,27 @@ from dagster import (
     AssetKey,
     DagsterEventType,
     DagsterRun,
-    MultiPartitionsDefinition,
     _check as check,
 )
 from dagster._core.definitions.data_time import CachingDataTimeResolver
-from dagster._core.definitions.partition import PartitionsDefinition, PartitionsSubset
-from dagster._core.definitions.remote_asset_graph import RemoteAssetNode
-from dagster._core.definitions.time_window_partitions import (
-    PartitionRangeStatus,
+from dagster._core.definitions.partitions.definition import (
+    MultiPartitionsDefinition,
+    PartitionsDefinition,
     TimeWindowPartitionsDefinition,
-    TimeWindowPartitionsSubset,
+)
+from dagster._core.definitions.partitions.subset import PartitionsSubset, TimeWindowPartitionsSubset
+from dagster._core.definitions.partitions.utils.time_window import (
+    PartitionRangeStatus,
     fetch_flattened_time_window_ranges,
 )
+from dagster._core.definitions.remote_asset_graph import RemoteAssetNode
+from dagster._core.errors import DagsterInvariantViolationError
 from dagster._core.event_api import AssetRecordsFilter, EventLogRecord
 from dagster._core.events.log import EventLogEntry
 from dagster._core.instance import DynamicPartitionsStore
 from dagster._core.remote_representation.external import RemoteRepository
 from dagster._core.storage.event_log.sql_event_log import get_max_event_records_limit
 from dagster._time import get_current_datetime
-
-from dagster_graphql.implementation.loader import StaleStatusLoader
 
 if TYPE_CHECKING:
     from dagster_graphql.schema.asset_graph import (
@@ -98,36 +99,46 @@ def get_assets(
     prefix: Optional[Sequence[str]] = None,
     cursor: Optional[str] = None,
     limit: Optional[int] = None,
+    asset_keys: Optional[Sequence[AssetKey]] = None,
 ) -> "GrapheneAssetConnection":
     from dagster_graphql.schema.pipelines.pipeline import GrapheneAsset
     from dagster_graphql.schema.roots.assets import GrapheneAssetConnection
 
+    if asset_keys is not None and prefix is not None:
+        # To make this resolver handle both asset_keys and prefix, we would need to
+        # make get_asset_keys handle a list of asset_keys so that we filter down to the asset keys that
+        # have materializations in the db and match the prefix.
+        raise DagsterInvariantViolationError(
+            "Cannot provide both asset_keys and prefix",
+        )
+
     instance = graphene_info.context.instance
 
     normalized_cursor_str = _normalize_asset_cursor_str(cursor)
-    materialized_keys = instance.get_asset_keys(
-        prefix=prefix, limit=limit, cursor=normalized_cursor_str
-    )
-    asset_nodes_by_asset_key = {
-        asset_key: asset_node
-        for asset_key, asset_node in get_asset_nodes_by_asset_key(graphene_info).items()
-        if (not prefix or asset_key.path[: len(prefix)] == prefix)
-        and (not normalized_cursor_str or asset_key.to_string() > normalized_cursor_str)
-    }
+    if asset_keys is None:
+        materialized_keys = instance.get_asset_keys(
+            prefix=prefix, limit=limit, cursor=normalized_cursor_str
+        )
+        asset_nodes_by_asset_key = {
+            asset_key: asset_node
+            for asset_key, asset_node in _get_asset_nodes_by_asset_key(graphene_info).items()
+            if (not prefix or asset_key.path[: len(prefix)] == prefix)
+            and (not normalized_cursor_str or asset_key.to_string() > normalized_cursor_str)
+            and (not asset_keys or asset_key in asset_keys)
+        }
 
-    asset_keys = sorted(set(materialized_keys).union(asset_nodes_by_asset_key.keys()), key=str)
+        merged_asset_keys = sorted(
+            set(materialized_keys).union(asset_nodes_by_asset_key.keys()), key=str
+        )
+    else:
+        merged_asset_keys = asset_keys
+
     if limit:
-        asset_keys = asset_keys[:limit]
+        merged_asset_keys = merged_asset_keys[:limit]
 
     return GrapheneAssetConnection(
-        nodes=[
-            GrapheneAsset(
-                key=asset_key,
-                definition=asset_nodes_by_asset_key.get(asset_key),
-            )
-            for asset_key in asset_keys
-        ],
-        cursor=asset_keys[-1].to_string() if asset_keys else None,
+        nodes=[GrapheneAsset(key=asset_key) for asset_key in merged_asset_keys],
+        cursor=merged_asset_keys[-1].to_string() if merged_asset_keys else None,
     )
 
 
@@ -177,37 +188,14 @@ def get_asset_node_definition_collisions(
     return results
 
 
-def _graphene_asset_node(
+def _get_asset_nodes_by_asset_key(
     graphene_info: "ResolveInfo",
-    remote_node: RemoteAssetNode,
-    stale_status_loader: Optional[StaleStatusLoader],
-):
-    from dagster_graphql.schema.asset_graph import GrapheneAssetNode
-
-    return GrapheneAssetNode(
-        remote_node=remote_node,
-        stale_status_loader=stale_status_loader,
-    )
-
-
-def get_asset_nodes_by_asset_key(
-    graphene_info: "ResolveInfo",
-) -> Mapping[AssetKey, "GrapheneAssetNode"]:
+) -> Mapping[AssetKey, RemoteAssetNode]:
     """If multiple repositories have asset nodes for the same asset key, chooses the asset node that
     has an op.
     """
-    stale_status_loader = StaleStatusLoader(
-        instance=graphene_info.context.instance,
-        asset_graph=lambda: graphene_info.context.asset_graph,
-        loading_context=graphene_info.context,
-    )
-
     return {
-        remote_node.key: _graphene_asset_node(
-            graphene_info,
-            remote_node,
-            stale_status_loader=stale_status_loader,
-        )
+        remote_node.key: remote_node
         for remote_node in graphene_info.context.asset_graph.asset_nodes
     }
 
@@ -215,6 +203,7 @@ def get_asset_nodes_by_asset_key(
 def get_asset_node(
     graphene_info: "ResolveInfo", asset_key: AssetKey
 ) -> Union["GrapheneAssetNode", "GrapheneAssetNotFoundError"]:
+    from dagster_graphql.schema.asset_graph import GrapheneAssetNode
     from dagster_graphql.schema.errors import GrapheneAssetNotFoundError
 
     check.inst_param(asset_key, "asset_key", AssetKey)
@@ -223,15 +212,7 @@ def get_asset_node(
         return GrapheneAssetNotFoundError(asset_key=asset_key)
 
     remote_node = graphene_info.context.asset_graph.get(asset_key)
-    return _graphene_asset_node(
-        graphene_info,
-        remote_node,
-        stale_status_loader=StaleStatusLoader(
-            instance=graphene_info.context.instance,
-            asset_graph=lambda: graphene_info.context.asset_graph,
-            loading_context=graphene_info.context,
-        ),
-    )
+    return GrapheneAssetNode(remote_node)
 
 
 def get_asset(
@@ -247,16 +228,7 @@ def get_asset(
     if not has_remote_node and not instance.has_asset_key(asset_key):
         return GrapheneAssetNotFoundError(asset_key=asset_key)
 
-    if has_remote_node:
-        def_node = _graphene_asset_node(
-            graphene_info,
-            graphene_info.context.asset_graph.get(asset_key),
-            stale_status_loader=None,
-        )
-    else:
-        def_node = None
-
-    return GrapheneAsset(key=asset_key, definition=def_node)
+    return GrapheneAsset(key=asset_key)
 
 
 def get_asset_materialization_event_records(

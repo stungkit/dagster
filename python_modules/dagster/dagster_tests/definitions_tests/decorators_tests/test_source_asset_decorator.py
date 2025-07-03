@@ -1,11 +1,11 @@
 import pytest
-from dagster import AssetSpec, multi_observable_source_asset
+from dagster import AssetSpec, Definitions, multi_observable_source_asset
 from dagster._core.definitions.data_version import DataVersion
 from dagster._core.definitions.decorators.source_asset_decorator import observable_source_asset
 from dagster._core.definitions.events import AssetKey
 from dagster._core.definitions.metadata import MetadataValue
 from dagster._core.definitions.observe import observe
-from dagster._core.definitions.partition import StaticPartitionsDefinition
+from dagster._core.definitions.partitions.definition import StaticPartitionsDefinition
 from dagster._core.errors import DagsterInvalidDefinitionError
 from dagster._core.storage.io_manager import io_manager
 
@@ -130,3 +130,17 @@ def test_multi_observable_source_asset_tags():
 
         @multi_observable_source_asset(specs=[AssetSpec("asset1", tags={"a%": "b"})])
         def assets(): ...
+
+
+def test_op_tags_forwarded_to_execution_step() -> None:
+    op_tags = {"foo": "bar", "baz": "qux"}
+
+    @observable_source_asset(op_tags=op_tags)
+    def tagged_source_asset():
+        return DataVersion("1")
+
+    # Create a job that includes the source asset
+    defs = Definitions(assets=[tagged_source_asset])
+    global_job = defs.resolve_implicit_global_asset_job_def()
+    assert len(global_job.nodes) == 1
+    assert global_job.nodes[0].tags == op_tags

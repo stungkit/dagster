@@ -48,6 +48,7 @@
 | `duckdb`              | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-duckdb-color.svg" width={20} height={20} />                         |
 | `elasticsearch`       | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-elasticsearch-color.svg" width={20} height={20} />                  |
 | `evidence`            | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-evidence.svg" width={20} height={20} />                             |
+| `exasol`              | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-exasol-color.svg" width={20} height={20} />                         |
 | `excel`               | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-excel-color.svg" width={20} height={20} />                          |
 | `facebook`            | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-facebook-color.svg" width={20} height={20} />                       |
 | `fivetran`            | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-fivetran-color.svg" width={20} height={20} />                       |
@@ -190,7 +191,7 @@
 | `thoughtspot`         | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-thoughtspot-color.svg" width={20} height={20} />                    |
 | `tiktok`              | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-tiktok-color.svg" width={20} height={20} />                         |
 | `toml`                | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/toml.svg" width={20} height={20} />                                      |
-| `treasuredata`        | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-treasuredata-color.svg" width={20} height={20} />              |
+| `treasuredata`        | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-treasuredata-color.svg" width={20} height={20} />                   |
 | `trino`               | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-trino-color.svg" width={20} height={20} />                          |
 | `twilio`              | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-twilio-color.svg" width={20} height={20} />                         |
 | `twitter`             | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-x-color.svg" width={20} height={20} />                              |
@@ -221,4 +222,4 @@
 | `workbook`            | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/dashboard.svg" width={20} height={20} />                                 |
 | `csv`                 | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/csv.svg" width={20} height={20} />                                       |
 | `pdf`                 | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/pdf.svg" width={20} height={20} />                                       |
-| `yaml`                | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/yaml.svg" width={20} height={20} />                                       |
+| `yaml`                | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/yaml.svg" width={20} height={20} />                                      |

@@ -15,7 +15,6 @@ from dagster import (
     DefaultScheduleStatus,
     Field,
     ScheduleDefinition,
-    StaticPartitionsDefinition,
     asset,
     build_schedule_from_partitioned_job,
     define_asset_job,
@@ -28,6 +27,7 @@ from dagster import (
 )
 from dagster._core.definitions.data_version import DataVersion
 from dagster._core.definitions.decorators.source_asset_decorator import observable_source_asset
+from dagster._core.definitions.partitions.definition import StaticPartitionsDefinition
 from dagster._core.definitions.run_request import RunRequest
 from dagster._core.instance import DagsterInstance
 from dagster._core.remote_representation import (
@@ -63,7 +63,8 @@ from dagster._core.workspace.context import WorkspaceProcessContext
 from dagster._core.workspace.load_target import EmptyWorkspaceTarget, ModuleTarget
 from dagster._daemon import get_default_daemon_logger
 from dagster._grpc.client import DagsterGrpcClient
-from dagster._grpc.server import GrpcServerCommand, open_server_process
+from dagster._grpc.constants import GrpcServerCommand
+from dagster._grpc.server import open_server_process
 from dagster._record import copy
 from dagster._scheduler.scheduler import (
     RETAIN_ORPHANED_STATE_INTERVAL_SECONDS,

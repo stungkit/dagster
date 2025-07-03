@@ -6,6 +6,8 @@ from typing import Any, Optional, cast
 import click
 import yaml
 from dagster_shared import check
+from dagster_shared.serdes.objects import EnvRegistryKey
+from dagster_shared.seven import load_module_object
 from pydantic import BaseModel, TypeAdapter
 
 from dagster.components.scaffold.scaffold import (
@@ -34,7 +36,7 @@ def scaffold_component(
     yaml_attributes: Optional[Mapping[str, Any]] = None,
 ) -> None:
     if request.scaffold_format == "yaml":
-        with open(request.target_path / "component.yaml", "w") as f:
+        with open(request.target_path / "defs.yaml", "w") as f:
             component_data = {"type": request.type_name, "attributes": yaml_attributes or {}}
             yaml.dump(
                 component_data, f, Dumper=ComponentDumper, sort_keys=False, default_flow_style=False
@@ -51,10 +53,10 @@ def scaffold_component(
             f.write(
                 textwrap.dedent(
                     f"""
-                        from dagster.components import component, ComponentLoadContext
+                        from dagster import component, ComponentLoadContext
                         from {module_path} import {class_name}
 
-                        @component
+                        @component_instance
                         def load(context: ComponentLoadContext) -> {class_name}: ...
                 """
                 ).lstrip()
@@ -65,7 +67,6 @@ def scaffold_component(
 
 def scaffold_object(
     path: Path,
-    obj: object,
     typename: str,
     json_params: Optional[str],
     scaffold_format: str,
@@ -73,9 +74,8 @@ def scaffold_object(
 ) -> None:
     from dagster.components.component.component import Component
 
-    click.echo(f"Creating a folder at {path}.")
-    if not path.exists():
-        path.mkdir(parents=True)
+    key = EnvRegistryKey.from_typename(typename)
+    obj = load_module_object(key.namespace, key.name)
 
     scaffolder = get_scaffolder(obj)
 
@@ -91,6 +91,10 @@ def scaffold_object(
 
     params_model = parse_params_model(obj=obj, json_params=json_params)
 
+    click.echo(f"Creating defs at {path}.")
+    if not path.exists():
+        path.mkdir(parents=True)
+
     scaffolder.scaffold(
         ScaffoldRequest(
             type_name=typename,
@@ -102,11 +106,11 @@ def scaffold_object(
     )
 
     if isinstance(obj, type) and issubclass(obj, Component):
-        component_yaml_path = path / "component.yaml"
+        defs_yaml_path = path / "defs.yaml"
         component_py_path = path / "component.py"
-        if not (component_yaml_path.exists() or component_py_path.exists()):
+        if not (defs_yaml_path.exists() or component_py_path.exists()):
             raise Exception(
-                f"Currently all components require a component.yaml or component.py file. Please ensure your implementation of scaffold writes this file at {component_yaml_path} or {component_py_path}."
+                f"Currently all components require a defs.yaml or component.py file. Please ensure your implementation of scaffold writes this file at {defs_yaml_path} or {component_py_path}."
             )
 
 

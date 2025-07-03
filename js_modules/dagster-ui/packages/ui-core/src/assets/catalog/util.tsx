@@ -5,10 +5,11 @@ import {useCatalogViews} from 'shared/assets/catalog/useCatalogViews.oss';
 import styles from './AssetSelectionSummaryTile.module.css';
 import {assertUnreachable} from '../../app/Util';
 import {useAssetsHealthData} from '../../asset-data/AssetHealthDataProvider';
+import {AssetHealthFragment} from '../../asset-data/types/AssetHealthDataProvider.types';
 import {AssetHealthStatus} from '../../graphql/types';
 import {
   linkToAssetTableWithAssetOwnerFilter,
-  linkToAssetTableWithGroupFilter,
+  linkToAssetTableWithCrossCodeLocationGroupFilter,
   linkToAssetTableWithKindFilter,
   linkToAssetTableWithTagFilter,
   linkToCodeLocationInCatalog,
@@ -60,11 +61,7 @@ export function getGroupedAssets(assets: AssetTableFragment[]) {
         acc.groupName[groupName] = acc.groupName[groupName] || {
           assets: [],
           label: groupName,
-          link: linkToAssetTableWithGroupFilter({
-            groupName,
-            repositoryLocationName: repository?.location.name,
-            repositoryName: repository?.name,
-          }),
+          link: linkToAssetTableWithCrossCodeLocationGroupFilter(groupName),
         };
         acc.groupName[groupName]!.assets.push(asset);
       }
@@ -121,26 +118,45 @@ export function useAssetHealthStatuses({
 }) {
   const assetCount = assets.length;
 
-  const {liveDataByNode} = useAssetsHealthData(
-    useMemo(() => assets.map((asset) => asset.key), [assets]),
-    threadId,
-  );
+  const {liveDataByNode} = useAssetsHealthData({
+    assetKeys: useMemo(() => assets.map((asset) => asset.key), [assets]),
+    thread: threadId,
+  });
 
   const loading = assetsLoading || assets.length > Object.keys(liveDataByNode).length;
 
-  const statusCounts = useMemo(() => {
-    return Object.values(liveDataByNode).reduce(
-      (acc, data) => {
-        let status: AssetHealthStatus = AssetHealthStatus.UNKNOWN;
-        if (data.assetHealth?.assetHealth) {
-          status = data.assetHealth.assetHealth;
-        }
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      },
-      {} as Record<AssetHealthStatus, number>,
-    );
-  }, [liveDataByNode]);
+  const {jsx, statusCounts} = useMemo(
+    () => getHealthStatuses({liveDataByNode, loading, assetCount}),
+    [liveDataByNode, loading, assetCount],
+  );
+
+  return {
+    loading,
+    statusCounts,
+    jsx,
+  };
+}
+
+export function getHealthStatuses({
+  liveDataByNode,
+  loading,
+  assetCount,
+}: {
+  liveDataByNode: Record<string, AssetHealthFragment>;
+  loading: boolean;
+  assetCount: number;
+}) {
+  const statusCounts = Object.values(liveDataByNode).reduce(
+    (acc, data) => {
+      let status: AssetHealthStatus = AssetHealthStatus.UNKNOWN;
+      if (data.assetHealth?.assetHealth) {
+        status = data.assetHealth.assetHealth;
+      }
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    },
+    {} as Record<AssetHealthStatus, number>,
+  );
 
   const degradedMeta = statusToIconAndColor[AssetHealthStatus.DEGRADED];
   const warningMeta = statusToIconAndColor[AssetHealthStatus.WARNING];
@@ -196,7 +212,6 @@ export function useAssetHealthStatuses({
   );
 
   return {
-    loading,
     statusCounts,
     jsx: (
       <div className={styles.footer}>

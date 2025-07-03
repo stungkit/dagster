@@ -5,9 +5,8 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Annotated, Callable, Optional, Union
 
 import dagster as dg
-from dagster import AssetKey, AssetSpec
+from dagster import AssetKey, AssetSpec, Component, ComponentLoadContext, Resolvable, Resolver
 from dagster._core.execution.context.asset_execution_context import AssetExecutionContext
-from dagster.components import Component, ComponentLoadContext, Resolvable, Resolver
 from dagster.components.resolved.context import ResolutionContext
 from dagster.components.resolved.core_models import AssetAttributesModel
 from dagster.components.scaffold.scaffold import scaffold_with
@@ -26,14 +25,14 @@ if TYPE_CHECKING:
 TranslationFn: TypeAlias = Callable[[AssetSpec, DltResourceTranslatorData], AssetSpec]
 
 
-def _load_object_from_python_path(path: str):
+def _load_object_from_python_path(resolution_context: ResolutionContext, path: str):
     """Loads a Python object from the given import path, accepting
     relative paths.
 
     For example, '.foo_module.bar_object' will find the relative module
     'foo_module' and return 'bar_object'.
     """
-    context = ComponentLoadContext.current()
+    context = ComponentLoadContext.from_resolution_context(resolution_context)
 
     if path.startswith("."):
         path = f"{context.defs_relative_module_name(context.path)}{path}"
@@ -53,7 +52,9 @@ class ComponentDagsterDltTranslator(DagsterDltTranslator):
         table_name = data.resource.table_name
         if isinstance(table_name, Callable):
             table_name = data.resource.name
-        prefix = [data.pipeline.dataset_name] if data.pipeline else []
+        prefix = (
+            [data.pipeline.dataset_name] if data.pipeline and data.pipeline.dataset_name else []
+        )
         base_asset_spec = (
             super().get_asset_spec(data).replace_attributes(key=AssetKey(prefix + [table_name]))
         )
@@ -82,6 +83,7 @@ ResolvedTranslationFn: TypeAlias = Annotated[
     TranslationFn,
     Resolver(
         resolve_translation,
+        inject_before_resolve=False,
         model_field_type=Union[str, AssetAttributesModel],
     ),
 ]
@@ -93,12 +95,12 @@ class DltLoadSpecModel(Resolvable):
 
     pipeline: Annotated[
         Pipeline,
-        Resolver(lambda ctx, path: _load_object_from_python_path(path), model_field_type=str),
+        Resolver(lambda ctx, path: _load_object_from_python_path(ctx, path), model_field_type=str),
     ]
     source: Annotated[
         DltSource,
         Resolver(
-            lambda ctx, path: _load_object_from_python_path(path),
+            lambda ctx, path: _load_object_from_python_path(ctx, path),
             model_field_type=str,
         ),
     ]

@@ -25,6 +25,8 @@ import {AssetHealthFragment} from '../asset-data/types/AssetHealthDataProvider.t
 import {AssetEventHistoryEventTypeSelector} from '../graphql/types';
 import {TimeFromNow} from '../ui/TimeFromNow';
 
+const INTERVAL_MSEC = 30 * 1000;
+
 export const AssetRecentUpdatesTrend = React.memo(({asset}: {asset: AssetHealthFragment}) => {
   // Wait 100ms to avoid querying during fast scrolling of the table
   const shouldQuery = useDelayedState(500);
@@ -33,7 +35,7 @@ export const AssetRecentUpdatesTrend = React.memo(({asset}: {asset: AssetHealthF
     latestInfo,
     loading,
     refetch,
-  } = useRecentAssetEvents(shouldQuery ? asset.assetKey : undefined, 5, [
+  } = useRecentAssetEvents(shouldQuery ? asset.key : undefined, 5, [
     AssetEventHistoryEventTypeSelector.MATERIALIZATION,
     AssetEventHistoryEventTypeSelector.FAILED_TO_MATERIALIZE,
     AssetEventHistoryEventTypeSelector.OBSERVATION,
@@ -48,7 +50,7 @@ export const AssetRecentUpdatesTrend = React.memo(({asset}: {asset: AssetHealthF
 
   useRefreshAtInterval({
     refresh: refetch,
-    intervalMs: 3000,
+    intervalMs: INTERVAL_MSEC,
     enabled: shouldQuery,
   });
 
@@ -105,7 +107,7 @@ export const AssetRecentUpdatesTrend = React.memo(({asset}: {asset: AssetHealthF
           <div style={{height: 13, width: 1, background: Colors.keylineDefault()}} />
         </>
       )}
-      <AssetHealthSummary assetKey={asset.assetKey} iconOnly />
+      <AssetHealthSummary assetKey={asset.key} iconOnly />
     </Box>
   );
 });

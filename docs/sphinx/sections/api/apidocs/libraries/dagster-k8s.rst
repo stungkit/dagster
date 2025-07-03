@@ -50,6 +50,21 @@ include a section like:
          - "dagster-k8s-job-runner-env"
        env_secrets:
          - "dagster-k8s-some-secret"
+       env_vars:
+         - "ENV_VAR=1"
+       labels:
+       resources:
+       run_k8s_config:
+         pod_template_spec_metadata:
+         pod_spec_config:
+         job_metadata:
+         job_spec_config:
+         container_config:
+       volume_mounts:
+       volumes:
+       security_context:
+       scheduler_name:
+       kubeconfig_file: 
 
 Helm chart
 ----------
@@ -80,9 +95,9 @@ To run the unit tests:
    pytest -m "not integration"
 
 
-To run the integration tests, you must have `Docker <https://docs.docker.com/install/>`_\ ,
+To run the integration tests, you must have `Docker <https://docs.docker.com/install>`_\ ,
 `kind <https://kind.sigs.k8s.io/docs/user/quick-start#installation>`__\ ,
-and `helm <https://helm.sh/docs/intro/install/>`_ installed.
+and `helm <https://helm.sh/docs/intro/install>`_ installed.
 
 On macOS:
 
