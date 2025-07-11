@@ -15,35 +15,41 @@ from dagster import _check as check
 from dagster._check import CheckError
 from dagster._core.asset_graph_view.entity_subset import EntitySubset, _ValidatedEntitySubsetValue
 from dagster._core.asset_graph_view.serializable_entity_subset import SerializableEntitySubset
-from dagster._core.definitions.asset_graph_subset import AssetGraphSubset
 from dagster._core.definitions.asset_key import AssetCheckKey, AssetKey, EntityKey, T_EntityKey
+from dagster._core.definitions.assets.graph.asset_graph_subset import AssetGraphSubset
 from dagster._core.definitions.events import AssetKeyPartitionKey
-from dagster._core.definitions.multi_dimensional_partitions import (
-    MultiPartitionKey,
+from dagster._core.definitions.partitions.definition import (
     MultiPartitionsDefinition,
-    PartitionDimensionDefinition,
-)
-from dagster._core.definitions.partition import AllPartitionsSubset, TemporalContext
-from dagster._core.definitions.partition_mapping import UpstreamPartitionsResult
-from dagster._core.definitions.time_window_partitions import (
-    TimeWindow,
     TimeWindowPartitionsDefinition,
+)
+from dagster._core.definitions.partitions.mapping import UpstreamPartitionsResult
+from dagster._core.definitions.partitions.subset import (
+    AllPartitionsSubset,
     TimeWindowPartitionsSubset,
+)
+from dagster._core.definitions.partitions.utils import (
+    MultiPartitionKey,
+    PartitionDimensionDefinition,
+    TimeWindow,
     get_time_partitions_def,
 )
+from dagster._core.definitions.temporal_context import TemporalContext
 from dagster._core.loader import LoadingContext
 from dagster._time import get_current_datetime
 from dagster._utils.aiodataloader import DataLoader
 from dagster._utils.cached_method import cached_method
 
 if TYPE_CHECKING:
-    from dagster._core.definitions.base_asset_graph import BaseAssetGraph, BaseAssetNode
+    from dagster._core.definitions.assets.graph.base_asset_graph import (
+        BaseAssetGraph,
+        BaseAssetNode,
+    )
     from dagster._core.definitions.declarative_automation.legacy.valid_asset_subset import (
         ValidAssetSubset,
     )
     from dagster._core.definitions.definitions_class import Definitions
-    from dagster._core.definitions.partition import PartitionsDefinition
-    from dagster._core.definitions.partition_key_range import PartitionKeyRange
+    from dagster._core.definitions.partitions.definition import PartitionsDefinition
+    from dagster._core.definitions.partitions.partition_key_range import PartitionKeyRange
     from dagster._core.instance import DagsterInstance
     from dagster._core.storage.asset_check_execution_record import AssetCheckExecutionResolvedStatus
     from dagster._core.storage.dagster_run import RunRecord
@@ -92,7 +98,7 @@ class AssetGraphView(LoadingContext):
                 last_event_id=last_event_id or instance.event_log_storage.get_maximum_record_id(),
             ),
             instance=instance,
-            asset_graph=defs.get_asset_graph(),
+            asset_graph=defs.resolve_asset_graph(),
         )
 
     def __init__(

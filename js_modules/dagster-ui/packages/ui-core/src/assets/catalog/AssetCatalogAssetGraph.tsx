@@ -15,14 +15,10 @@ export const AssetCatalogAssetGraph = React.memo(
   ({
     selection,
     onChangeSelection,
-    isFullScreen,
-    toggleFullScreen,
     tabs,
   }: {
     selection: string;
     onChangeSelection: (selection: string) => void;
-    isFullScreen: boolean;
-    toggleFullScreen: () => void;
     tabs: React.ReactNode;
   }) => {
     const history = useHistory();
@@ -103,8 +99,6 @@ export const AssetCatalogAssetGraph = React.memo(
           )}
           onNavigateToSourceAssetNode={onNavigateToSourceAssetNode}
           viewType={AssetGraphViewType.CATALOG}
-          isFullScreen={isFullScreen}
-          toggleFullScreen={toggleFullScreen}
           setHideEdgesToNodesOutsideQuery={setHideEdgesToNodesOutsideQuery}
         />
       </>

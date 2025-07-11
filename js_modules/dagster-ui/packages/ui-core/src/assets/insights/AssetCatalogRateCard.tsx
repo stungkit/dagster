@@ -2,13 +2,67 @@ import {BodyLarge, Box, Colors, Icon, Spinner} from '@dagster-io/ui-components';
 import React from 'react';
 
 import styles from './AssetCatalogRateCard.module.css';
-import {numberFormatter} from '../../ui/formatters';
+import {percentFormatter} from '../../ui/formatters';
 
 export interface AssetCatalogRateCardProps {
   title: string;
   value: number | null; // e.g., 0.981 for 98.1%
   prevValue: number | null; // e.g., 1 for 100%
   loading: boolean;
+  unit: 'percent' | 'seconds';
+}
+
+function pctChange(x: number, y: number): number {
+  if (x === 0) {
+    if (y === 0) {
+      return 0.0; // No change
+    }
+    return Number.POSITIVE_INFINITY;
+  }
+
+  if (y >= x) {
+    return y / x - 1;
+  }
+  return -(1 - y / x);
+}
+
+const secondsFormatter = new Intl.NumberFormat(navigator.language, {
+  style: 'unit',
+  unit: 'second',
+});
+
+function formatValues(
+  valueOrNull: number | null,
+  prevValueOrNull: number | null,
+  unit: 'percent' | 'seconds',
+): {
+  currValueString: string;
+  prevValueString: string;
+  absDeltaString: string;
+  hasNegativeDelta: boolean;
+} {
+  const value = valueOrNull ?? 0;
+  const prevValue = prevValueOrNull ?? 0;
+
+  const delta = pctChange(prevValue, value);
+  const hasNegativeDelta = delta < 0;
+  const absDelta = Math.abs(delta);
+
+  if (unit === 'percent') {
+    return {
+      currValueString: percentFormatter.format(value),
+      prevValueString: percentFormatter.format(prevValue),
+      absDeltaString: percentFormatter.format(absDelta),
+      hasNegativeDelta,
+    };
+  }
+
+  return {
+    currValueString: secondsFormatter.format(value),
+    prevValueString: secondsFormatter.format(prevValue),
+    absDeltaString: percentFormatter.format(absDelta),
+    hasNegativeDelta,
+  };
 }
 
 export function AssetCatalogRateCard({
@@ -16,18 +70,16 @@ export function AssetCatalogRateCard({
   value,
   prevValue,
   loading,
+  unit,
 }: AssetCatalogRateCardProps) {
-  const pct = value ? Math.round(value * 1000) / 10 : 0;
-  const prevPct = prevValue ? Math.round(prevValue * 1000) / 10 : 0;
-  const delta = pct - prevPct;
-  const isDown = delta < 0;
-  const absDelta = Math.abs(delta);
+  const {currValueString, prevValueString, absDeltaString, hasNegativeDelta} = formatValues(
+    value,
+    prevValue,
+    unit,
+  );
 
   const noDataAvailableCard = (
-    <div className={styles.rateCardNoDataContainer}>
-      <div className={styles.rateCardNoDataPercentContainer}>%</div>
-      No data available
-    </div>
+    <div className={styles.rateCardNoDataContainer}>No data available</div>
   );
 
   if (loading) {
@@ -45,9 +97,9 @@ export function AssetCatalogRateCard({
 
   return (
     <div className={styles.rateCardContainer}>
-      <BodyLarge>{title}</BodyLarge>
+      <BodyLarge style={{marginBottom: 12}}>{title}</BodyLarge>
       {value !== null ? (
-        <div className={styles.rateCardValue}>{numberFormatter.format(pct) + '%'}</div>
+        <div className={styles.rateCardValue}>{currValueString}</div>
       ) : (
         noDataAvailableCard
       )}
@@ -57,7 +109,6 @@ export function AssetCatalogRateCard({
             className={styles.rateCardDeltaRow}
             flex={{direction: 'row', alignItems: 'center', gap: 4}}
           >
-            <Icon name="trending_up" color={Colors.textLight()} size={16} />
             <span className={styles.rateCardDelta}>
               <>New this period</>
             </span>
@@ -66,20 +117,18 @@ export function AssetCatalogRateCard({
           prevValue !== null &&
           value !== null && (
             <>
-              <div className={styles.rateCardPrev}>
-                {numberFormatter.format(prevPct) + '% last period'}
-              </div>
+              <div className={styles.rateCardPrev}>{prevValueString + ' previous period'}</div>
               <Box
                 className={styles.rateCardDeltaRow}
                 flex={{direction: 'row', alignItems: 'center', gap: 4}}
               >
                 <Icon
-                  name={isDown ? 'trending_down' : 'trending_up'}
-                  color={Colors.textLight()}
+                  name={hasNegativeDelta ? 'trending_down' : 'trending_up'}
+                  color={Colors.textLighter()}
                   size={16}
                 />
                 <span className={styles.rateCardDelta}>
-                  <>{numberFormatter.format(absDelta)}%</>
+                  <>{absDeltaString}</>
                 </span>
               </Box>
             </>

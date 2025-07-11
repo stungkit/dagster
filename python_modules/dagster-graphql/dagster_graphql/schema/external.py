@@ -1,5 +1,5 @@
 import asyncio
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Optional
 
 import graphene
 from dagster import _check as check
@@ -21,7 +21,7 @@ from dagster._core.workspace.workspace import CodeLocationEntry, CodeLocationLoa
 from dagster.components.core.load_defs import PLUGIN_COMPONENT_TYPES_JSON_METADATA_KEY
 
 from dagster_graphql.implementation.fetch_solids import get_solid, get_solids
-from dagster_graphql.implementation.loader import RepositoryScopedBatchLoader, StaleStatusLoader
+from dagster_graphql.implementation.loader import RepositoryScopedBatchLoader
 from dagster_graphql.implementation.utils import capture_error
 from dagster_graphql.schema.asset_graph import GrapheneAssetGroup, GrapheneAssetNode
 from dagster_graphql.schema.env_vars import (
@@ -385,16 +385,9 @@ class GrapheneRepository(graphene.ObjectType):
     def resolve_assetNodes(self, graphene_info: ResolveInfo):
         remote_nodes = self.get_repository(graphene_info).asset_graph.asset_nodes
 
-        stale_status_loader = StaleStatusLoader(
-            instance=graphene_info.context.instance,
-            asset_graph=lambda: self.get_repository(graphene_info).asset_graph,
-            loading_context=graphene_info.context,
-        )
-
         return [
             GrapheneAssetNode(
                 remote_node=remote_node,
-                stale_status_loader=stale_status_loader,
             )
             for remote_node in remote_nodes
         ]
@@ -444,18 +437,15 @@ class GrapheneRepository(graphene.ObjectType):
         graphene_info: ResolveInfo,
     ) -> GrapheneLocationDocsJson:
         repository = self.get_repository(graphene_info)
-        plugin_docs_json = (
-            cast(
-                "list",
-                repository.repository_snap.metadata.get(
-                    PLUGIN_COMPONENT_TYPES_JSON_METADATA_KEY, [[]]
-                ),
-            )[0]
-            if repository.repository_snap.metadata
-            else []
-        )
+        value = []
+        if repository.repository_snap.metadata:
+            entry = repository.repository_snap.metadata.get(
+                PLUGIN_COMPONENT_TYPES_JSON_METADATA_KEY
+            )
+            if entry:
+                value = entry.value
 
-        return GrapheneLocationDocsJson(json=plugin_docs_json)
+        return GrapheneLocationDocsJson(json=value)
 
 
 class GrapheneRepositoryConnection(graphene.ObjectType):

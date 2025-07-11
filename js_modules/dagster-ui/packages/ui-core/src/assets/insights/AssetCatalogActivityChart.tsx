@@ -3,17 +3,27 @@ import {
   BodyLarge,
   BodySmall,
   Box,
+  Colors,
   Mono,
   Popover,
   Spinner,
   Subheading,
 } from '@dagster-io/ui-components';
+import clsx from 'clsx';
 import React from 'react';
 
 import styles from './AssetCatalogInsights.module.css';
+import {AssetCatalogMetricNames} from './AssetCatalogMetricUtils';
 import {TooltipCard} from '../../insights/InsightsChartShared';
 import {numberFormatter} from '../../ui/formatters';
 import {useFormatDateTime} from '../../ui/useFormatDateTime';
+
+type MetricsDialogData = {
+  after: number;
+  before: number;
+  metric: AssetCatalogMetricNames;
+  unit: string;
+};
 
 export type ActivityChartDayData = {
   date: number;
@@ -29,7 +39,19 @@ export type ActivityChartData = {
 };
 
 export const ActivityChart = React.memo(
-  ({metrics, unit, loading}: {metrics: ActivityChartData; unit: string; loading: boolean}) => {
+  ({
+    metrics,
+    unit,
+    loading,
+    openMetricDialog,
+    metric,
+  }: {
+    metrics: ActivityChartData;
+    unit: string;
+    loading: boolean;
+    openMetricDialog: ({before, after, metric, unit}: MetricsDialogData) => void;
+    metric: AssetCatalogMetricNames;
+  }) => {
     const {header, color, dataByDay, max, hoverColor} = metrics;
     return (
       <div className={styles.ActivityChartContainer}>
@@ -50,6 +72,8 @@ export const ActivityChart = React.memo(
               color={color}
               hoverColor={hoverColor}
               unit={unit}
+              onClick={openMetricDialog}
+              metric={metric}
             />
           ))}
           <div className={styles.ActivityChartRow}>
@@ -76,6 +100,8 @@ const ActivityChartRow = React.memo(
     color,
     unit,
     hoverColor,
+    onClick,
+    metric,
   }: {
     date: number;
     hourlyValues: Array<number | null>;
@@ -83,6 +109,8 @@ const ActivityChartRow = React.memo(
     color: string;
     hoverColor: string;
     unit: string;
+    onClick: (data: MetricsDialogData) => void;
+    metric: AssetCatalogMetricNames;
   }) => {
     const formatDate = useFormatDateTime();
     return (
@@ -107,13 +135,11 @@ const ActivityChartRow = React.memo(
                 targetTagName="div"
                 interactionKind="hover"
                 popoverClassName={styles.Popover}
+                placement="top"
                 content={
                   <TooltipCard>
-                    <Box
-                      flex={{direction: 'column', gap: 4}}
-                      padding={{vertical: 8, horizontal: 12}}
-                    >
-                      <Box border="bottom" padding={{bottom: 4}} margin={{bottom: 4}}>
+                    <Box flex={{direction: 'column'}}>
+                      <Box border="bottom" padding={{horizontal: 12, vertical: 8}}>
                         <Subheading>
                           {formatDate(new Date(date + index * 60 * 60 * 1000), {
                             month: 'short',
@@ -123,26 +149,44 @@ const ActivityChartRow = React.memo(
                           })}
                         </Subheading>
                       </Box>
-                      <Box flex={{direction: 'row', alignItems: 'center', gap: 4}}>
+                      <Box
+                        flex={{direction: 'row', alignItems: 'center', gap: 4}}
+                        padding={{horizontal: 12, vertical: 8}}
+                      >
                         <Mono>{numberFormatter.format(value)}</Mono>
-                        <Body>{unit}</Body>
+                        <Body color={Colors.textLight()}>{unit}</Body>
                       </Box>
+                      {value > 0 ? (
+                        <Box padding={{horizontal: 12, vertical: 8}} border="top">
+                          <Body color={Colors.textLight()}>Click to view details</Body>
+                        </Box>
+                      ) : null}
                     </Box>
                   </TooltipCard>
                 }
               >
-                <div className={styles.TileContainer}>
-                  <div className={styles.Tile} />
+                <div
+                  className={clsx(styles.TileContainer, opacity ? styles.clickable : null)}
+                  style={
+                    {
+                      '--tile-hover-color': hoverColor,
+                      '--tile-color': color,
+                    } as React.CSSProperties
+                  }
+                >
+                  <div className={styles.placeholderTile} />
                   {opacity ? (
-                    <div
-                      className={styles.Tile}
-                      style={
-                        {
-                          '--tile-color': color,
-                          '--tile-hover-color': hoverColor,
-                          opacity,
-                        } as React.CSSProperties
-                      }
+                    <button
+                      className={styles.tileButton}
+                      style={{opacity}}
+                      onClick={() => {
+                        onClick({
+                          before: date / 1000 + index * 60 * 60,
+                          after: date / 1000 + (index - 1) * 60 * 60,
+                          metric,
+                          unit,
+                        });
+                      }}
                     />
                   ) : null}
                 </div>

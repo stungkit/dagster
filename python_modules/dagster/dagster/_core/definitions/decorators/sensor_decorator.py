@@ -8,6 +8,7 @@ import dagster._check as check
 from dagster._core.definitions.asset_selection import AssetSelection, CoercibleToAssetSelection
 from dagster._core.definitions.asset_sensor_definition import AssetSensorDefinition
 from dagster._core.definitions.events import AssetKey
+from dagster._core.definitions.metadata import RawMetadataMapping
 from dagster._core.definitions.multi_asset_sensor_definition import (
     AssetMaterializationFunction,
     MultiAssetMaterializationFunction,
@@ -25,7 +26,7 @@ from dagster._core.definitions.target import ExecutableDefinition
 from dagster._core.errors import DagsterInvariantViolationError
 
 if TYPE_CHECKING:
-    from dagster._core.definitions.assets import AssetsDefinition
+    from dagster._core.definitions.assets.definition.assets_definition import AssetsDefinition
     from dagster._core.definitions.job_definition import JobDefinition
     from dagster._core.definitions.unresolved_asset_job_definition import (
         UnresolvedAssetJobDefinition,
@@ -44,7 +45,7 @@ def sensor(
     asset_selection: Optional[CoercibleToAssetSelection] = None,
     required_resource_keys: Optional[set[str]] = None,
     tags: Optional[Mapping[str, str]] = None,
-    metadata: Optional[Mapping[str, object]] = None,
+    metadata: Optional[RawMetadataMapping] = None,
     target: Optional[
         Union[
             "CoercibleToAssetSelection",
@@ -81,6 +82,7 @@ def sensor(
         asset_selection (Optional[Union[str, Sequence[str], Sequence[AssetKey], Sequence[Union[AssetsDefinition, SourceAsset]], AssetSelection]]):
             An asset selection to launch a run for if the sensor condition is met.
             This can be provided instead of specifying a job.
+        required_resource_keys (Optional[set[str]]): A set of resource keys that must be available on the context when the sensor evaluation function runs. Use this to specify resources your sensor function depends on.
         tags (Optional[Mapping[str, str]]): A set of key-value tags that annotate the sensor and can
             be used for searching and filtering in the UI.
         metadata (Optional[Mapping[str, object]]): A set of metadata entries that annotate the
@@ -131,7 +133,7 @@ def asset_sensor(
     default_status: DefaultSensorStatus = DefaultSensorStatus.STOPPED,
     required_resource_keys: Optional[set[str]] = None,
     tags: Optional[Mapping[str, str]] = None,
-    metadata: Optional[Mapping[str, object]] = None,
+    metadata: Optional[RawMetadataMapping] = None,
 ) -> Callable[
     [
         AssetMaterializationFunction,
@@ -260,7 +262,7 @@ def multi_asset_sensor(
     request_assets: Optional[AssetSelection] = None,
     required_resource_keys: Optional[set[str]] = None,
     tags: Optional[Mapping[str, str]] = None,
-    metadata: Optional[Mapping[str, object]] = None,
+    metadata: Optional[RawMetadataMapping] = None,
 ) -> Callable[
     [
         MultiAssetMaterializationFunction,

@@ -11,7 +11,7 @@ from dagster._core.asset_graph_view.entity_subset import EntitySubset
 from dagster._core.definitions.asset_daemon_cursor import AssetDaemonCursor
 from dagster._core.definitions.asset_key import AssetKey
 from dagster._core.definitions.asset_selection import AssetSelection
-from dagster._core.definitions.assets import AssetsDefinition
+from dagster._core.definitions.assets.definition.assets_definition import AssetsDefinition
 from dagster._core.definitions.declarative_automation.automation_condition import AutomationResult
 from dagster._core.definitions.declarative_automation.automation_condition_evaluator import (
     AutomationConditionEvaluator,
@@ -119,7 +119,7 @@ def evaluate_automation_conditions(
             AssetSelection.all(include_sources=True) | AssetSelection.all_asset_checks()
         )
 
-    asset_graph = defs.get_asset_graph()
+    asset_graph = defs.resolve_asset_graph()
 
     # round-trip the provided cursor to simulate actual usage
     cursor = (

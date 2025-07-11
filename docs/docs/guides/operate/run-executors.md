@@ -4,7 +4,7 @@ description: Executors are responsible for executing steps within a Dagster job 
 sidebar_position: 40
 ---
 
-Executors are responsible for executing steps within a job run. Once a run has launched and the process for the run (the [run worker](/guides/deploy/oss-deployment-architecture#job-execution-flow)) is allocated and started, the executor assumes responsibility for execution.
+Executors are responsible for executing steps within a job run. Once a run has launched and the process for the run (the [run worker](/deployment/oss/oss-deployment-architecture#job-execution-flow)) is allocated and started, the executor assumes responsibility for execution.
 
 Executors can range from single-process serial executors to managing per-step computational resources with a sophisticated control plane.
 
@@ -28,20 +28,20 @@ An executor can be specified directly on a job by supplying an <PyObject section
 
 <CodeExample
   path="docs_snippets/docs_snippets/deploying/executors/executors.py"
+  title="src/<project_name>/defs/jobs.py"
   startAfter="start_executor_on_job"
   endBefore="end_executor_on_job"
 />
 
 ### For a code location
 
-To specify a default executor for all jobs and assets provided to a code location, supply the `executor` argument to the <PyObject section="definitions" module="dagster" object="Definitions" /> object.
+To specify a default executor for all jobs and assets provided to a code location, create a file in your `/defs` folder that contains an `@definitions`-decorated function that returns a `Definitions` object with the executor specified.
 
 If a job explicitly specifies an executor, then that executor will be used. Otherwise, jobs that don't specify an executor will use the default provided to the code location:
 
 <CodeExample
-  path="docs_snippets/docs_snippets/deploying/executors/executors.py"
-  startAfter="start_executor_on_repo"
-  endBefore="end_executor_on_repo"
+  path="docs_snippets/docs_snippets/deploying/executors/code_location_executor.py"
+  title="src/<project_name>/defs/executor.py"
 />
 
 :::note

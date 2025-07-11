@@ -8,13 +8,13 @@ from dagster_shared.serdes import whitelist_for_serdes
 
 from dagster._annotations import deprecated
 from dagster._core.asset_graph_view.serializable_entity_subset import SerializableEntitySubset
+from dagster._core.definitions.assets.graph.base_asset_graph import sort_key_for_asset_partition
 from dagster._core.definitions.auto_materialize_rule import AutoMaterializeRule
 from dagster._core.definitions.auto_materialize_rule_evaluation import (
     AutoMaterializeDecisionType,
     ParentUpdatedRuleEvaluationData,
     WaitingOnAssetsRuleEvaluationData,
 )
-from dagster._core.definitions.base_asset_graph import sort_key_for_asset_partition
 from dagster._core.definitions.declarative_automation.legacy.valid_asset_subset import (
     ValidAssetSubset,
 )
@@ -22,12 +22,11 @@ from dagster._core.definitions.events import AssetKey, AssetKeyPartitionKey
 from dagster._core.definitions.freshness_based_auto_materialize import (
     freshness_evaluation_results_for_asset_key,
 )
-from dagster._core.definitions.multi_dimensional_partitions import MultiPartitionsDefinition
-from dagster._core.definitions.time_window_partitions import (
-    TimeWindow,
+from dagster._core.definitions.partitions.definition import (
+    MultiPartitionsDefinition,
     TimeWindowPartitionsDefinition,
-    get_time_partitions_def,
 )
+from dagster._core.definitions.partitions.utils import TimeWindow, get_time_partitions_def
 from dagster._core.errors import DagsterInvariantViolationError
 from dagster._core.event_api import AssetRecordsFilter
 from dagster._core.storage.dagster_run import IN_PROGRESS_RUN_STATUSES, RunsFilter

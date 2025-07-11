@@ -14,6 +14,13 @@ import Beta from '@site/docs/partials/\_Beta.md';
 
 <Beta />
 
+:::note
+
+If you are just getting started with the Airbyte Cloud integration, we recommend using the new [Airbyte Cloud component](/guides/build/components/integrations/airbyte-cloud-component-tutorial).
+
+:::
+
+
 This guide provides instructions for using Dagster with Airbyte Cloud using the `dagster-airbyte` library. Your Airbyte Cloud connection tables can be represented as assets in the Dagster asset graph, allowing you to track lineage and dependencies between Airbyte Cloud assets and data assets you are already modeling in Dagster. You can also use Dagster to orchestrate Airbyte Cloud connections, allowing you to trigger syncs for these on a cadence or based on upstream data changes.
 
 ## What you'll learn
@@ -105,7 +112,6 @@ By default, Dagster does not set upstream dependencies when generating asset spe
 Note that `super()` is called in each of the overridden methods to generate the default asset spec. It is best practice to generate the default asset spec before customizing it.
 
 You can pass an instance of the custom <PyObject section="libraries" module="dagster_airbyte" object="DagsterAirbyteTranslator" /> to the <PyObject section="libraries" module="dagster_airbyte" object="airbyte_assets" /> decorator or the <PyObject section="libraries" module="dagster_airbyte" object="build_airbyte_assets_definitions" /> factory.
-
 
 ### Define downstream dependencies
 

@@ -2,6 +2,7 @@ import memoize from 'lodash/memoize';
 import LRU from 'lru-cache';
 
 import {timeByParts} from './timeByParts';
+import {hashObject} from '../util/hashObject';
 import {cache} from '../util/idb-lru-cache';
 import {weakMapMemoize} from '../util/weakMapMemoize';
 
@@ -147,10 +148,11 @@ export function asyncMemoize<T, R, U extends (arg: T, ...rest: any[]) => Promise
 
 export const indexedDBAsyncMemoize = <R, U extends (...args: any[]) => Promise<R>>(
   fn: U,
+  key: string,
   hashFn?: (...args: Parameters<U>) => any,
-  key?: string,
 ): U & {
   isCached: (...args: Parameters<U>) => Promise<boolean>;
+  clearEntry: (...args: Parameters<U>) => Promise<void>;
 } => {
   let lru: ReturnType<typeof cache<R>> | undefined;
   try {
@@ -162,20 +164,9 @@ export const indexedDBAsyncMemoize = <R, U extends (...args: any[]) => Promise<R
 
   const hashToPromise: Record<string, Promise<R>> = {};
 
-  const genHashKey = async (...args: Parameters<U>) => {
-    const hash = hashFn ? hashFn(...args) : args;
-
-    const encoder = new TextEncoder();
-    // Crypto.subtle isn't defined in insecure contexts... fallback to using the full string as a key
-    // https://stackoverflow.com/questions/46468104/how-to-use-subtlecrypto-in-chrome-window-crypto-subtle-is-undefined
-    if (crypto.subtle?.digest) {
-      const data = encoder.encode(hash.toString());
-      const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer)); // convert buffer to byte array
-      return hashArray.map((b) => b.toString(16).padStart(2, '0')).join(''); // convert bytes to hex string
-    }
-    return hash.toString();
-  };
+  const genHashKey = weakMapMemoize(async (...args: Parameters<U>) => {
+    return hashFn ? hashFn(...args) : hashObject(args);
+  });
 
   const ret = weakMapMemoize(async (...args: Parameters<U>) => {
     return new Promise<R>(async (resolve, reject) => {
@@ -200,6 +191,7 @@ export const indexedDBAsyncMemoize = <R, U extends (...args: any[]) => Promise<R
               delete hashToPromise[hashKey];
             }
           } catch (e) {
+            delete hashToPromise[hashKey];
             rej(e);
           }
         });
@@ -208,6 +200,7 @@ export const indexedDBAsyncMemoize = <R, U extends (...args: any[]) => Promise<R
         const result = await hashToPromise[hashKey]!;
         resolve(result);
       } catch (e) {
+        delete hashToPromise[hashKey];
         reject(e);
       }
     });
@@ -218,6 +211,14 @@ export const indexedDBAsyncMemoize = <R, U extends (...args: any[]) => Promise<R
       return false;
     }
     return await lru.has(hashKey);
+  };
+  ret.clearEntry = async (...args: Parameters<U>) => {
+    if (!lru) {
+      return;
+    }
+    const hashKey = await genHashKey(...args);
+    delete hashToPromise[hashKey];
+    await lru.delete(hashKey);
   };
   return ret;
 };

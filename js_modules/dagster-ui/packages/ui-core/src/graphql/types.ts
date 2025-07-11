@@ -101,7 +101,7 @@ export type ArrayConfigType = ConfigType &
 export type Asset = {
   __typename: 'Asset';
   assetEventHistory: AssetResultEventHistoryConnection;
-  assetMaterializationHistory: MaterializationHistoryConnection;
+  assetHealth: Maybe<AssetHealth>;
   assetMaterializations: Array<MaterializationEvent>;
   assetObservations: Array<ObservationEvent>;
   definition: Maybe<AssetNode>;
@@ -116,17 +116,6 @@ export type AssetAssetEventHistoryArgs = {
   cursor?: InputMaybe<Scalars['String']['input']>;
   eventTypeSelectors: Array<AssetEventHistoryEventTypeSelector>;
   limit: Scalars['Int']['input'];
-  partitionInLast?: InputMaybe<Scalars['Int']['input']>;
-  partitions?: InputMaybe<Array<Scalars['String']['input']>>;
-};
-
-export type AssetAssetMaterializationHistoryArgs = {
-  afterTimestampMillis?: InputMaybe<Scalars['String']['input']>;
-  beforeTimestampMillis?: InputMaybe<Scalars['String']['input']>;
-  cursor?: InputMaybe<Scalars['String']['input']>;
-  eventTypeSelector?: InputMaybe<MaterializationHistoryEventTypeSelector>;
-  limit?: InputMaybe<Scalars['Int']['input']>;
-  partitionInLast?: InputMaybe<Scalars['Int']['input']>;
   partitions?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
@@ -134,7 +123,6 @@ export type AssetAssetMaterializationsArgs = {
   afterTimestampMillis?: InputMaybe<Scalars['String']['input']>;
   beforeTimestampMillis?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
-  partitionInLast?: InputMaybe<Scalars['Int']['input']>;
   partitions?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
@@ -142,7 +130,6 @@ export type AssetAssetObservationsArgs = {
   afterTimestampMillis?: InputMaybe<Scalars['String']['input']>;
   beforeTimestampMillis?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
-  partitionInLast?: InputMaybe<Scalars['Int']['input']>;
   partitions?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
@@ -493,8 +480,6 @@ export type AssetLineageInfo = {
   partitions: Array<Scalars['String']['output']>;
 };
 
-export type AssetMaterializationEventType = FailedToMaterializeEvent | MaterializationEvent;
-
 export enum AssetMaterializationFailureReason {
   FAILED_TO_MATERIALIZE = 'FAILED_TO_MATERIALIZE',
   RUN_TERMINATED = 'RUN_TERMINATED',
@@ -532,7 +517,6 @@ export type AssetMetadataEntry = MetadataEntry & {
 export type AssetNode = {
   __typename: 'AssetNode';
   assetChecksOrError: AssetChecksOrError;
-  assetHealth: Maybe<AssetHealth>;
   assetKey: AssetKey;
   assetMaterializationUsedData: Array<MaterializationUpstreamDataVersion>;
   assetMaterializations: Array<MaterializationEvent>;
@@ -554,6 +538,7 @@ export type AssetNode = {
   description: Maybe<Scalars['String']['output']>;
   freshnessInfo: Maybe<AssetFreshnessInfo>;
   freshnessPolicy: Maybe<FreshnessPolicy>;
+  freshnessStatusInfo: Maybe<FreshnessStatusInfo>;
   graphName: Maybe<Scalars['String']['output']>;
   groupName: Scalars['String']['output'];
   hasAssetChecks: Scalars['Boolean']['output'];
@@ -1079,6 +1064,13 @@ export type ConflictingExecutionParamsError = Error & {
   message: Scalars['String']['output'];
 };
 
+export type CronFreshnessPolicy = {
+  __typename: 'CronFreshnessPolicy';
+  deadlineCron: Scalars['String']['output'];
+  lowerBoundDeltaSeconds: Scalars['Int']['output'];
+  timezone: Scalars['String']['output'];
+};
+
 export type DaemonHealth = {
   __typename: 'DaemonHealth';
   allDaemonStatuses: Array<DaemonStatus>;
@@ -1107,10 +1099,12 @@ export enum DagsterEventType {
   ASSET_CHECK_EVALUATION = 'ASSET_CHECK_EVALUATION',
   ASSET_CHECK_EVALUATION_PLANNED = 'ASSET_CHECK_EVALUATION_PLANNED',
   ASSET_FAILED_TO_MATERIALIZE = 'ASSET_FAILED_TO_MATERIALIZE',
+  ASSET_HEALTH_CHANGED = 'ASSET_HEALTH_CHANGED',
   ASSET_MATERIALIZATION = 'ASSET_MATERIALIZATION',
   ASSET_MATERIALIZATION_PLANNED = 'ASSET_MATERIALIZATION_PLANNED',
   ASSET_OBSERVATION = 'ASSET_OBSERVATION',
   ASSET_STORE_OPERATION = 'ASSET_STORE_OPERATION',
+  ASSET_WIPED = 'ASSET_WIPED',
   ENGINE_EVENT = 'ENGINE_EVENT',
   FRESHNESS_STATE_CHANGE = 'FRESHNESS_STATE_CHANGE',
   FRESHNESS_STATE_EVALUATION = 'FRESHNESS_STATE_EVALUATION',
@@ -1177,6 +1171,7 @@ export type DagsterRunEvent =
   | ExecutionStepUpForRetryEvent
   | FailedToMaterializeEvent
   | HandledOutputEvent
+  | HealthChangedEvent
   | HookCompletedEvent
   | HookErroredEvent
   | HookSkippedEvent
@@ -1883,6 +1878,12 @@ export type FreshnessPolicy = {
   maximumLagMinutes: Scalars['Float']['output'];
 };
 
+export type FreshnessStatusInfo = {
+  __typename: 'FreshnessStatusInfo';
+  freshnessStatus: AssetHealthStatus;
+  freshnessStatusMetadata: Maybe<AssetHealthFreshnessMeta>;
+};
+
 export type Graph = SolidContainer & {
   __typename: 'Graph';
   description: Maybe<Scalars['String']['output']>;
@@ -1954,6 +1955,48 @@ export type HandledOutputEvent = DisplayableEvent &
     runId: Scalars['String']['output'];
     solidHandleID: Maybe<Scalars['String']['output']>;
     stepKey: Maybe<Scalars['String']['output']>;
+    timestamp: Scalars['String']['output'];
+  };
+
+export type HealthChangedEvent = DisplayableEvent &
+  MessageEvent &
+  StepEvent & {
+    __typename: 'HealthChangedEvent';
+    assetKey: Maybe<AssetKey>;
+    description: Maybe<Scalars['String']['output']>;
+    eventType: Maybe<DagsterEventType>;
+    label: Maybe<Scalars['String']['output']>;
+    level: LogLevel;
+    message: Scalars['String']['output'];
+    metadataEntries: Array<
+      | AssetMetadataEntry
+      | BoolMetadataEntry
+      | CodeReferencesMetadataEntry
+      | FloatMetadataEntry
+      | IntMetadataEntry
+      | JobMetadataEntry
+      | JsonMetadataEntry
+      | MarkdownMetadataEntry
+      | NotebookMetadataEntry
+      | NullMetadataEntry
+      | PathMetadataEntry
+      | PipelineRunMetadataEntry
+      | PoolMetadataEntry
+      | PythonArtifactMetadataEntry
+      | TableColumnLineageMetadataEntry
+      | TableMetadataEntry
+      | TableSchemaMetadataEntry
+      | TextMetadataEntry
+      | TimestampMetadataEntry
+      | UrlMetadataEntry
+    >;
+    partition: Maybe<Scalars['String']['output']>;
+    runId: Scalars['String']['output'];
+    runOrError: RunOrError;
+    solidHandleID: Maybe<Scalars['String']['output']>;
+    stepKey: Maybe<Scalars['String']['output']>;
+    stepStats: RunStepStats;
+    tags: Array<EventTag>;
     timestamp: Scalars['String']['output'];
   };
 
@@ -2112,6 +2155,7 @@ export type Instance = {
   concurrencyLimits: Array<ConcurrencyKeyInfo>;
   daemonHealth: DaemonHealth;
   executablePath: Scalars['String']['output'];
+  freshnessEvaluationEnabled: Scalars['Boolean']['output'];
   hasInfo: Scalars['Boolean']['output'];
   id: Scalars['String']['output'];
   info: Maybe<Scalars['String']['output']>;
@@ -2260,7 +2304,7 @@ export type IntMetadataEntry = MetadataEntry & {
   label: Scalars['String']['output'];
 };
 
-export type InternalFreshnessPolicy = TimeWindowFreshnessPolicy;
+export type InternalFreshnessPolicy = CronFreshnessPolicy | TimeWindowFreshnessPolicy;
 
 export type InvalidOutputError = {
   __typename: 'InvalidOutputError';
@@ -2782,18 +2826,6 @@ export type MaterializationEvent = DisplayableEvent &
     tags: Array<EventTag>;
     timestamp: Scalars['String']['output'];
   };
-
-export type MaterializationHistoryConnection = {
-  __typename: 'MaterializationHistoryConnection';
-  cursor: Scalars['String']['output'];
-  results: Array<AssetMaterializationEventType>;
-};
-
-export enum MaterializationHistoryEventTypeSelector {
-  ALL = 'ALL',
-  FAILED_TO_MATERIALIZE = 'FAILED_TO_MATERIALIZE',
-  MATERIALIZATION = 'MATERIALIZATION',
-}
 
 export type MaterializationUpstreamDataVersion = {
   __typename: 'MaterializationUpstreamDataVersion';
@@ -4154,6 +4186,7 @@ export type QueryAssetsLatestInfoArgs = {
 };
 
 export type QueryAssetsOrErrorArgs = {
+  assetKeys?: InputMaybe<Array<AssetKeyInput>>;
   cursor?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   prefix?: InputMaybe<Array<Scalars['String']['input']>>;
@@ -6248,12 +6281,12 @@ export const buildAsset = (
         : relationshipsToOmit.has('AssetResultEventHistoryConnection')
           ? ({} as AssetResultEventHistoryConnection)
           : buildAssetResultEventHistoryConnection({}, relationshipsToOmit),
-    assetMaterializationHistory:
-      overrides && overrides.hasOwnProperty('assetMaterializationHistory')
-        ? overrides.assetMaterializationHistory!
-        : relationshipsToOmit.has('MaterializationHistoryConnection')
-          ? ({} as MaterializationHistoryConnection)
-          : buildMaterializationHistoryConnection({}, relationshipsToOmit),
+    assetHealth:
+      overrides && overrides.hasOwnProperty('assetHealth')
+        ? overrides.assetHealth!
+        : relationshipsToOmit.has('AssetHealth')
+          ? ({} as AssetHealth)
+          : buildAssetHealth({}, relationshipsToOmit),
     assetMaterializations:
       overrides && overrides.hasOwnProperty('assetMaterializations')
         ? overrides.assetMaterializations!
@@ -7084,12 +7117,6 @@ export const buildAssetNode = (
         : relationshipsToOmit.has('AssetCheckNeedsAgentUpgradeError')
           ? ({} as AssetCheckNeedsAgentUpgradeError)
           : buildAssetCheckNeedsAgentUpgradeError({}, relationshipsToOmit),
-    assetHealth:
-      overrides && overrides.hasOwnProperty('assetHealth')
-        ? overrides.assetHealth!
-        : relationshipsToOmit.has('AssetHealth')
-          ? ({} as AssetHealth)
-          : buildAssetHealth({}, relationshipsToOmit),
     assetKey:
       overrides && overrides.hasOwnProperty('assetKey')
         ? overrides.assetKey!
@@ -7173,6 +7200,12 @@ export const buildAssetNode = (
         : relationshipsToOmit.has('FreshnessPolicy')
           ? ({} as FreshnessPolicy)
           : buildFreshnessPolicy({}, relationshipsToOmit),
+    freshnessStatusInfo:
+      overrides && overrides.hasOwnProperty('freshnessStatusInfo')
+        ? overrides.freshnessStatusInfo!
+        : relationshipsToOmit.has('FreshnessStatusInfo')
+          ? ({} as FreshnessStatusInfo)
+          : buildFreshnessStatusInfo({}, relationshipsToOmit),
     graphName: overrides && overrides.hasOwnProperty('graphName') ? overrides.graphName! : 'et',
     groupName:
       overrides && overrides.hasOwnProperty('groupName') ? overrides.groupName! : 'asperiores',
@@ -7193,9 +7226,9 @@ export const buildAssetNode = (
     internalFreshnessPolicy:
       overrides && overrides.hasOwnProperty('internalFreshnessPolicy')
         ? overrides.internalFreshnessPolicy!
-        : relationshipsToOmit.has('TimeWindowFreshnessPolicy')
-          ? ({} as TimeWindowFreshnessPolicy)
-          : buildTimeWindowFreshnessPolicy({}, relationshipsToOmit),
+        : relationshipsToOmit.has('CronFreshnessPolicy')
+          ? ({} as CronFreshnessPolicy)
+          : buildCronFreshnessPolicy({}, relationshipsToOmit),
     isAutoCreatedStub:
       overrides && overrides.hasOwnProperty('isAutoCreatedStub')
         ? overrides.isAutoCreatedStub!
@@ -8065,6 +8098,24 @@ export const buildConflictingExecutionParamsError = (
   return {
     __typename: 'ConflictingExecutionParamsError',
     message: overrides && overrides.hasOwnProperty('message') ? overrides.message! : 'pariatur',
+  };
+};
+
+export const buildCronFreshnessPolicy = (
+  overrides?: Partial<CronFreshnessPolicy>,
+  _relationshipsToOmit: Set<string> = new Set(),
+): {__typename: 'CronFreshnessPolicy'} & CronFreshnessPolicy => {
+  const relationshipsToOmit: Set<string> = new Set(_relationshipsToOmit);
+  relationshipsToOmit.add('CronFreshnessPolicy');
+  return {
+    __typename: 'CronFreshnessPolicy',
+    deadlineCron:
+      overrides && overrides.hasOwnProperty('deadlineCron') ? overrides.deadlineCron! : 'mollitia',
+    lowerBoundDeltaSeconds:
+      overrides && overrides.hasOwnProperty('lowerBoundDeltaSeconds')
+        ? overrides.lowerBoundDeltaSeconds!
+        : 1084,
+    timezone: overrides && overrides.hasOwnProperty('timezone') ? overrides.timezone! : 'vero',
   };
 };
 
@@ -9250,6 +9301,27 @@ export const buildFreshnessPolicy = (
   };
 };
 
+export const buildFreshnessStatusInfo = (
+  overrides?: Partial<FreshnessStatusInfo>,
+  _relationshipsToOmit: Set<string> = new Set(),
+): {__typename: 'FreshnessStatusInfo'} & FreshnessStatusInfo => {
+  const relationshipsToOmit: Set<string> = new Set(_relationshipsToOmit);
+  relationshipsToOmit.add('FreshnessStatusInfo');
+  return {
+    __typename: 'FreshnessStatusInfo',
+    freshnessStatus:
+      overrides && overrides.hasOwnProperty('freshnessStatus')
+        ? overrides.freshnessStatus!
+        : AssetHealthStatus.DEGRADED,
+    freshnessStatusMetadata:
+      overrides && overrides.hasOwnProperty('freshnessStatusMetadata')
+        ? overrides.freshnessStatusMetadata!
+        : relationshipsToOmit.has('AssetHealthFreshnessMeta')
+          ? ({} as AssetHealthFreshnessMeta)
+          : buildAssetHealthFreshnessMeta({}, relationshipsToOmit),
+  };
+};
+
 export const buildGraph = (
   overrides?: Partial<Graph>,
   _relationshipsToOmit: Set<string> = new Set(),
@@ -9344,6 +9416,55 @@ export const buildHandledOutputEvent = (
       overrides && overrides.hasOwnProperty('solidHandleID') ? overrides.solidHandleID! : 'dolor',
     stepKey: overrides && overrides.hasOwnProperty('stepKey') ? overrides.stepKey! : 'dolorum',
     timestamp: overrides && overrides.hasOwnProperty('timestamp') ? overrides.timestamp! : 'nisi',
+  };
+};
+
+export const buildHealthChangedEvent = (
+  overrides?: Partial<HealthChangedEvent>,
+  _relationshipsToOmit: Set<string> = new Set(),
+): {__typename: 'HealthChangedEvent'} & HealthChangedEvent => {
+  const relationshipsToOmit: Set<string> = new Set(_relationshipsToOmit);
+  relationshipsToOmit.add('HealthChangedEvent');
+  return {
+    __typename: 'HealthChangedEvent',
+    assetKey:
+      overrides && overrides.hasOwnProperty('assetKey')
+        ? overrides.assetKey!
+        : relationshipsToOmit.has('AssetKey')
+          ? ({} as AssetKey)
+          : buildAssetKey({}, relationshipsToOmit),
+    description:
+      overrides && overrides.hasOwnProperty('description') ? overrides.description! : 'quam',
+    eventType:
+      overrides && overrides.hasOwnProperty('eventType')
+        ? overrides.eventType!
+        : DagsterEventType.ALERT_FAILURE,
+    label: overrides && overrides.hasOwnProperty('label') ? overrides.label! : 'consequuntur',
+    level: overrides && overrides.hasOwnProperty('level') ? overrides.level! : LogLevel.CRITICAL,
+    message: overrides && overrides.hasOwnProperty('message') ? overrides.message! : 'tempora',
+    metadataEntries:
+      overrides && overrides.hasOwnProperty('metadataEntries') ? overrides.metadataEntries! : [],
+    partition: overrides && overrides.hasOwnProperty('partition') ? overrides.partition! : 'qui',
+    runId: overrides && overrides.hasOwnProperty('runId') ? overrides.runId! : 'et',
+    runOrError:
+      overrides && overrides.hasOwnProperty('runOrError')
+        ? overrides.runOrError!
+        : relationshipsToOmit.has('PythonError')
+          ? ({} as PythonError)
+          : buildPythonError({}, relationshipsToOmit),
+    solidHandleID:
+      overrides && overrides.hasOwnProperty('solidHandleID')
+        ? overrides.solidHandleID!
+        : 'repellendus',
+    stepKey: overrides && overrides.hasOwnProperty('stepKey') ? overrides.stepKey! : 'mollitia',
+    stepStats:
+      overrides && overrides.hasOwnProperty('stepStats')
+        ? overrides.stepStats!
+        : relationshipsToOmit.has('RunStepStats')
+          ? ({} as RunStepStats)
+          : buildRunStepStats({}, relationshipsToOmit),
+    tags: overrides && overrides.hasOwnProperty('tags') ? overrides.tags! : [],
+    timestamp: overrides && overrides.hasOwnProperty('timestamp') ? overrides.timestamp! : 'neque',
   };
 };
 
@@ -9599,6 +9720,10 @@ export const buildInstance = (
           : buildDaemonHealth({}, relationshipsToOmit),
     executablePath:
       overrides && overrides.hasOwnProperty('executablePath') ? overrides.executablePath! : 'fuga',
+    freshnessEvaluationEnabled:
+      overrides && overrides.hasOwnProperty('freshnessEvaluationEnabled')
+        ? overrides.freshnessEvaluationEnabled!
+        : true,
     hasInfo: overrides && overrides.hasOwnProperty('hasInfo') ? overrides.hasInfo! : true,
     id: overrides && overrides.hasOwnProperty('id') ? overrides.id! : 'deleniti',
     info: overrides && overrides.hasOwnProperty('info') ? overrides.info! : 'qui',
@@ -10726,19 +10851,6 @@ export const buildMaterializationEvent = (
           : buildRunStepStats({}, relationshipsToOmit),
     tags: overrides && overrides.hasOwnProperty('tags') ? overrides.tags! : [],
     timestamp: overrides && overrides.hasOwnProperty('timestamp') ? overrides.timestamp! : 'id',
-  };
-};
-
-export const buildMaterializationHistoryConnection = (
-  overrides?: Partial<MaterializationHistoryConnection>,
-  _relationshipsToOmit: Set<string> = new Set(),
-): {__typename: 'MaterializationHistoryConnection'} & MaterializationHistoryConnection => {
-  const relationshipsToOmit: Set<string> = new Set(_relationshipsToOmit);
-  relationshipsToOmit.add('MaterializationHistoryConnection');
-  return {
-    __typename: 'MaterializationHistoryConnection',
-    cursor: overrides && overrides.hasOwnProperty('cursor') ? overrides.cursor! : 'omnis',
-    results: overrides && overrides.hasOwnProperty('results') ? overrides.results! : [],
   };
 };
 

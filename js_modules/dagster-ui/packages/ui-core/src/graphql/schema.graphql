@@ -50,6 +50,8 @@ enum DagsterEventType {
   STEP_EXPECTATION_RESULT
   ASSET_CHECK_EVALUATION_PLANNED
   ASSET_CHECK_EVALUATION
+  ASSET_HEALTH_CHANGED
+  ASSET_WIPED
   RUN_ENQUEUED
   RUN_DEQUEUED
   RUN_STARTING
@@ -606,30 +608,18 @@ type Asset {
   key: AssetKey!
   assetMaterializations(
     partitions: [String!]
-    partitionInLast: Int
     beforeTimestampMillis: String
     afterTimestampMillis: String
     limit: Int
   ): [MaterializationEvent!]!
   assetObservations(
     partitions: [String!]
-    partitionInLast: Int
     beforeTimestampMillis: String
     afterTimestampMillis: String
     limit: Int
   ): [ObservationEvent!]!
-  assetMaterializationHistory(
-    partitions: [String!]
-    partitionInLast: Int
-    beforeTimestampMillis: String
-    afterTimestampMillis: String
-    limit: Int
-    eventTypeSelector: MaterializationHistoryEventTypeSelector
-    cursor: String
-  ): MaterializationHistoryConnection!
   assetEventHistory(
     partitions: [String!]
-    partitionInLast: Int
     beforeTimestampMillis: String
     afterTimestampMillis: String
     limit: Int!
@@ -638,14 +628,15 @@ type Asset {
   ): AssetResultEventHistoryConnection!
   definition: AssetNode
   latestEventSortKey: ID
+  assetHealth: AssetHealth
 }
 
-type MaterializationHistoryConnection {
-  results: [AssetMaterializationEventType!]!
+type AssetResultEventHistoryConnection {
+  results: [AssetResultEventType!]!
   cursor: String!
 }
 
-union AssetMaterializationEventType = FailedToMaterializeEvent | MaterializationEvent
+union AssetResultEventType = FailedToMaterializeEvent | MaterializationEvent | ObservationEvent
 
 type FailedToMaterializeEvent implements MessageEvent & StepEvent & DisplayableEvent {
   runId: String!
@@ -679,19 +670,6 @@ enum AssetMaterializationFailureType {
   SKIPPED
 }
 
-enum MaterializationHistoryEventTypeSelector {
-  MATERIALIZATION
-  FAILED_TO_MATERIALIZE
-  ALL
-}
-
-type AssetResultEventHistoryConnection {
-  results: [AssetResultEventType!]!
-  cursor: String!
-}
-
-union AssetResultEventType = FailedToMaterializeEvent | MaterializationEvent | ObservationEvent
-
 enum AssetEventHistoryEventTypeSelector {
   MATERIALIZATION
   FAILED_TO_MATERIALIZE
@@ -699,7 +677,6 @@ enum AssetEventHistoryEventTypeSelector {
 }
 
 type AssetNode {
-  assetHealth: AssetHealth
   assetKey: AssetKey!
   assetMaterializations(
     partitions: [String!]
@@ -728,6 +705,7 @@ type AssetNode {
   description: String
   freshnessInfo: AssetFreshnessInfo
   freshnessPolicy: FreshnessPolicy
+  freshnessStatusInfo: FreshnessStatusInfo
   internalFreshnessPolicy: InternalFreshnessPolicy
   autoMaterializePolicy: AutoMaterializePolicy
   automationCondition: AutomationCondition
@@ -771,69 +749,6 @@ type AssetNode {
   assetChecksOrError(limit: Int, pipeline: PipelineSelector): AssetChecksOrError!
   currentAutoMaterializeEvaluationId: ID
   targetingInstigators: [Instigator!]!
-}
-
-type AssetHealth {
-  assetHealth: AssetHealthStatus!
-  materializationStatus: AssetHealthStatus!
-  materializationStatusMetadata: AssetHealthMaterializationMeta
-  assetChecksStatus: AssetHealthStatus!
-  assetChecksStatusMetadata: AssetHealthCheckMeta
-  freshnessStatus: AssetHealthStatus!
-  freshnessStatusMetadata: AssetHealthFreshnessMeta
-}
-
-enum AssetHealthStatus {
-  HEALTHY
-  WARNING
-  DEGRADED
-  UNKNOWN
-  NOT_APPLICABLE
-}
-
-union AssetHealthMaterializationMeta =
-  | AssetHealthMaterializationDegradedPartitionedMeta
-  | AssetHealthMaterializationHealthyPartitionedMeta
-  | AssetHealthMaterializationDegradedNotPartitionedMeta
-
-type AssetHealthMaterializationDegradedPartitionedMeta {
-  numFailedPartitions: Int!
-  numMissingPartitions: Int!
-  totalNumPartitions: Int!
-}
-
-type AssetHealthMaterializationHealthyPartitionedMeta {
-  numMissingPartitions: Int!
-  totalNumPartitions: Int!
-}
-
-type AssetHealthMaterializationDegradedNotPartitionedMeta {
-  failedRunId: String!
-}
-
-union AssetHealthCheckMeta =
-  | AssetHealthCheckDegradedMeta
-  | AssetHealthCheckWarningMeta
-  | AssetHealthCheckUnknownMeta
-
-type AssetHealthCheckDegradedMeta {
-  numFailedChecks: Int!
-  numWarningChecks: Int!
-  totalNumChecks: Int!
-}
-
-type AssetHealthCheckWarningMeta {
-  numWarningChecks: Int!
-  totalNumChecks: Int!
-}
-
-type AssetHealthCheckUnknownMeta {
-  numNotExecutedChecks: Int!
-  totalNumChecks: Int!
-}
-
-type AssetHealthFreshnessMeta {
-  lastMaterializedTimestamp: Float
 }
 
 type MaterializationUpstreamDataVersion {
@@ -949,11 +864,34 @@ type FreshnessPolicy {
   lastEvaluationTimestamp: String
 }
 
-union InternalFreshnessPolicy = TimeWindowFreshnessPolicy
+type FreshnessStatusInfo {
+  freshnessStatus: AssetHealthStatus!
+  freshnessStatusMetadata: AssetHealthFreshnessMeta
+}
+
+enum AssetHealthStatus {
+  HEALTHY
+  WARNING
+  DEGRADED
+  UNKNOWN
+  NOT_APPLICABLE
+}
+
+type AssetHealthFreshnessMeta {
+  lastMaterializedTimestamp: Float
+}
+
+union InternalFreshnessPolicy = TimeWindowFreshnessPolicy | CronFreshnessPolicy
 
 type TimeWindowFreshnessPolicy {
   failWindowSeconds: Int!
   warnWindowSeconds: Int
+}
+
+type CronFreshnessPolicy {
+  deadlineCron: String!
+  lowerBoundDeltaSeconds: Int!
+  timezone: String!
 }
 
 type AutoMaterializePolicy {
@@ -1175,6 +1113,57 @@ type AssetCheckNeedsAgentUpgradeError implements Error {
 }
 
 union Instigator = Schedule | Sensor
+
+type AssetHealth {
+  assetHealth: AssetHealthStatus!
+  materializationStatus: AssetHealthStatus!
+  materializationStatusMetadata: AssetHealthMaterializationMeta
+  assetChecksStatus: AssetHealthStatus!
+  assetChecksStatusMetadata: AssetHealthCheckMeta
+  freshnessStatus: AssetHealthStatus!
+  freshnessStatusMetadata: AssetHealthFreshnessMeta
+}
+
+union AssetHealthMaterializationMeta =
+  | AssetHealthMaterializationDegradedPartitionedMeta
+  | AssetHealthMaterializationHealthyPartitionedMeta
+  | AssetHealthMaterializationDegradedNotPartitionedMeta
+
+type AssetHealthMaterializationDegradedPartitionedMeta {
+  numFailedPartitions: Int!
+  numMissingPartitions: Int!
+  totalNumPartitions: Int!
+}
+
+type AssetHealthMaterializationHealthyPartitionedMeta {
+  numMissingPartitions: Int!
+  totalNumPartitions: Int!
+}
+
+type AssetHealthMaterializationDegradedNotPartitionedMeta {
+  failedRunId: String!
+}
+
+union AssetHealthCheckMeta =
+  | AssetHealthCheckDegradedMeta
+  | AssetHealthCheckWarningMeta
+  | AssetHealthCheckUnknownMeta
+
+type AssetHealthCheckDegradedMeta {
+  numFailedChecks: Int!
+  numWarningChecks: Int!
+  totalNumChecks: Int!
+}
+
+type AssetHealthCheckWarningMeta {
+  numWarningChecks: Int!
+  totalNumChecks: Int!
+}
+
+type AssetHealthCheckUnknownMeta {
+  numNotExecutedChecks: Int!
+  totalNumChecks: Int!
+}
 
 enum EvaluationErrorReason {
   RUNTIME_TYPE_MISMATCH
@@ -1407,6 +1396,7 @@ union DagsterRunEvent =
   | ExecutionStepSuccessEvent
   | ExecutionStepUpForRetryEvent
   | ExecutionStepRestartEvent
+  | HealthChangedEvent
   | LogMessageEvent
   | ResourceInitFailureEvent
   | ResourceInitStartedEvent
@@ -1439,6 +1429,24 @@ union DagsterRunEvent =
   | AssetMaterializationPlannedEvent
   | AssetCheckEvaluationPlannedEvent
   | AssetCheckEvaluationEvent
+
+type HealthChangedEvent implements MessageEvent & StepEvent & DisplayableEvent {
+  runId: String!
+  message: String!
+  timestamp: String!
+  level: LogLevel!
+  stepKey: String
+  solidHandleID: String
+  eventType: DagsterEventType
+  label: String
+  description: String
+  metadataEntries: [MetadataEntry!]!
+  assetKey: AssetKey
+  runOrError: RunOrError!
+  stepStats: RunStepStats!
+  partition: String
+  tags: [EventTag!]!
+}
 
 type LogsCapturedEvent implements MessageEvent {
   runId: String!
@@ -2713,6 +2721,7 @@ type Instance {
   concurrencyLimit(concurrencyKey: String): ConcurrencyKeyInfo!
   useAutoMaterializeSensors: Boolean!
   poolConfig: PoolConfig
+  freshnessEvaluationEnabled: Boolean!
 }
 
 type RunQueueConfig {
@@ -3585,7 +3594,12 @@ type Query {
   ): ExecutionPlanOrError!
   runConfigSchemaOrError(selector: PipelineSelector!, mode: String): RunConfigSchemaOrError!
   instance: Instance!
-  assetsOrError(prefix: [String!], cursor: String, limit: Int): AssetsOrError!
+  assetsOrError(
+    prefix: [String!]
+    assetKeys: [AssetKeyInput!]
+    cursor: String
+    limit: Int
+  ): AssetsOrError!
   assetRecordsOrError(prefix: [String!], cursor: String, limit: Int): AssetRecordsOrError!
   assetOrError(assetKey: AssetKeyInput!): AssetOrError!
   assetNodes(

@@ -1,10 +1,10 @@
 // eslint-disable-next-line no-restricted-imports
 import {BreadcrumbProps, Breadcrumbs} from '@blueprintjs/core';
-import {Box, Colors, Heading, Icon, MiddleTruncate, PageHeader} from '@dagster-io/ui-components';
+import {Box, Colors, Icon, MiddleTruncate, PageHeader, Subtitle1} from '@dagster-io/ui-components';
 import * as React from 'react';
 import {useContext} from 'react';
 import {Link, useHistory, useLocation} from 'react-router-dom';
-import {FeatureFlag} from 'shared/app/FeatureFlags.oss';
+import {observeEnabled} from 'shared/app/observeEnabled.oss';
 import {
   getAssetSelectionQueryString,
   useAssetSelectionState,
@@ -13,7 +13,6 @@ import styled from 'styled-components';
 
 import {globalAssetGraphPathToString} from './globalAssetGraphPathToString';
 import {AppContext} from '../app/AppContext';
-import {featureEnabled} from '../app/Flags';
 import {AnchorButton} from '../ui/AnchorButton';
 import {CopyIconButton} from '../ui/CopyButton';
 
@@ -39,14 +38,14 @@ export const AssetPageHeader = ({
   const copyableString = assetKey.path.join('/');
 
   const location = useLocation();
-  const filterStateQueryString = getAssetSelectionQueryString(location.search);
+  const assetSelection = getAssetSelectionQueryString(location.search);
 
   const breadcrumbs = React.useMemo(() => {
     const keyPathItems: BreadcrumbProps[] = [];
     assetKey.path.reduce((accum: string, elem: string) => {
       const nextAccum = `${accum ? `${accum}/` : ''}${encodeURIComponent(elem)}`;
       let href = `/assets/${nextAccum}?view=folder`;
-      if (featureEnabled(FeatureFlag.flagUseNewObserveUIs)) {
+      if (observeEnabled()) {
         href = `/assets?asset-selection=key:"${nextAccum}/*"`;
       }
       keyPathItems.push({text: elem, href});
@@ -59,24 +58,32 @@ export const AssetPageHeader = ({
     // and we can then remove the basePath for individual rendered breadcrumbs, which we are
     // able to control.
     const headerItems = headerBreadcrumbs.map((item) => {
+      const url = new URL(item.href ?? '', window.location.origin);
+      if (assetSelection) {
+        url.searchParams.set('asset-selection', assetSelection);
+      }
       return {
         ...item,
         href: item.href
-          ? history.createHref({pathname: item.href, search: filterStateQueryString})
+          ? history.createHref({pathname: url.pathname, search: url.search})
           : undefined,
       };
     });
 
     // Attach the filter state querystring to key path items.
     const keyPathItemsWithSearch = keyPathItems.map((item) => {
+      const url = new URL(item.href ?? '', window.location.origin);
+      if (assetSelection) {
+        url.searchParams.set('asset-selection', assetSelection);
+      }
       return {
         ...item,
-        href: history.createHref({pathname: item.href, search: filterStateQueryString}),
+        href: history.createHref({pathname: url.pathname, search: url.search}),
       };
     });
 
     return [...headerItems, ...keyPathItemsWithSearch];
-  }, [assetKey.path, headerBreadcrumbs, filterStateQueryString, history]);
+  }, [assetKey.path, headerBreadcrumbs, assetSelection, history]);
 
   return (
     <PageHeader
@@ -120,7 +127,7 @@ export const AssetPageHeader = ({
   );
 };
 
-const TruncatedHeading = styled(Heading)`
+const TruncatedHeading = styled(Subtitle1)`
   max-width: 300px;
   overflow: hidden;
 `;

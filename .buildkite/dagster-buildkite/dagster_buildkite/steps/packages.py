@@ -240,13 +240,18 @@ EXAMPLE_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         # snippets in all python versions since we are testing the core code exercised by the
         # snippets against all supported python versions.
         unsupported_python_versions=AvailablePythonVersion.get_all_except_default(),
-        pytest_tox_factors=["all", "integrations", "docs_snapshot_test"],
+        pytest_tox_factors=[
+            "all",
+            "integrations",
+            "docs_snapshot_test",
+        ],
         always_run_if=has_dg_changes,
     ),
     PackageSpec(
         "examples/project_fully_featured",
         unsupported_python_versions=[
             AvailablePythonVersion.V3_12,  # duckdb
+            AvailablePythonVersion.V3_13,  # duckdb
         ],
     ),
     PackageSpec(
@@ -266,6 +271,7 @@ EXAMPLE_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         unsupported_python_versions=[
             # dagster-wandb dep
             AvailablePythonVersion.V3_12,
+            AvailablePythonVersion.V3_13,
         ],
     ),
     # The 6 tutorials referenced in cloud onboarding cant test "source" due to dagster-cloud dep
@@ -278,17 +284,23 @@ EXAMPLE_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         pytest_tox_factors=["pypi"],
         unsupported_python_versions=[
             AvailablePythonVersion.V3_12,  # duckdb
+            AvailablePythonVersion.V3_13,  # duckdb
         ],
     ),
     PackageSpec(
         "examples/assets_dynamic_partitions",
         unsupported_python_versions=[
             AvailablePythonVersion.V3_12,  # duckdb
+            AvailablePythonVersion.V3_13,  # duckdb
         ],
     ),
     PackageSpec(
         "examples/quickstart_aws",
         pytest_tox_factors=["pypi"],
+        # TODO - re-enable once new version of `dagster-cloud` is available on pypi
+        unsupported_python_versions=[
+            AvailablePythonVersion.V3_13,
+        ],
     ),
     PackageSpec(
         "examples/quickstart_etl",
@@ -316,6 +328,7 @@ EXAMPLE_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         unsupported_python_versions=[
             # airflow
             AvailablePythonVersion.V3_12,
+            AvailablePythonVersion.V3_13,
         ],
     ),
     PackageSpec(
@@ -324,6 +337,7 @@ EXAMPLE_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         unsupported_python_versions=[
             # airflow
             AvailablePythonVersion.V3_12,
+            AvailablePythonVersion.V3_13,
         ],
     ),
 ]
@@ -333,7 +347,11 @@ def _unsupported_dagster_python_versions(
     tox_factor: Optional[str],
 ) -> List[AvailablePythonVersion]:
     if tox_factor == "general_tests_old_protobuf":
-        return [AvailablePythonVersion.V3_11, AvailablePythonVersion.V3_12]
+        return [
+            AvailablePythonVersion.V3_11,
+            AvailablePythonVersion.V3_12,
+            AvailablePythonVersion.V3_13,
+        ]
 
     if tox_factor in {
         "type_signature_tests",
@@ -445,15 +463,22 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         unsupported_python_versions=[
             # dagster-airflow
             AvailablePythonVersion.V3_12,
+            AvailablePythonVersion.V3_13,
         ],
     ),
     PackageSpec(
         "python_modules/libraries/dagster-dbt",
         pytest_tox_factors=[
             f"{deps_factor}-{command_factor}"
-            for deps_factor in ["dbt17", "dbt18", "dbt19"]
+            for deps_factor in ["dbt17", "dbt18", "dbt19", "dbt110"]
             for command_factor in ["cloud", "core-main", "core-derived-metadata"]
         ],
+        # dbt-core 1.7's protobuf<5 constraint conflicts with the grpc requirement for Python 3.13
+        unsupported_python_versions=(
+            lambda tox_factor: [AvailablePythonVersion.V3_13]
+            if tox_factor and tox_factor.startswith("dbt17")
+            else []
+        ),
     ),
     PackageSpec(
         "python_modules/libraries/dagster-snowflake",
@@ -464,6 +489,12 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         unsupported_python_versions=[
             # airflow
             AvailablePythonVersion.V3_12,
+            AvailablePythonVersion.V3_13,
+        ],
+        env_vars=[
+            "AIRLIFT_MWAA_TEST_ENV_NAME",
+            "AIRLIFT_MWAA_TEST_PROFILE",
+            "AIRLIFT_MWAA_TEST_REGION",
         ],
     ),
     PackageSpec(
@@ -477,6 +508,7 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
             AvailablePythonVersion.V3_10,
             AvailablePythonVersion.V3_11,
             AvailablePythonVersion.V3_12,
+            AvailablePythonVersion.V3_13,
         ],
         env_vars=[
             "AIRFLOW_HOME",
@@ -494,8 +526,16 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         ],
     ),
     PackageSpec(
-        "python_modules/libraries/dagster-dg",
+        "python_modules/libraries/dagster-dg-cli",
         pytest_tox_factors=["general", "docs", "plus"],
+    ),
+    PackageSpec(
+        "python_modules/libraries/dagster-dg-cli",
+        name="dagster-dg-cli-mcp",
+        pytest_tox_factors=["mcp"],
+        unsupported_python_versions=[
+            AvailablePythonVersion.V3_9,
+        ],
     ),
     PackageSpec(
         "python_modules/libraries/dagster-aws",
@@ -641,6 +681,10 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         env_vars=["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_BUILDKITE_PASSWORD"],
     ),
     PackageSpec(
+        "python_modules/libraries/dagster-snowflake-polars",
+        env_vars=["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_BUILDKITE_PASSWORD"],
+    ),
+    PackageSpec(
         "python_modules/libraries/dagster-postgres",
         pytest_tox_factors=[
             "storage_tests",
@@ -657,18 +701,21 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
     PackageSpec(
         "python_modules/libraries/dagster-wandb",
         unsupported_python_versions=[
-            # duckdb
             AvailablePythonVersion.V3_12,
+            AvailablePythonVersion.V3_13,
         ],
     ),
     PackageSpec(
         "python_modules/libraries/dagstermill",
         pytest_tox_factors=["papermill1", "papermill2"],
         retries=2,  # Workaround for flaky kernel issues
-        unsupported_python_versions=[
-            # duckdb
-            AvailablePythonVersion.V3_12,
-        ],
+        unsupported_python_versions=(
+            lambda tox_factor: (
+                [AvailablePythonVersion.V3_12, AvailablePythonVersion.V3_13]
+                if (tox_factor == "papermill1")
+                else []
+            )
+        ),
     ),
     PackageSpec(
         "python_modules/libraries/dagster-airlift/perf-harness",
@@ -676,6 +723,7 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         unsupported_python_versions=[
             # airflow
             AvailablePythonVersion.V3_12,
+            AvailablePythonVersion.V3_13,
         ],
     ),
     PackageSpec(
@@ -684,6 +732,7 @@ LIBRARY_PACKAGES_WITH_CUSTOM_CONFIG: List[PackageSpec] = [
         unsupported_python_versions=[
             # airflow
             AvailablePythonVersion.V3_12,
+            AvailablePythonVersion.V3_13,
         ],
         queue=BuildkiteQueue.DOCKER,
     ),

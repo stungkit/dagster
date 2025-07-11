@@ -6,14 +6,12 @@ tree
 │   └── my_project
 │       ├── __init__.py
 │       ├── definitions.py
-│       ├── defs
-│       │   ├── __init__.py
-│       │   └── assets
-│       │       └── my_asset.py
-│       └── lib
-│           └── __init__.py
+│       └── defs
+│           ├── __init__.py
+│           └── assets
+│               └── my_asset.py
 ├── tests
 │   └── __init__.py
 └── uv.lock
 
-7 directories, 8 files
+6 directories, 7 files

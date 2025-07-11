@@ -9,10 +9,12 @@
 | `aws`                 | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-aws-color.svg" width={20} height={20} />                            |
 | `awsstepfunction`     | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-stepfunctions-color.svg" width={20} height={20} />                  |
 | `awsstepfunctions`    | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-stepfunctions-color.svg" width={20} height={20} />                  |
+| `ax`                  | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-ax-color.svg" width={20} height={20} />                  |
 | `axioma`              | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-axioma-color.svg" width={20} height={20} />                         |
 | `azure`               | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-azure-color.svg" width={20} height={20} />                          |
 | `azureml`             | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-azureml-color.svg" width={20} height={20} />                        |
 | `bigquery`            | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-bigquery-color.svg" width={20} height={20} />                       |
+| `botorch`                  | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-botorch-color.svg" width={20} height={20} />                  |
 | `cassandra`           | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-cassandra-color.svg" width={20} height={20} />                      |
 | `catboost`            | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-catboost-color.svg" width={20} height={20} />                       |
 | `celery`              | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-celery-color.svg" width={20} height={20} />                         |
@@ -48,6 +50,7 @@
 | `duckdb`              | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-duckdb-color.svg" width={20} height={20} />                         |
 | `elasticsearch`       | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-elasticsearch-color.svg" width={20} height={20} />                  |
 | `evidence`            | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-evidence.svg" width={20} height={20} />                             |
+| `exasol`              | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-exasol-color.svg" width={20} height={20} />                         |
 | `excel`               | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-excel-color.svg" width={20} height={20} />                          |
 | `facebook`            | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-facebook-color.svg" width={20} height={20} />                       |
 | `fivetran`            | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-fivetran-color.svg" width={20} height={20} />                       |
@@ -190,7 +193,7 @@
 | `thoughtspot`         | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-thoughtspot-color.svg" width={20} height={20} />                    |
 | `tiktok`              | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-tiktok-color.svg" width={20} height={20} />                         |
 | `toml`                | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/toml.svg" width={20} height={20} />                                      |
-| `treasuredata`        | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-treasuredata-color.svg" width={20} height={20} />              |
+| `treasuredata`        | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-treasuredata-color.svg" width={20} height={20} />                   |
 | `trino`               | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-trino-color.svg" width={20} height={20} />                          |
 | `twilio`              | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-twilio-color.svg" width={20} height={20} />                         |
 | `twitter`             | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/tool-x-color.svg" width={20} height={20} />                              |
@@ -221,4 +224,4 @@
 | `workbook`            | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/dashboard.svg" width={20} height={20} />                                 |
 | `csv`                 | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/csv.svg" width={20} height={20} />                                       |
 | `pdf`                 | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/pdf.svg" width={20} height={20} />                                       |
-| `yaml`                | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/yaml.svg" width={20} height={20} />                                       |
+| `yaml`                | <img src="/images/guides/build/assets/metadata-tags/kinds/icons/yaml.svg" width={20} height={20} />                                      |

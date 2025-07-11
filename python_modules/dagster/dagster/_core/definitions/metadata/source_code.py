@@ -19,8 +19,14 @@ from dagster._core.definitions.metadata.metadata_value import MetadataValue
 from dagster._serdes import whitelist_for_serdes
 
 if TYPE_CHECKING:
-    from dagster._core.definitions.assets import AssetsDefinition, AssetSpec, SourceAsset
-    from dagster._core.definitions.cacheable_assets import CacheableAssetsDefinition
+    from dagster._core.definitions.assets.definition.assets_definition import (
+        AssetsDefinition,
+        AssetSpec,
+        SourceAsset,
+    )
+    from dagster._core.definitions.assets.definition.cacheable_assets_definition import (
+        CacheableAssetsDefinition,
+    )
 
 DEFAULT_SOURCE_FILE_KEY = "asset_definition"
 
@@ -79,6 +85,32 @@ def local_source_path_from_fn(fn: Callable[..., Any]) -> Optional[LocalFileCodeR
     return LocalFileCodeReference(file_path=origin_file, line_number=origin_line)
 
 
+def merge_code_references(
+    asset_spec: "AssetSpec",
+    new_code_references: Sequence[CodeReference],
+) -> "AssetSpec":
+    existing_references_meta = CodeReferencesMetadataSet.extract(asset_spec.metadata)
+    references = (
+        existing_references_meta.code_references.code_references
+        if existing_references_meta.code_references
+        else []
+    )
+
+    return asset_spec.replace_attributes(
+        metadata={
+            **asset_spec.metadata,
+            **CodeReferencesMetadataSet(
+                code_references=CodeReferencesMetadataValue(
+                    code_references=[
+                        *references,
+                        *new_code_references,
+                    ],
+                )
+            ),
+        }
+    )
+
+
 class CodeReferencesMetadataSet(NamespacedMetadataSet):
     """Metadata entries that apply to asset definitions and which specify the location where
     source code for the asset can be found.
@@ -94,7 +126,7 @@ class CodeReferencesMetadataSet(NamespacedMetadataSet):
 def _with_code_source_single_definition(
     assets_def: Union["AssetsDefinition", "SourceAsset", "CacheableAssetsDefinition", "AssetSpec"],
 ) -> Union["AssetsDefinition", "SourceAsset", "CacheableAssetsDefinition", "AssetSpec"]:
-    from dagster._core.definitions.assets import AssetsDefinition
+    from dagster._core.definitions.assets.definition.assets_definition import AssetsDefinition
 
     # SourceAsset and AssetSpec don't have an op definition to point to - cacheable assets
     # will be supported eventually but are a bit trickier
@@ -250,7 +282,7 @@ def _convert_local_path_to_git_path_single_definition(
     file_path_mapping: FilePathMapping,
     assets_def: Union["AssetsDefinition", "SourceAsset", "CacheableAssetsDefinition", "AssetSpec"],
 ) -> Union["AssetsDefinition", "SourceAsset", "CacheableAssetsDefinition", "AssetSpec"]:
-    from dagster._core.definitions.assets import AssetsDefinition
+    from dagster._core.definitions.assets.definition.assets_definition import AssetsDefinition
 
     # SourceAsset doesn't have an op definition to point to - cacheable assets
     # will be supported eventually but are a bit trickier
@@ -327,7 +359,7 @@ def link_code_references_to_git(
     Example:
         .. code-block:: python
 
-                defs = Definitions(
+                Definitions(
                     assets=link_code_references_to_git(
                         with_source_code_references([my_dbt_assets]),
                         git_url="https://github.com/dagster-io/dagster",

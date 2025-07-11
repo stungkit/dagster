@@ -8,10 +8,10 @@ from dagster_shared.serdes import whitelist_for_serdes
 
 import dagster._check as check
 from dagster._annotations import PublicAttr
-from dagster._core.definitions.asset_check_evaluation import AssetCheckEvaluation
-from dagster._core.definitions.asset_check_spec import AssetCheckKey
-from dagster._core.definitions.asset_graph_subset import AssetGraphSubset
+from dagster._core.definitions.asset_checks.asset_check_evaluation import AssetCheckEvaluation
+from dagster._core.definitions.asset_checks.asset_check_spec import AssetCheckKey
 from dagster._core.definitions.asset_key import EntityKey
+from dagster._core.definitions.assets.graph.asset_graph_subset import AssetGraphSubset
 from dagster._core.definitions.declarative_automation.serialized_objects import (
     AutomationConditionEvaluation,
 )
@@ -20,7 +20,7 @@ from dagster._core.definitions.dynamic_partitions_request import (
     DeleteDynamicPartitionsRequest,
 )
 from dagster._core.definitions.events import AssetKey, AssetMaterialization, AssetObservation
-from dagster._core.definitions.partition_key_range import PartitionKeyRange
+from dagster._core.definitions.partitions.partition_key_range import PartitionKeyRange
 from dagster._core.instance import DynamicPartitionsStore
 from dagster._core.storage.dagster_run import DagsterRun, DagsterRunStatus
 from dagster._core.storage.tags import (

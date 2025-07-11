@@ -16,8 +16,10 @@ import uniq from 'lodash/uniq';
 import without from 'lodash/without';
 import * as React from 'react';
 import {useCallback, useMemo, useRef, useState} from 'react';
+import {observeEnabled} from 'shared/app/observeEnabled.oss';
 import {AssetSelectionInput} from 'shared/asset-selection/input/AssetSelectionInput.oss';
 import {CreateCatalogViewButton} from 'shared/assets/CreateCatalogViewButton.oss';
+import {useCatalogExtraDropdownOptions} from 'shared/assets/catalog/useCatalogExtraDropdownOptions.oss';
 import styled from 'styled-components';
 
 import {AssetEdges} from './AssetEdges';
@@ -46,9 +48,9 @@ import {assetKeyTokensInRange} from './assetKeyTokensInRange';
 import {AssetGraphLayout, GroupLayout} from './layout';
 import {AssetGraphExplorerSidebar} from './sidebar/Sidebar';
 import {AssetGraphQueryItem} from './types';
-import {AssetNodeForGraphQueryFragment} from './types/useAssetGraphData.types';
 import {AssetGraphFetchScope, useAssetGraphData, useFullAssetGraphData} from './useAssetGraphData';
 import {AssetLocation, useFindAssetLocation} from './useFindAssetLocation';
+import {useFullScreen, useFullScreenAllowedView} from '../app/AppTopNav/AppTopNavContext';
 import {useFeatureFlags} from '../app/Flags';
 import {AssetLiveDataRefreshButton} from '../asset-data/AssetLiveDataProvider';
 import {LaunchAssetExecutionButton} from '../assets/LaunchAssetExecutionButton';
@@ -77,7 +79,9 @@ import {SyntaxError} from '../selection/CustomErrorListener';
 import {IndeterminateLoadingBar} from '../ui/IndeterminateLoadingBar';
 import {LoadingSpinner} from '../ui/Loading';
 import {isIframe} from '../util/isIframe';
-type AssetNode = AssetNodeForGraphQueryFragment;
+import {WorkspaceAssetFragment} from '../workspace/WorkspaceContext/types/WorkspaceQueries.types';
+
+type AssetNode = WorkspaceAssetFragment;
 
 type Props = {
   options: GraphExplorerOptions;
@@ -93,9 +97,6 @@ type Props = {
   ) => void;
   viewType: AssetGraphViewType;
   setHideEdgesToNodesOutsideQuery?: (hideEdgesToNodesOutsideQuery: boolean) => void;
-
-  isFullScreen?: boolean;
-  toggleFullScreen?: () => void;
 };
 
 export const MINIMAL_SCALE = 0.6;
@@ -109,7 +110,6 @@ export const AssetGraphExplorer = React.memo((props: Props) => {
 
   const {
     loading: graphDataLoading,
-    fetchResult,
     assetGraphData: currentAssetGraphData,
     graphQueryItems: currentGraphQueryItems,
     allAssetKeys: currentAllAssetKeys,
@@ -123,7 +123,7 @@ export const AssetGraphExplorer = React.memo((props: Props) => {
   const graphQueryItems = currentGraphQueryItems ?? previousGraphQueryItems;
   const allAssetKeys = currentAllAssetKeys ?? previousAllAssetKeys;
 
-  if ((fetchResult.loading || graphDataLoading) && (!assetGraphData || !allAssetKeys)) {
+  if (graphDataLoading && (!assetGraphData || !allAssetKeys)) {
     return <LoadingSpinner purpose="page" />;
   }
 
@@ -144,7 +144,7 @@ export const AssetGraphExplorer = React.memo((props: Props) => {
       fullAssetGraphData={fullAssetGraphData ?? assetGraphData}
       allAssetKeys={allAssetKeys}
       graphQueryItems={graphQueryItems}
-      loading={graphDataLoading || fetchResult.loading}
+      loading={graphDataLoading}
       {...props}
     />
   );
@@ -164,8 +164,6 @@ const AssetGraphExplorerWithData = ({
   options,
   setOptions,
   explorerPath,
-  isFullScreen,
-  toggleFullScreen,
   onChangeExplorerPath,
   onNavigateToSourceAssetNode: onNavigateToSourceAssetNode,
   assetGraphData,
@@ -221,6 +219,7 @@ const AssetGraphExplorerWithData = ({
       () => ({direction, facets: flagAssetNodeFacets ? Array.from(facets) : false}),
       [direction, facets, flagAssetNodeFacets],
     ),
+    dataLoading,
   );
 
   const viewportEl = React.useRef<SVGViewportRef>();
@@ -662,6 +661,32 @@ const AssetGraphExplorerWithData = ({
 
   const [errorState, setErrorState] = useState<SyntaxError[]>([]);
 
+  const extraDropdownOptions = useCatalogExtraDropdownOptions(
+    useMemo(
+      () => ({
+        scope: {selected: selectedGraphNodes.map((n) => ({assetKey: n.assetKey}))},
+      }),
+      [selectedGraphNodes],
+    ),
+  );
+
+  useFullScreenAllowedView();
+  const {isFullScreen, toggleFullScreen} = useFullScreen();
+
+  const toggleFullScreenButton = useMemo(() => {
+    if (viewType === AssetGraphViewType.CATALOG) {
+      return null;
+    }
+    return (
+      <Tooltip content={isFullScreen ? 'Collapse' : 'Expand'}>
+        <Button
+          icon={<Icon name={isFullScreen ? 'collapse_fullscreen' : 'expand_fullscreen'} />}
+          onClick={toggleFullScreen}
+        />
+      </Tooltip>
+    );
+  }, [viewType, toggleFullScreen, isFullScreen]);
+
   const explorer = (
     <SplitPanelContainer
       key="explorer"
@@ -721,7 +746,7 @@ const AssetGraphExplorerWithData = ({
               </OptionsOverlay>
             )}
 
-            <TopbarWrapper $isFullScreen={isFullScreen}>
+            <TopbarWrapper $isFullScreen={isFullScreen} $viewType={viewType}>
               <Box flex={{direction: 'column'}} style={{width: '100%'}}>
                 {isFullScreen ? <IndeterminateLoadingBar $loading={nextLayoutLoading} /> : null}
                 <Box
@@ -738,20 +763,12 @@ const AssetGraphExplorerWithData = ({
                       />
                     </Tooltip>
                   )}
+                  {viewType !== AssetGraphViewType.CATALOG && observeEnabled()
+                    ? toggleFullScreenButton
+                    : null}
                   {viewType === AssetGraphViewType.CATALOG ? (
                     <>
-                      {toggleFullScreen ? (
-                        <Tooltip content={isFullScreen ? 'Collapse' : 'Expand'}>
-                          <Button
-                            icon={
-                              <Icon
-                                name={isFullScreen ? 'collapse_fullscreen' : 'expand_fullscreen'}
-                              />
-                            }
-                            onClick={toggleFullScreen}
-                          />
-                        </Tooltip>
-                      ) : null}
+                      {toggleFullScreenButton}
                       <div style={{flex: 1}} />
                     </>
                   ) : (
@@ -780,10 +797,11 @@ const AssetGraphExplorerWithData = ({
                           ? {selected: selectedDefinitions}
                           : {all: allDefinitionsForMaterialize}
                       }
+                      additionalDropdownOptions={extraDropdownOptions}
                     />
                   )}
                 </Box>
-                {isFullScreen ? null : (
+                {isFullScreen && viewType === AssetGraphViewType.CATALOG ? null : (
                   <IndeterminateLoadingBar
                     $loading={nextLayoutLoading}
                     style={{
@@ -887,14 +905,14 @@ const SVGContainer = styled.svg`
   }
 `;
 
-const TopbarWrapper = styled.div<{$isFullScreen?: boolean}>`
+const TopbarWrapper = styled.div<{$isFullScreen?: boolean; $viewType: AssetGraphViewType}>`
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   display: flex;
-  ${({$isFullScreen}) => {
-    return $isFullScreen
+  ${({$isFullScreen, $viewType}) => {
+    return $isFullScreen && $viewType === AssetGraphViewType.CATALOG
       ? ''
       : `
         background: ${Colors.backgroundDefault()};

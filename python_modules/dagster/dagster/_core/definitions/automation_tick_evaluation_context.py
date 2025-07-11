@@ -8,11 +8,11 @@ import dagster._check as check
 from dagster import PartitionKeyRange
 from dagster._core.asset_graph_view.entity_subset import EntitySubset
 from dagster._core.definitions.asset_daemon_cursor import AssetDaemonCursor
-from dagster._core.definitions.asset_graph_subset import AssetGraphSubset
 from dagster._core.definitions.asset_key import AssetCheckKey, EntityKey
 from dagster._core.definitions.asset_selection import AssetSelection
+from dagster._core.definitions.assets.graph.asset_graph_subset import AssetGraphSubset
+from dagster._core.definitions.assets.graph.base_asset_graph import BaseAssetGraph
 from dagster._core.definitions.backfill_policy import BackfillPolicy, BackfillPolicyType
-from dagster._core.definitions.base_asset_graph import BaseAssetGraph
 from dagster._core.definitions.declarative_automation.automation_condition import (
     AutomationCondition,
     AutomationResult,
@@ -24,7 +24,7 @@ from dagster._core.definitions.declarative_automation.serialized_objects import 
     AutomationConditionEvaluation,
 )
 from dagster._core.definitions.events import AssetKey, AssetKeyPartitionKey
-from dagster._core.definitions.partition import PartitionsDefinition
+from dagster._core.definitions.partitions.definition import PartitionsDefinition
 from dagster._core.definitions.run_request import RunRequest
 from dagster._core.instance import DynamicPartitionsStore
 from dagster._core.storage.tags import (
@@ -164,6 +164,20 @@ class AutomationTickEvaluationContext:
             ):
                 updated_evaluations.append(result.serializable_evaluation)
         return updated_evaluations
+
+    async def async_evaluate(
+        self,
+    ) -> tuple[
+        Sequence[RunRequest], AssetDaemonCursor, Sequence[AutomationConditionEvaluation[EntityKey]]
+    ]:
+        observe_run_requests = self._legacy_build_auto_observe_run_requests()
+        results, entity_subsets = await self._evaluator.async_evaluate()
+
+        return (
+            [*self._build_run_requests(entity_subsets), *observe_run_requests],
+            self._get_updated_cursor(results, observe_run_requests),
+            self._get_updated_evaluations(results),
+        )
 
     def evaluate(
         self,

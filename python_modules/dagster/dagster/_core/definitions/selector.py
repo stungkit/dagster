@@ -1,8 +1,10 @@
 from collections.abc import Iterable, Mapping, Sequence
 from typing import AbstractSet, Any, Optional  # noqa: UP035
 
+from dagster_shared.utils.hash import make_hashable
+
 import dagster._check as check
-from dagster._core.definitions.asset_check_spec import AssetCheckKey
+from dagster._core.definitions.asset_checks.asset_check_spec import AssetCheckKey
 from dagster._core.definitions.events import AssetKey
 from dagster._core.definitions.repository_definition import SINGLETON_REPOSITORY_NAME
 from dagster._record import IHaveNew, record, record_custom
@@ -72,6 +74,11 @@ class JobSubsetSelector(IHaveNew):
             location_name=self.location_name,
             repository_name=self.repository_name,
         )
+
+    def __hash__(self) -> int:
+        if not hasattr(self, "_hash"):
+            self._hash = hash(make_hashable(self))
+        return self._hash
 
 
 @whitelist_for_serdes
