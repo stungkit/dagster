@@ -9,7 +9,7 @@ else
     ROOT="${GIT_ROOT}"
 fi
 
-pushd "$ROOT/js_modules/dagster-ui"
+pushd "$ROOT/js_modules"
 set -eux
 
 corepack enable

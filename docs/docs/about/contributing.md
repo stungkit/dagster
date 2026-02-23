@@ -115,11 +115,11 @@ Don't forget to activate the virtual environment (`source .venv/bin/activate`) w
 :::
 
 ```bash
-cd js_modules/dagster-ui
+cd js_modules
 make dev_webapp
 ```
 
-During development, you might find these commands useful. Run them from `js_modules/dagster-ui`:
+During development, you might find these commands useful. Run them from `js_modules`:
 
 - `make ts`: Typescript typechecking
 - `make lint`: Linting with autofix

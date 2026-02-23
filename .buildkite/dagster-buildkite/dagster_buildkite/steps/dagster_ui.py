@@ -16,10 +16,7 @@ def skip_if_no_dagster_ui_components_changes():
         return None
 
     # If anything changes in the ui-components directory
-    if any(
-        Path("js_modules/dagster-ui/packages/ui-components") in path.parents
-        for path in ChangedFiles.all_oss
-    ):
+    if any(Path("js_modules/ui-components") in path.parents for path in ChangedFiles.all_oss):
         return None
 
     return "No changes that affect the ui-components JS library"
@@ -32,7 +29,7 @@ def build_dagster_ui_components_steps() -> list[CommandStepConfiguration]:
             AvailablePythonVersion.get_default(),
         )
         .run(
-            "cd js_modules/dagster-ui/packages/ui-components",
+            "cd js_modules/ui-components",
             "pip install -U uv",
             f"tox -vv -e {AvailablePythonVersion.to_tox_factor(AvailablePythonVersion.get_default())}",
         )
