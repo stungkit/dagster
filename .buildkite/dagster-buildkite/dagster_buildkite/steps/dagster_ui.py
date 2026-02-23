@@ -61,7 +61,7 @@ def build_dagster_ui_core_steps() -> list[CommandStepConfiguration]:
             AvailablePythonVersion.get_default(),
         )
         .run(
-            "cd js_modules/dagster-ui",
+            "cd js_modules",
             "pip install -U uv",
             f"tox -vv -e {AvailablePythonVersion.to_tox_factor(AvailablePythonVersion.get_default())}",
         )

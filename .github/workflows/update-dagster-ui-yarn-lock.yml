@@ -4,7 +4,7 @@ on:
   push:
     branches: [master]
     paths:
-      - js_modules/dagster-ui/**/package.json
+      - js_modules/**/package.json
 
 jobs:
   update-yarn-lock:
@@ -19,12 +19,12 @@ jobs:
         run: corepack enable
 
       - name: Install dependencies
-        working-directory: js_modules/dagster-ui
+        working-directory: js_modules
         run: yarn install --no-immutable
 
       - name: Check for changes
         id: diff
-        working-directory: js_modules/dagster-ui
+        working-directory: js_modules
         run: |
           if git diff --quiet yarn.lock; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -41,13 +41,13 @@ jobs:
           git config user.email "devtools@dagsterlabs.com"
           branch="update-dagster-ui-yarn-lock"
           git checkout -b "$branch"
-          git add js_modules/dagster-ui/yarn.lock
-          git commit -m "Update dagster-ui yarn.lock"
+          git add js_modules/yarn.lock
+          git commit -m "Update OSS yarn.lock"
           git push --force origin "$branch"
           if ! gh pr list --head "$branch" --state open --json number --jq '.[0].number' | grep -q .; then
             gh pr create \
-              --title "Update dagster-ui yarn.lock" \
-              --body "Automated PR to update \`js_modules/dagster-ui/yarn.lock\` after a \`package.json\` change." \
+              --title "Update OSS yarn.lock" \
+              --body "Automated PR to update \`js_modules/yarn.lock\` after a \`package.json\` change." \
               --base master \
               --head "$branch"
           fi

@@ -83,7 +83,7 @@ sanity_check:
 
 rebuild_ui: sanity_check
 	corepack enable
-	cd js_modules/dagster-ui && yarn install && yarn workspace @dagster-io/app-oss build
+	cd js_modules && yarn install && yarn workspace @dagster-io/app-oss build
 
 rebuild_ui_with_profiling: sanity_check
 	cd js_modules; yarn install && yarn build-with-profiling
