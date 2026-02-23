@@ -2,7 +2,7 @@
 set -eux
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WEBSERVER_DIR="$SCRIPT_DIR/../../../../python_modules/dagster-webserver/dagster_webserver"
+WEBSERVER_DIR="$SCRIPT_DIR/../../python_modules/dagster-webserver/dagster_webserver"
 
 # Build Next.js app
 npx next build

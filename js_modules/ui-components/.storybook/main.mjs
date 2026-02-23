@@ -18,7 +18,7 @@ const config = {
     getAbsolutePath('@storybook/addon-docs'),
   ],
   framework: {
-    name: getAbsolutePath('@storybook/nextjs-vite'),
+    name: getAbsolutePath('@storybook/react-vite'),
     options: {},
   },
   typescript: {

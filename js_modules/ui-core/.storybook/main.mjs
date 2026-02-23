@@ -22,7 +22,7 @@ const config = {
     reactDocgen: false,
   },
   framework: {
-    name: getAbsolutePath('@storybook/nextjs-vite'),
+    name: getAbsolutePath('@storybook/react-vite'),
   },
   // Vite configuration for aliases and GraphQL support
   viteFinal: async (config) => {
