@@ -43,15 +43,15 @@ Pushing changes to the `main` branch of that project repository will automatical
       </TabItem>
     </Tabs>
 
-3. Add the `dagster-cloud` package as a project dependency:
+3.  Add the `dagster-cloud` package as a project dependency:
 
     <Tabs groupId="package-manager">
-    <TabItem value="uv" label="uv">
+      <TabItem value="uv" label="uv">
         <CliInvocationExample path="docs_snippets/docs_snippets/dagster-plus/deployment/ci-cd/uv-add-dagster-cloud.txt" />
-    </TabItem>
-    <TabItem value="pip" label="pip">
+      </TabItem>
+      <TabItem value="pip" label="pip">
         <CliInvocationExample path="docs_snippets/docs_snippets/dagster-plus/deployment/ci-cd/pip-install-dagster-cloud.txt" />
-    </TabItem>
+      </TabItem>
     </Tabs>
 
 4.  Initialize a Git repository in the project directory:
