@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing_extensions import Required, TypedDict
 
 
 class InputSelectOption(TypedDict):
@@ -24,26 +24,24 @@ class InputTextField(TypedDict):
     required: bool | None
 
 
-BlockStepConfiguration = TypedDict(
-    "BlockStepConfiguration",
-    {
-        "block": str,
-        "key": str | None,
-        "prompt": str | None,
-        "fields": list[InputSelectField | InputTextField],
-        "depends_on": list[str] | None,
-        "if": str | None,
-        "skip": str | None,
-    },
-    total=False,
-)
+class BlockStepConfiguration(TypedDict, closed=True, total=False):
+    label: Required[str]
+    block: str
+    key: str | None
+    prompt: str | None
+    fields: list[InputSelectField | InputTextField]
+    depends_on: list[str] | None
+    skip: str | None
+    # Covers the "if" key, which is a Python reserved word and cannot be used as
+    # a class attribute. Buildkite uses "if" for conditional step execution.
+    __extra_items__: str | None
 
 
 class BlockStepBuilder:
     _step: BlockStepConfiguration
 
     def __init__(self, block, key=None):
-        self._step = {"block": block}
+        self._step = {"label": block, "block": block}
 
         if key is not None:
             self._step["key"] = key
@@ -60,7 +58,7 @@ class BlockStepBuilder:
         return self
 
     def with_condition(self, condition):
-        self._step["if"] = condition
+        self._step["if"] = condition  # pyright: ignore[reportGeneralTypeIssues]
         return self
 
     def depends_on(self, dependencies):

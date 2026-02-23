@@ -1,21 +1,19 @@
-from typing import TypedDict
+from typing_extensions import Required, TypedDict
 
-# use alt syntax because of `async` and `if` reserved words
-TriggerStepConfiguration = TypedDict(
-    "TriggerStepConfiguration",
-    {
-        "trigger": str,
-        "label": str,
-        "async": bool | None,
-        "build": dict[str, object],
-        "branches": str | None,
-        "if": str | None,
-        "key": str | None,
-        "depends_on": list[str] | None,
-        "soft_fail": bool,
-    },
-    total=False,
-)
+
+class TriggerStepConfiguration(TypedDict, closed=True, total=False):
+    trigger: Required[str]
+    label: Required[str]
+    build: dict[str, object]
+    branches: str | None
+    key: str | None
+    depends_on: list[str] | None
+    soft_fail: bool
+    # Covers the "async" (bool | None) and "if" (str | None) keys, which are
+    # Python reserved words and cannot be used as class attributes. Buildkite
+    # uses "async" for asynchronous trigger execution and "if" for conditional
+    # step execution.
+    __extra_items__: str | bool | None
 
 
 class TriggerStepBuilder:
@@ -32,7 +30,7 @@ class TriggerStepBuilder:
         return self
 
     def with_condition(self, condition):
-        self._step["if"] = condition
+        self._step["if"] = condition  # pyright: ignore[reportGeneralTypeIssues]
         return self
 
     def depends_on(self, dependencies):
@@ -40,7 +38,7 @@ class TriggerStepBuilder:
         return self
 
     def with_async(self, async_step: bool):
-        self._step["async"] = async_step
+        self._step["async"] = async_step  # pyright: ignore[reportGeneralTypeIssues]
         return self
 
     def soft_fail(self, soft_fail: bool):

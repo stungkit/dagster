@@ -14,7 +14,7 @@ classifiers = [
 ]
 dependencies = [
     "packaging",
-    "typing_extensions>=4.2",
+    "typing_extensions>=4.10",
 ]
 
 [project.urls]

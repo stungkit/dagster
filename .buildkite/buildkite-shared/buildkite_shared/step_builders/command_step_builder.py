@@ -1,9 +1,9 @@
 import os
 from collections.abc import Callable, Mapping
 from enum import Enum
-from typing import Any, TypedDict
+from typing import Any
 
-from typing_extensions import NotRequired
+from typing_extensions import NotRequired, TypedDict
 
 DEFAULT_TIMEOUT_IN_MIN = 35
 
@@ -53,26 +53,24 @@ class BuildkiteQueue(Enum):
         return isinstance(value, cls)
 
 
-CommandStepConfiguration = TypedDict(
-    "CommandStepConfiguration",
-    {
-        "agents": dict[str, str],
-        "label": str,
-        "timeout_in_minutes": int,
-        "plugins": list[dict[str, object]],
-        "retry": dict[str, object],
-        "commands": NotRequired[list[str]],
-        "depends_on": NotRequired[list[str]],
-        "key": NotRequired[str],
-        "skip": NotRequired[str | None],
-        "artifact_paths": NotRequired[list[str]],
-        "concurrency": NotRequired[int],
-        "concurrency_group": NotRequired[str],
-        "allow_dependency_failure": NotRequired[bool],
-        "soft_fail": NotRequired[bool],
-        "if": NotRequired[str],  # Reserved word handled with quotes
-    },
-)
+class CommandStepConfiguration(TypedDict, closed=True):
+    agents: dict[str, str]
+    label: str
+    timeout_in_minutes: int
+    plugins: list[dict[str, object]]
+    retry: dict[str, object]
+    commands: NotRequired[list[str]]
+    depends_on: NotRequired[list[str]]
+    key: NotRequired[str]
+    skip: NotRequired[str | None]
+    artifact_paths: NotRequired[list[str]]
+    concurrency: NotRequired[int]
+    concurrency_group: NotRequired[str]
+    allow_dependency_failure: NotRequired[bool]
+    soft_fail: NotRequired[bool]
+    # Covers the "if" key, which is a Python reserved word and cannot be used as
+    # a class attribute. Buildkite uses "if" for conditional step execution.
+    __extra_items__: str
 
 
 class CommandStepBuilder:
@@ -226,7 +224,7 @@ class CommandStepBuilder:
         return self
 
     def with_condition(self, condition):
-        self._step["if"] = condition
+        self._step["if"] = condition  # pyright: ignore[reportGeneralTypeIssues]
         return self
 
     def with_secret(self, name, reference):

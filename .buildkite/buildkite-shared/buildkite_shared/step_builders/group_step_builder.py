@@ -6,7 +6,7 @@ from buildkite_shared.step_builders.command_step_builder import (
 )
 from buildkite_shared.step_builders.trigger_step_builder import TriggerStepConfiguration
 from buildkite_shared.step_builders.wait_step_builder import WaitStepConfiguration
-from typing_extensions import TypedDict
+from typing_extensions import Required, TypedDict
 
 GroupLeafStepConfiguration: TypeAlias = (
     CommandStepConfiguration | TriggerStepConfiguration | WaitStepConfiguration
@@ -16,7 +16,7 @@ GroupLeafStepConfiguration: TypeAlias = (
 class GroupStepConfiguration(TypedDict, total=False):
     group: str
     label: str
-    steps: list[GroupLeafStepConfiguration]
+    steps: Required[list[GroupLeafStepConfiguration]]
     key: str | None
     skip: str | None
 
