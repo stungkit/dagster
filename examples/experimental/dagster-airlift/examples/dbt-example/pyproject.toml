@@ -3,22 +3,17 @@ requires = ["setuptools>=69.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "starlift-demo"
+name = "dbt-example"
 version = "1!0+dev"
 dependencies = [
-    "dagster",
-    "dagster-webserver",
-    "dagster-airlift[core,in-airflow]",
-    "dagster-dbt",
+    "dagster==1!0+dev",
+    "dagster-webserver==1!0+dev",
+    "dagster-airlift[core,in-airflow]==1!0+dev",
     "dbt-duckdb",
     "pandas",
-    "apache-airflow<3.0.0",
 ]
 
 [project.optional-dependencies]
 test = ["pytest"]
-
-[tool.dagster]
-module_name = "dbt_example.definitions"
 
 [tool.setuptools.packages.find]
