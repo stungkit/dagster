@@ -125,6 +125,19 @@ class SinceCondition(BuiltinAutomationCondition[T_EntityKey]):
         # must evaluate child condition over the entire subset to avoid missing state transitions
         child_candidate_subset = context.asset_graph_view.get_full_subset(key=context.key)
 
+        from dagster._core.definitions.declarative_automation.operands import (
+            CronTickPassedCondition,
+            NewlyUpdatedCondition,
+        )
+
+        # Bit of a hack to ensure that all_deps_updated_since_cron doesn't drop new updates that
+        # happen in the same tick as the evaluation where the cron tick passes.
+
+        reset_newly_true = not (
+            isinstance(self.reset_condition, CronTickPassedCondition)
+            and isinstance(self.trigger_condition, NewlyUpdatedCondition)
+        )
+
         # compute result for trigger and reset conditions
         trigger_result, reset_result = await asyncio.gather(
             *[
@@ -144,10 +157,17 @@ class SinceCondition(BuiltinAutomationCondition[T_EntityKey]):
         # take the previous subset that this was true for
         true_subset = context.previous_true_subset or context.get_empty_subset()
 
-        # add in any newly true trigger asset partitions
-        true_subset = true_subset.compute_union(trigger_result.true_subset)
-        # remove any newly true reset asset partitions
-        true_subset = true_subset.compute_difference(reset_result.true_subset)
+        if reset_newly_true:
+            # add in any newly true trigger asset partitions
+            true_subset = true_subset.compute_union(trigger_result.true_subset)
+            # remove any newly true reset asset partitions
+            true_subset = true_subset.compute_difference(reset_result.true_subset)
+        else:
+            # remove any newly true reset asset partitions
+            true_subset = true_subset.compute_difference(reset_result.true_subset)
+
+            # add in any newly true trigger asset partitions
+            true_subset = true_subset.compute_union(trigger_result.true_subset)
 
         # if anything changed since the previous evaluation, update the metadata
         condition_data = SinceConditionData.from_metadata(context.previous_metadata).update(
