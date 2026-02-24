@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=69.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.19.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "iris_analysis"
@@ -17,5 +17,3 @@ dev = ["dagster-webserver"]
 [tool.dagster]
 module_name = "iris_analysis.definitions"
 code_location_name = "iris_analysis"
-
-[tool.setuptools.packages.find]

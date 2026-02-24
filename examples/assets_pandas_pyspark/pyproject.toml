@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=69.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.19.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "assets_pandas_pyspark"
@@ -18,6 +18,3 @@ test = ["pandas", "pyarrow; python_version < '3.9'", "pyspark<4"]
 [tool.dagster]
 module_name = "assets_pandas_pyspark.definitions"
 code_location_name = "assets_pandas_pyspark"
-
-[tool.setuptools.packages.find]
-exclude = ["assets_pandas_pyspark_tests*"]

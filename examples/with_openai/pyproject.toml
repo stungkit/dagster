@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=69.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.19.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "with_openai"
@@ -22,6 +22,3 @@ dev = ["dagster-webserver", "pytest"]
 [tool.dagster]
 module_name = "with_openai.definitions"
 code_location_name = "with_openai"
-
-[tool.setuptools.packages.find]
-exclude = ["with_openai_tests*"]

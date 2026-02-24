@@ -1,6 +1,9 @@
 [build-system]
-requires = ["setuptools>=69.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.19.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+packages = ["tutorial_example"]
 
 [project]
 name = "tutorial-example"
@@ -18,5 +21,3 @@ test = ["pytest"]
 
 [tool.dagster]
 module_name = "tutorial_example.definitions"
-
-[tool.setuptools.packages.find]

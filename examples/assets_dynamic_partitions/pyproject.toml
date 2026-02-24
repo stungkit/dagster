@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=69.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.19.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "assets_dynamic_partitions"
@@ -17,6 +17,3 @@ dev = ["dagster-webserver", "pytest"]
 [tool.dagster]
 module_name = "assets_dynamic_partitions.definitions"
 code_location_name = "assets_dynamic_partitions"
-
-[tool.setuptools.packages.find]
-exclude = ["assets_dynamic_partitions_tests*"]
