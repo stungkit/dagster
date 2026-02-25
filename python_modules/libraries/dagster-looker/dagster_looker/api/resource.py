@@ -329,7 +329,6 @@ class LookerApiDefsLoader(StateBackedDefinitionsLoader[Mapping[str, Any]]):
                             "view_name",
                             "sql_table_name",
                             "joins",
-                            "connection_name",
                         ]
                     ),
                 )
