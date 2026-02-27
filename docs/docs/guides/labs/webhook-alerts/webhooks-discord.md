@@ -1,7 +1,7 @@
 ---
 title: Discord webhook alerts
 description: Send notifications to a Discord channel using Discord Webhooks.
-sidebar_position: 10
+sidebar_position: 20
 ---
 
 import EarlyAccess from '@site/docs/partials/\_EarlyAccess.md';
