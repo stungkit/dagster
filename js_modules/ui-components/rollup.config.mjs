@@ -7,12 +7,12 @@ import json from '@rollup/plugin-json';
 import resolve from '@rollup/plugin-node-resolve';
 import url from '@rollup/plugin-url';
 import polyfills from 'rollup-plugin-polyfill-node';
-import styles from 'rollup-plugin-styles';
+import postcss from 'rollup-plugin-postcss';
 
 const extensions = ['.js', '.jsx', '.ts', '.tsx', '.css', '.svg'];
 
 const sharedPlugins = [
-  styles({
+  postcss({
     extract: true,
     autoModules: true,
   }),
@@ -28,6 +28,14 @@ const sharedPlugins = [
   polyfills(),
   resolve({extensions, preferBuiltins: false}),
 ];
+
+function onwarn(warning, warn) {
+  // Silence "use client" directive warnings from Radix UI modules
+  if (warning.code === 'MODULE_LEVEL_DIRECTIVE') {
+    return;
+  }
+  warn(warning);
+}
 
 const sharedExternals = [
   '@blueprintjs/core',
@@ -65,6 +73,7 @@ export default [
     },
     plugins: sharedPlugins,
     external: [...sharedExternals, '@tanstack/react-virtual'],
+    onwarn,
   },
   {
     input: './src/editor.ts',
@@ -76,5 +85,6 @@ export default [
     },
     plugins: sharedPlugins,
     external: sharedExternals,
+    onwarn,
   },
 ];
