@@ -320,23 +320,6 @@ class ComponentLoadContext(ComponentDeclLoadContext):
         )
         return self.component_tree.build_defs(resolved_path)
 
-    @deprecated(
-        breaking_version="1.13.0",
-        additional_warn_text="Use build_defs instead.",
-    )
-    def build_defs_at_path(self, defs_path: Union[Path, "ComponentPath"]) -> Definitions:
-        """Builds definitions from the given defs subdirectory. Currently
-        does not incorporate postprocessing from parent defs modules.
-
-        Args:
-            defs_path: Path to the defs module to load. If relative, resolves relative to the defs root.
-
-        Returns:
-            Definitions: The definitions loaded from the given path.
-
-        """
-        return self.build_defs(defs_path)
-
     def for_path(self, path: Path) -> "Self":
         """Creates a new context for the given path.
 
