@@ -151,6 +151,7 @@ def _validate_hidden_non_argument_dep_param(
     emit_runtime_warning=False,
     breaking_version="1.10.0",
 )
+@hidden_param(param="is_view", breaking_version="", emit_runtime_warning=False)
 def asset(
     compute_fn: Callable[..., Any] | None = None,
     *,
@@ -345,6 +346,7 @@ def asset(
         key=key,
         owners=owners,
         pool=pool,
+        is_view=kwargs.get("is_view", False),
     )
 
     if compute_fn is not None:
@@ -420,6 +422,7 @@ class AssetDecoratorArgs(NamedTuple):
     check_specs: Sequence[AssetCheckSpec] | None
     owners: Sequence[str] | None
     pool: str | None
+    is_view: bool
 
 
 class ResourceRelatedState(NamedTuple):
@@ -532,6 +535,7 @@ def create_assets_def_from_fn_and_decorator_args(
                     backfill_policy=args.backfill_policy,
                     owners=args.owners,
                     tags=normalize_tags(args.tags or {}, strict=True),
+                    is_view=args.is_view,
                 )
             },
             upstream_asset_deps=args.deps,

@@ -103,6 +103,7 @@ def validate_kind_tags(kinds: AbstractSet[str] | None) -> None:
     breaking_version="1.10.0",
     additional_warn_text="use `automation_condition` instead",
 )
+@hidden_param(param="is_view", breaking_version="", emit_runtime_warning=False)
 @public
 @record_custom
 class AssetSpec(IHasInternalInit, IHaveNew, LegacyNamedTupleMixin):
@@ -153,6 +154,7 @@ class AssetSpec(IHasInternalInit, IHaveNew, LegacyNamedTupleMixin):
     owners: PublicAttr[Sequence[str]]
     tags: PublicAttr[Mapping[str, str]]
     partitions_def: PublicAttr[PartitionsDefinition | None]
+    is_view: PublicAttr[bool]
 
     def __new__(
         cls,
@@ -177,6 +179,7 @@ class AssetSpec(IHasInternalInit, IHaveNew, LegacyNamedTupleMixin):
         )
 
         only_allow_hidden_params_in_kwargs(AssetSpec, kwargs)
+        is_view = check.bool_param(kwargs.get("is_view", False), "is_view")
 
         key = AssetKey.from_coercible(key)
         asset_deps = coerce_to_deps_and_check_duplicates(deps, key)
@@ -229,6 +232,7 @@ class AssetSpec(IHasInternalInit, IHaveNew, LegacyNamedTupleMixin):
             partitions_def=check.opt_inst_param(
                 partitions_def, "partitions_def", PartitionsDefinition
             ),
+            is_view=is_view,
         )
 
     @staticmethod
@@ -264,6 +268,7 @@ class AssetSpec(IHasInternalInit, IHaveNew, LegacyNamedTupleMixin):
             tags=tags,
             kinds=kinds,
             partitions_def=partitions_def,
+            is_view=kwargs.get("is_view", False),
         )
 
     @cached_property
@@ -320,6 +325,7 @@ class AssetSpec(IHasInternalInit, IHaveNew, LegacyNamedTupleMixin):
         partitions_def: PartitionsDefinition | None | EllipsisType = ...,
         legacy_freshness_policy: LegacyFreshnessPolicy | None | EllipsisType = ...,
         freshness_policy: FreshnessPolicy | None | EllipsisType = ...,
+        is_view: bool | EllipsisType = ...,
     ) -> "AssetSpec":
         """Returns a new AssetSpec with the specified attributes replaced."""
         current_tags_without_kinds = {
@@ -347,6 +353,7 @@ class AssetSpec(IHasInternalInit, IHaveNew, LegacyNamedTupleMixin):
                 tags=tags if tags is not ... else current_tags_without_kinds,
                 kinds=kinds if kinds is not ... else self.kinds,
                 partitions_def=partitions_def if partitions_def is not ... else self.partitions_def,
+                is_view=is_view if is_view is not ... else self.is_view,
             )
 
     @public
@@ -395,6 +402,7 @@ class AssetSpec(IHasInternalInit, IHaveNew, LegacyNamedTupleMixin):
                 tags={**current_tags_without_kinds, **(tags if tags is not ... else {})},
                 kinds={*self.kinds, *(kinds if kinds is not ... else {})},
                 partitions_def=self.partitions_def,
+                is_view=self.is_view,
             )
 
 

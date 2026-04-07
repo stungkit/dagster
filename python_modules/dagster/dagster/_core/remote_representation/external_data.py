@@ -1009,6 +1009,7 @@ class AssetNodeSnap(IHaveNew):
     backfill_policy: BackfillPolicy | None
     auto_observe_interval_minutes: float | int | None
     owners: Sequence[str] | None
+    is_view: bool
 
     def __new__(
         cls,
@@ -1041,6 +1042,7 @@ class AssetNodeSnap(IHaveNew):
         backfill_policy: BackfillPolicy | None = None,
         auto_observe_interval_minutes: float | int | None = None,
         owners: Sequence[str] | None = None,
+        is_view: bool = False,
     ):
         metadata = normalize_metadata(
             check.opt_mapping_param(metadata, "metadata", key_type=str), allow_invalid=True
@@ -1120,6 +1122,7 @@ class AssetNodeSnap(IHaveNew):
             auto_observe_interval_minutes=auto_observe_interval_minutes,
             owners=owners or [],
             execution_type=execution_type,
+            is_view=is_view,
         )
 
     @property
@@ -1347,6 +1350,7 @@ def asset_node_snaps_from_repo(repo: RepositoryDefinition) -> Sequence[AssetNode
                 backfill_policy=asset_node.backfill_policy,
                 auto_observe_interval_minutes=asset_node.auto_observe_interval_minutes,
                 owners=asset_node.owners,
+                is_view=asset_node.is_view,
             )
         )
 

@@ -638,6 +638,7 @@ type AssetNode = {
   isMaterializable: Scalars['Boolean']['output'];
   isObservable: Scalars['Boolean']['output'];
   isPartitioned: Scalars['Boolean']['output'];
+  isView: Scalars['Boolean']['output'];
   jobNames: Array<Scalars['String']['output']>;
   jobs: Array<Pipeline>;
   kinds: Array<Scalars['String']['output']>;
@@ -7409,6 +7410,7 @@ export const buildAssetNode = (
       overrides && overrides.hasOwnProperty('isObservable') ? overrides.isObservable! : false,
     isPartitioned:
       overrides && overrides.hasOwnProperty('isPartitioned') ? overrides.isPartitioned! : true,
+    isView: overrides && overrides.hasOwnProperty('isView') ? overrides.isView! : true,
     jobNames: overrides && overrides.hasOwnProperty('jobNames') ? overrides.jobNames! : [],
     jobs: overrides && overrides.hasOwnProperty('jobs') ? overrides.jobs! : [],
     kinds: overrides && overrides.hasOwnProperty('kinds') ? overrides.kinds! : [],

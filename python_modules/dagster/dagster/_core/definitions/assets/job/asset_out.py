@@ -34,6 +34,11 @@ EMPTY_ASSET_KEY_SENTINEL = AssetKey([])
 
 
 @hidden_param(
+    param="is_view",
+    breaking_version="",
+    emit_runtime_warning=False,
+)
+@hidden_param(
     param="legacy_freshness_policy",
     breaking_version="1.13.0",
 )
@@ -111,6 +116,7 @@ class AssetOut:
         if spec:
             del kwargs["spec"]
 
+        is_view = kwargs.pop("is_view", False)
         only_allow_hidden_params_in_kwargs(AssetOut, kwargs)
         if isinstance(key_prefix, str):
             key_prefix = [key_prefix]
@@ -171,6 +177,7 @@ class AssetOut:
                 owners=check.opt_sequence_param(owners, "owners", of_type=str),
                 tags=normalize_tags(tags or {}, strict=True),
                 kinds=check.opt_set_param(kinds, "kinds", of_type=str),
+                is_view=check.bool_param(is_view, "is_view"),
             )
         self.key_prefix = key_prefix
         self.dagster_type = dagster_type

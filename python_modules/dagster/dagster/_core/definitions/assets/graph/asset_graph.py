@@ -140,6 +140,10 @@ class AssetNode(BaseAssetNode):
         return self._spec.code_version
 
     @property
+    def is_view(self) -> bool:
+        return self._spec.is_view
+
+    @property
     def check_keys(self) -> AbstractSet[AssetCheckKey]:
         return self._check_keys
 
