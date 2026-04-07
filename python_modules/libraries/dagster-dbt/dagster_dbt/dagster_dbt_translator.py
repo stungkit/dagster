@@ -64,7 +64,7 @@ class DagsterDbtTranslatorSettings(Resolvable):
         enable_source_tests_as_checks (bool): Whether to load dbt source tests as Dagster asset checks.
             Defaults to False. If False, asset observations will be emitted for source tests.
         enable_source_metadata (bool): Whether to include metadata on AssetDep objects for dbt sources.
-            If set to True, enables the ability to remap upstream asset keys based on table name. Defaults to False.
+            If set to True, enables the ability to remap upstream asset keys based on table name. Defaults to True.
         enable_dbt_views_as_virtual_assets (bool): Whether to treat dbt models with
             ``materialized: view`` as virtual assets. When enabled, view models will have
             ``is_virtual=True`` and ``"view"`` added to their kinds. Defaults to False.
@@ -75,7 +75,7 @@ class DagsterDbtTranslatorSettings(Resolvable):
     enable_code_references: bool = False
     enable_dbt_selection_by_name: bool = False
     enable_source_tests_as_checks: bool = False
-    enable_source_metadata: bool = False
+    enable_source_metadata: bool = True
     enable_dbt_views_as_virtual_assets: bool = False
 
 
