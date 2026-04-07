@@ -16,7 +16,10 @@ from dagster._core.definitions.declarative_automation.automation_condition impor
     T_AutomationCondition,
 )
 from dagster._core.definitions.declarative_automation.automation_context import AutomationContext
-from dagster._core.definitions.declarative_automation.operators.utils import has_allow_ignore
+from dagster._core.definitions.declarative_automation.operators.utils import (
+    has_allow_ignore,
+    has_transparent_views,
+)
 from dagster._core.definitions.metadata import MetadataMapping
 from dagster._core.definitions.metadata.metadata_value import FloatMetadataValue, IntMetadataValue
 from dagster._record import copy, record
@@ -226,5 +229,20 @@ class SinceCondition(BuiltinAutomationCondition[T_EntityKey]):
             else self.trigger_condition,
             reset_condition=self.reset_condition.ignore(selection)
             if has_allow_ignore(self.reset_condition)
+            else self.reset_condition,
+        )
+
+    def with_transparent_views(self, value: bool = True) -> "SinceCondition":
+        """Applies the ``.with_transparent_views()`` method across all sub-conditions.
+
+        This impacts any dep-related sub-conditions.
+        """
+        return copy(
+            self,
+            trigger_condition=self.trigger_condition.with_transparent_views(value)
+            if has_transparent_views(self.trigger_condition)
+            else self.trigger_condition,
+            reset_condition=self.reset_condition.with_transparent_views(value)
+            if has_transparent_views(self.reset_condition)
             else self.reset_condition,
         )

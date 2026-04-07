@@ -228,6 +228,286 @@ async def test_dep_missing_complex_exclude() -> None:
     assert result.true_subset.size == 0
 
 
+def _make_linear_four_assets(
+    condition: AutomationCondition,
+    views: Sequence[str] = (),
+) -> list[dg.AssetsDefinition]:
+    """A -> B -> C -> D, with the condition applied to D.
+
+    Assets named in ``views`` are marked as ``is_view=True``.
+    """
+
+    @dg.asset(is_view="A" in views)
+    def A() -> None: ...
+
+    @dg.asset(deps=["A"], is_view="B" in views)
+    def B() -> None: ...
+
+    @dg.asset(deps=["B"], is_view="C" in views)
+    def C() -> None: ...
+
+    @dg.asset(deps=["C"], automation_condition=condition)
+    def D() -> None: ...
+
+    return [A, B, C, D]
+
+
+def test_transparent_views_basic() -> None:
+    """D's direct dep is C (a view). Looking through it, effective dep becomes B."""
+    condition = AutomationCondition.any_deps_match(
+        AutomationCondition.missing()
+    ).with_transparent_views()
+    assets = _make_linear_four_assets(condition, views=["C"])
+    instance = dg.DagsterInstance.ephemeral()
+
+    # B is missing — effective dep after looking through view C — so D matches
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance)
+    assert result.total_requested == 1
+
+    # Materialize B — now the effective dep is no longer missing
+    instance.report_runless_asset_event(dg.AssetMaterialization("B"))
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance, cursor=result.cursor)
+    assert result.total_requested == 0
+
+
+def test_transparent_views_recursive() -> None:
+    """Looking through views B and C from D should find A as the effective dep."""
+    condition = AutomationCondition.any_deps_match(
+        AutomationCondition.missing()
+    ).with_transparent_views()
+    assets = _make_linear_four_assets(condition, views=["B", "C"])
+    instance = dg.DagsterInstance.ephemeral()
+
+    # A is missing — effective dep after looking through views B and C
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance)
+    assert result.total_requested == 1
+
+    # Materialize A — now no effective deps are missing
+    instance.report_runless_asset_event(dg.AssetMaterialization("A"))
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance, cursor=result.cursor)
+    assert result.total_requested == 0
+
+
+def test_transparent_views_with_allow() -> None:
+    """transparent_views applied first, then allow filters the expanded set."""
+    condition = (
+        AutomationCondition.any_deps_match(AutomationCondition.missing())
+        .with_transparent_views()
+        .allow(AssetSelection.keys("A"))
+    )
+    # C is a view, so D's effective dep becomes B — but allow only permits A
+    assets = _make_linear_four_assets(condition, views=["C"])
+    instance = dg.DagsterInstance.ephemeral()
+
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance)
+    assert result.total_requested == 0
+
+
+def test_transparent_views_with_ignore() -> None:
+    """transparent_views applied first, then ignore filters the expanded set."""
+    condition = (
+        AutomationCondition.any_deps_match(AutomationCondition.missing())
+        .with_transparent_views()
+        .ignore(AssetSelection.keys("B"))
+    )
+    # C is a view, so D's effective dep becomes B — but B is ignored
+    assets = _make_linear_four_assets(condition, views=["C"])
+    instance = dg.DagsterInstance.ephemeral()
+
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance)
+    assert result.total_requested == 0
+
+
+def test_transparent_views_all_deps() -> None:
+    """all_deps_match works with transparent_views."""
+    condition = AutomationCondition.all_deps_match(
+        AutomationCondition.missing()
+    ).with_transparent_views()
+    # B and C are views, so D's only effective dep is A
+    assets = _make_linear_four_assets(condition, views=["B", "C"])
+    instance = dg.DagsterInstance.ephemeral()
+
+    # A is missing — the only effective dep, so all_deps_match(missing) is satisfied
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance)
+    assert result.total_requested == 1
+
+    # Materialize A — now no effective deps are missing
+    instance.report_runless_asset_event(dg.AssetMaterialization("A"))
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance, cursor=result.cursor)
+    assert result.total_requested == 0
+
+
+def test_transparent_views_no_views() -> None:
+    """No assets are views — behavior unchanged from without transparent_views."""
+    condition = AutomationCondition.any_deps_match(
+        AutomationCondition.missing()
+    ).with_transparent_views()
+    assets = _make_linear_four_assets(condition, views=[])
+    instance = dg.DagsterInstance.ephemeral()
+
+    # D's direct dep is C (not a view), C is missing
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance)
+    assert result.total_requested == 1
+
+    # Materialize C — direct dep no longer missing
+    instance.report_runless_asset_event(dg.AssetMaterialization("C"))
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance, cursor=result.cursor)
+    assert result.total_requested == 0
+
+
+def test_on_cron_with_transparent_views() -> None:
+    r"""on_cron().with_transparent_views() propagates through the AndAutomationCondition
+    down to the dep conditions.
+
+    Graph:
+        NV1   NV2   E1   E2
+         |     |     \\  /
+         |    V1      V3   (view, chain)
+          \\   |      |
+           \\  |     V2    (view, chain)
+            \\ |    /
+            target
+
+    target has 3 direct deps: NV1 (non-view), V1 (view -> NV2), V2 (view -> V3 (view) -> E1, E2).
+    With transparent_views, effective deps are: NV1, NV2, E1, E2.
+    """
+    import datetime
+
+    @dg.asset
+    def NV1() -> None: ...
+
+    @dg.asset
+    def NV2() -> None: ...
+
+    @dg.asset
+    def E1() -> None: ...
+
+    @dg.asset
+    def E2() -> None: ...
+
+    @dg.asset(deps=["E1", "E2"], is_view=True)
+    def V3() -> None: ...
+
+    @dg.asset(deps=["V3"], is_view=True)
+    def V2() -> None: ...
+
+    @dg.asset(deps=["NV2"], is_view=True)
+    def V1() -> None: ...
+
+    @dg.asset(
+        deps=["NV1", "V1", "V2"],
+        automation_condition=AutomationCondition.on_cron("0 * * * *").with_transparent_views(),
+    )
+    def target() -> None: ...
+
+    assets = [NV1, NV2, E1, E2, V3, V2, V1, target]
+    instance = dg.DagsterInstance.ephemeral()
+    current_time = datetime.datetime(2020, 2, 2, 0, 55)
+
+    # baseline — no cron tick yet
+    result = dg.evaluate_automation_conditions(
+        defs=assets, instance=instance, evaluation_time=current_time
+    )
+    assert result.total_requested == 0
+
+    # cross cron boundary — deps not updated yet
+    current_time += datetime.timedelta(minutes=10)
+    result = dg.evaluate_automation_conditions(
+        defs=assets, instance=instance, cursor=result.cursor, evaluation_time=current_time
+    )
+    assert result.total_requested == 0
+
+    # materialize some but not all effective deps — still not ready
+    instance.report_runless_asset_event(dg.AssetMaterialization("NV1"))
+    instance.report_runless_asset_event(dg.AssetMaterialization("NV2"))
+    instance.report_runless_asset_event(dg.AssetMaterialization("E1"))
+    current_time += datetime.timedelta(minutes=1)
+    result = dg.evaluate_automation_conditions(
+        defs=assets, instance=instance, cursor=result.cursor, evaluation_time=current_time
+    )
+    assert result.total_requested == 0  # E2 still hasn't been updated
+
+    # materialize E2 — now all effective deps are updated
+    instance.report_runless_asset_event(dg.AssetMaterialization("E2"))
+    current_time += datetime.timedelta(minutes=1)
+    result = dg.evaluate_automation_conditions(
+        defs=assets, instance=instance, cursor=result.cursor, evaluation_time=current_time
+    )
+    assert result.total_requested == 1
+
+
+def test_eager_with_transparent_views() -> None:
+    r"""eager().with_transparent_views() propagates through the AndAutomationCondition
+    down to all dep conditions (any_deps_updated, any_deps_missing, any_deps_in_progress).
+
+    Same graph as test_on_cron_with_transparent_views:
+        NV1   NV2   E1   E2
+         |     |     \\  /
+         |    V1      V3   (view, chain)
+          \\   |      |
+           \\  |     V2    (view, chain)
+            \\ |    /
+            target
+
+    Effective deps with transparent_views: NV1, NV2, E1, E2.
+    """
+
+    @dg.asset
+    def NV1() -> None: ...
+
+    @dg.asset
+    def NV2() -> None: ...
+
+    @dg.asset
+    def E1() -> None: ...
+
+    @dg.asset
+    def E2() -> None: ...
+
+    @dg.asset(deps=["E1", "E2"], is_view=True)
+    def V3() -> None: ...
+
+    @dg.asset(deps=["V3"], is_view=True)
+    def V2() -> None: ...
+
+    @dg.asset(deps=["NV2"], is_view=True)
+    def V1() -> None: ...
+
+    @dg.asset(
+        deps=["NV1", "V1", "V2"],
+        automation_condition=AutomationCondition.eager().with_transparent_views(),
+    )
+    def target() -> None: ...
+
+    assets = [NV1, NV2, E1, E2, V3, V2, V1, target]
+    instance = dg.DagsterInstance.ephemeral()
+
+    # baseline — all effective deps are missing, so any_deps_missing blocks
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance)
+    assert result.total_requested == 0
+
+    # materialize some effective deps — still blocked by missing E2
+    instance.report_runless_asset_event(dg.AssetMaterialization("NV1"))
+    instance.report_runless_asset_event(dg.AssetMaterialization("NV2"))
+    instance.report_runless_asset_event(dg.AssetMaterialization("E1"))
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance, cursor=result.cursor)
+    assert result.total_requested == 0
+
+    # materialize E2 — all effective deps present, target is newly_missing so eager fires
+    instance.report_runless_asset_event(dg.AssetMaterialization("E2"))
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance, cursor=result.cursor)
+    assert result.total_requested == 1
+
+    # handle the request, then update one effective dep — should fire again
+    instance.report_runless_asset_event(dg.AssetMaterialization("target"))
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance, cursor=result.cursor)
+    assert result.total_requested == 0
+
+    instance.report_runless_asset_event(dg.AssetMaterialization("NV1"))
+    result = dg.evaluate_automation_conditions(defs=assets, instance=instance, cursor=result.cursor)
+    assert result.total_requested == 1
+
+
 def test_any_dep_invalid_selection() -> None:
     @dg.asset(
         automation_condition=dg.AutomationCondition.any_deps_match(
