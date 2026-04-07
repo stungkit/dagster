@@ -105,7 +105,7 @@ class BaseAssetNode(BaseEntityNode[AssetKey]):
 
     @property
     @abstractmethod
-    def is_view(self) -> bool: ...
+    def is_virtual(self) -> bool: ...
 
     @property
     @abstractmethod
@@ -451,10 +451,10 @@ class BaseAssetGraph(ABC, Generic[T_AssetNode]):
         """Returns all asset nodes that are direct dependencies on the given asset node."""
         return {self._asset_nodes_by_key[key] for key in self.get(node.key).parent_keys}
 
-    def get_non_view_ancestor_keys(self, key: EntityKey) -> AbstractSet[AssetKey]:
-        """Direct parent asset keys, recursively expanding any parent that is a view asset.
+    def get_non_virtual_ancestor_keys(self, key: EntityKey) -> AbstractSet[AssetKey]:
+        """Direct parent asset keys, recursively expanding any parent that is a virtual asset.
 
-        View assets are excluded from the result; their upstream parents are walked instead.
+        Virtual assets are excluded from the result; their upstream parents are walked instead.
         """
         frontier: set[AssetKey] = set(
             cast("AbstractSet[AssetKey]", self.get(key).parent_entity_keys)
@@ -463,7 +463,7 @@ class BaseAssetGraph(ABC, Generic[T_AssetNode]):
         while frontier:
             current = frontier.pop()
             node = self.get(current)
-            if node.is_view:
+            if node.is_virtual:
                 frontier |= node.parent_entity_keys
             else:
                 resolved.add(current)

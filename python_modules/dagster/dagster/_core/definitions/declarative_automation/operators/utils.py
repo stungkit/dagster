@@ -51,7 +51,7 @@ def has_allow_ignore(
     )
 
 
-def has_transparent_views(
+def has_resolve_through_virtual(
     condition: AutomationCondition,
 ) -> TypeIs[
     Union[

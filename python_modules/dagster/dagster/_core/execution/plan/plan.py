@@ -410,15 +410,15 @@ def _get_ordering_step_keys_for_view(
         return set()
 
     # Use the source asset graph when available, as the job-scoped graph only
-    # includes direct dependencies of selected assets. Transitive view ancestors
+    # includes direct dependencies of selected assets. Transitive virtual ancestors
     # beyond those direct deps are absent from the graph, preventing the
-    # get_non_view_ancestor_keys BFS from traversing the full view chain.
+    # get_non_virtual_ancestor_keys BFS from traversing the full virtual chain.
     asset_graph = asset_layer.asset_graph
     if isinstance(asset_graph, JobScopedAssetGraph):
         asset_graph = asset_graph.source_asset_graph
-    if not asset_graph.has(input_asset_key) or not asset_graph.get(input_asset_key).is_view:
+    if not asset_graph.has(input_asset_key) or not asset_graph.get(input_asset_key).is_virtual:
         return set()
-    ancestor_keys = asset_graph.get_non_view_ancestor_keys(input_asset_key)
+    ancestor_keys = asset_graph.get_non_virtual_ancestor_keys(input_asset_key)
     selected_keys = asset_layer.selected_asset_keys
     step_keys: set[str] = set()
     for ancestor_key in ancestor_keys:

@@ -20,7 +20,7 @@ def test_basic_view_transitive_dep():
     @dg.asset
     def a() -> None: ...
 
-    @dg.asset(deps=["a"], is_view=True)
+    @dg.asset(deps=["a"], is_virtual=True)
     def b() -> None: ...
 
     @dg.asset(deps=["b"])
@@ -51,10 +51,10 @@ def test_chain_of_views():
     @dg.asset
     def a() -> None: ...
 
-    @dg.asset(deps=["a"], is_view=True)
+    @dg.asset(deps=["a"], is_virtual=True)
     def b() -> None: ...
 
-    @dg.asset(deps=["b"], is_view=True)
+    @dg.asset(deps=["b"], is_virtual=True)
     def c() -> None: ...
 
     @dg.asset(deps=["c"])
@@ -79,7 +79,7 @@ def test_diamond_through_view():
     @dg.asset
     def a() -> None: ...
 
-    @dg.asset(deps=["a"], is_view=True)
+    @dg.asset(deps=["a"], is_virtual=True)
     def b() -> None: ...
 
     @dg.asset(deps=["a"])
@@ -112,7 +112,7 @@ def test_multiple_non_view_ancestors():
     @dg.asset
     def c() -> None: ...
 
-    @dg.asset(deps=["a", "c"], is_view=True)
+    @dg.asset(deps=["a", "c"], is_virtual=True)
     def b() -> None: ...
 
     @dg.asset(deps=["b"])
@@ -138,7 +138,7 @@ def test_view_selected_no_ordering_deps():
     @dg.asset
     def a() -> None: ...
 
-    @dg.asset(deps=["a"], is_view=True)
+    @dg.asset(deps=["a"], is_virtual=True)
     def b() -> None: ...
 
     @dg.asset(deps=["b"])
@@ -166,7 +166,7 @@ def test_ancestor_not_in_plan():
     @dg.asset
     def a() -> None: ...
 
-    @dg.asset(deps=["a"], is_view=True)
+    @dg.asset(deps=["a"], is_virtual=True)
     def b() -> None: ...
 
     @dg.asset(deps=["b"])

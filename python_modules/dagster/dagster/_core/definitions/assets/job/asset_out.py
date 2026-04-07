@@ -34,11 +34,6 @@ EMPTY_ASSET_KEY_SENTINEL = AssetKey([])
 
 
 @hidden_param(
-    param="is_view",
-    breaking_version="",
-    emit_runtime_warning=False,
-)
-@hidden_param(
     param="legacy_freshness_policy",
     breaking_version="1.13.0",
 )
@@ -47,6 +42,7 @@ EMPTY_ASSET_KEY_SENTINEL = AssetKey([])
     breaking_version="1.10.0",
     additional_warn_text="use `automation_condition` instead",
 )
+@hidden_param(param="is_virtual", breaking_version="", emit_runtime_warning=False)
 @public
 class AssetOut:
     """Defines one of the assets produced by a :py:func:`@multi_asset <multi_asset>`.
@@ -108,6 +104,7 @@ class AssetOut:
         tags: Mapping[str, str] | None = None,
         kinds: set[str] | None = None,
         freshness_policy: FreshnessPolicy | None = None,
+        is_virtual: bool = False,
         **kwargs,
     ):
         # Accept a hidden "spec" argument to allow for the AssetOut to be constructed from an AssetSpec
@@ -116,7 +113,6 @@ class AssetOut:
         if spec:
             del kwargs["spec"]
 
-        is_view = kwargs.pop("is_view", False)
         only_allow_hidden_params_in_kwargs(AssetOut, kwargs)
         if isinstance(key_prefix, str):
             key_prefix = [key_prefix]
@@ -177,7 +173,7 @@ class AssetOut:
                 owners=check.opt_sequence_param(owners, "owners", of_type=str),
                 tags=normalize_tags(tags or {}, strict=True),
                 kinds=check.opt_set_param(kinds, "kinds", of_type=str),
-                is_view=check.bool_param(is_view, "is_view"),
+                is_virtual=check.bool_param(is_virtual, "is_virtual"),
             )
         self.key_prefix = key_prefix
         self.dagster_type = dagster_type
@@ -228,6 +224,10 @@ class AssetOut:
     @property
     def kinds(self) -> set[str] | None:
         return self._spec.kinds
+
+    @property
+    def is_virtual(self) -> bool:
+        return self._spec.is_virtual
 
     def to_out(self) -> Out:
         return Out(

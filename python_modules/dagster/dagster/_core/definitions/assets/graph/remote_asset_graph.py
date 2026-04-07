@@ -126,8 +126,8 @@ class RemoteAssetNode(BaseAssetNode, ABC):
         return self.resolve_to_singular_repo_scoped_node().asset_node_snap.code_version
 
     @property
-    def is_view(self) -> bool:
-        return self.resolve_to_singular_repo_scoped_node().asset_node_snap.is_view
+    def is_virtual(self) -> bool:
+        return self.resolve_to_singular_repo_scoped_node().asset_node_snap.is_virtual
 
     @property
     def job_names(self) -> Sequence[str]:

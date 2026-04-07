@@ -10,7 +10,7 @@ from dagster._utils.test.data_versions import (
 
 
 def _make_view_asset(name, deps, code_version=None):
-    @dg.asset(name=name, deps=deps, is_view=True, code_version=code_version)
+    @dg.asset(name=name, deps=deps, is_virtual=True, code_version=code_version)
     def _view():
         pass
 

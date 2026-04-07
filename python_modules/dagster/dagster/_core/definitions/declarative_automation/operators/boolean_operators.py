@@ -17,7 +17,7 @@ from dagster._core.definitions.declarative_automation.automation_condition impor
 from dagster._core.definitions.declarative_automation.automation_context import AutomationContext
 from dagster._core.definitions.declarative_automation.operators.utils import (
     has_allow_ignore,
-    has_transparent_views,
+    has_resolve_through_virtual,
 )
 from dagster._core.definitions.declarative_automation.serialized_objects import OperatorType
 from dagster._record import copy, record
@@ -137,15 +137,17 @@ class AndAutomationCondition(BuiltinAutomationCondition[T_EntityKey]):
             ],
         )
 
-    def with_transparent_views(self, value: bool = True) -> "AndAutomationCondition":
-        """Applies the ``.with_transparent_views()`` method across all sub-conditions.
+    def resolve_through_virtual(self, value: bool = True) -> "AndAutomationCondition":
+        """Applies the ``.resolve_through_virtual()`` method across all sub-conditions.
 
         This impacts any dep-related sub-conditions.
         """
         return copy(
             self,
             operands=[
-                child.with_transparent_views(value) if has_transparent_views(child) else child
+                child.resolve_through_virtual(value)
+                if has_resolve_through_virtual(child)
+                else child
                 for child in self.operands
             ],
         )
@@ -257,15 +259,17 @@ class OrAutomationCondition(BuiltinAutomationCondition[T_EntityKey]):
             ],
         )
 
-    def with_transparent_views(self, value: bool = True) -> "OrAutomationCondition":
-        """Applies the ``.with_transparent_views()`` method across all sub-conditions.
+    def resolve_through_virtual(self, value: bool = True) -> "OrAutomationCondition":
+        """Applies the ``.resolve_through_virtual()`` method across all sub-conditions.
 
         This impacts any dep-related sub-conditions.
         """
         return copy(
             self,
             operands=[
-                child.with_transparent_views(value) if has_transparent_views(child) else child
+                child.resolve_through_virtual(value)
+                if has_resolve_through_virtual(child)
+                else child
                 for child in self.operands
             ],
         )
@@ -363,14 +367,14 @@ class NotAutomationCondition(BuiltinAutomationCondition[T_EntityKey]):
             else self.operand,
         )
 
-    def with_transparent_views(self, value: bool = True) -> "NotAutomationCondition":
-        """Applies the ``.with_transparent_views()`` method across all sub-conditions.
+    def resolve_through_virtual(self, value: bool = True) -> "NotAutomationCondition":
+        """Applies the ``.resolve_through_virtual()`` method across all sub-conditions.
 
         This impacts any dep-related sub-conditions.
         """
         return copy(
             self,
-            operand=self.operand.with_transparent_views(value)
-            if has_transparent_views(self.operand)
+            operand=self.operand.resolve_through_virtual(value)
+            if has_resolve_through_virtual(self.operand)
             else self.operand,
         )

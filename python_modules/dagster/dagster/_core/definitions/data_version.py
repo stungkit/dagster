@@ -443,15 +443,17 @@ class CachingStaleStatusResolver:
         else:
             current_version = self._get_current_data_version(key=key)
             if current_version == NULL_DATA_VERSION:
-                if asset.is_view:
+                if asset.is_virtual:
                     # A view is MISSING only when none of its non-view ancestors
                     # have been materialized yet. Otherwise it is
                     # FRESH/STALE based on its stale causes (e.g. code version).
-                    non_view_ancestors = self.asset_graph.get_non_view_ancestor_keys(key.asset_key)
+                    non_virtual_ancestors = self.asset_graph.get_non_virtual_ancestor_keys(
+                        key.asset_key
+                    )
                     any_ancestor_materialized = any(
                         self._get_current_data_version(key=AssetKeyPartitionKey(ak, None))
                         != NULL_DATA_VERSION
-                        for ak in non_view_ancestors
+                        for ak in non_virtual_ancestors
                     )
                     if any_ancestor_materialized:
                         causes = self._get_stale_causes(key=key)
@@ -473,7 +475,10 @@ class CachingStaleStatusResolver:
             return []
         elif asset.is_external:
             return []
-        elif asset.is_view:
+        elif asset.is_virtual:
+            current_version = self._get_current_data_version(key=key)
+            if current_version == NULL_DATA_VERSION:
+                return []
             code_cause = self._get_code_version_stale_cause(key=key)
             return [code_cause] if code_cause else []
         else:
@@ -646,14 +651,15 @@ class CachingStaleStatusResolver:
                         ],
                     )
 
-        # Propagate staleness through view dependencies. Views are transparent
-        # for staleness: if a non-view ancestor behind a view has been updated
-        # since this asset's last materialization, we treat this asset as stale.
+        # Propagate staleness through virtual dependencies. Virtual assets are
+        # transparent for staleness: if a non-virtual ancestor behind a virtual
+        # asset has been updated since this asset's last materialization, we treat
+        # this asset as stale.
         for dep_asset_key in self.asset_graph.get(key.asset_key).parent_keys:
-            if not self.asset_graph.get(dep_asset_key).is_view:
+            if not self.asset_graph.get(dep_asset_key).is_virtual:
                 continue
-            non_view_ancestors = self.asset_graph.get_non_view_ancestor_keys(dep_asset_key)
-            for ancestor_key in sorted(non_view_ancestors):
+            non_virtual_ancestors = self.asset_graph.get_non_virtual_ancestor_keys(dep_asset_key)
+            for ancestor_key in sorted(non_virtual_ancestors):
                 ancestor_dep = AssetKeyPartitionKey(ancestor_key, None)
                 ancestor_record = self._get_latest_data_version_record(key=ancestor_dep)
                 if ancestor_record is not None and ancestor_record.timestamp > materialization_time:

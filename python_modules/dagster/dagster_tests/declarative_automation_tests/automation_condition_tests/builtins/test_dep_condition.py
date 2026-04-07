@@ -234,16 +234,16 @@ def _make_linear_four_assets(
 ) -> list[dg.AssetsDefinition]:
     """A -> B -> C -> D, with the condition applied to D.
 
-    Assets named in ``views`` are marked as ``is_view=True``.
+    Assets named in ``views`` are marked as ``is_virtual=True``.
     """
 
-    @dg.asset(is_view="A" in views)
+    @dg.asset(is_virtual="A" in views)
     def A() -> None: ...
 
-    @dg.asset(deps=["A"], is_view="B" in views)
+    @dg.asset(deps=["A"], is_virtual="B" in views)
     def B() -> None: ...
 
-    @dg.asset(deps=["B"], is_view="C" in views)
+    @dg.asset(deps=["B"], is_virtual="C" in views)
     def C() -> None: ...
 
     @dg.asset(deps=["C"], automation_condition=condition)
@@ -252,11 +252,11 @@ def _make_linear_four_assets(
     return [A, B, C, D]
 
 
-def test_transparent_views_basic() -> None:
+def test_resolve_through_virtual_basic() -> None:
     """D's direct dep is C (a view). Looking through it, effective dep becomes B."""
     condition = AutomationCondition.any_deps_match(
         AutomationCondition.missing()
-    ).with_transparent_views()
+    ).resolve_through_virtual()
     assets = _make_linear_four_assets(condition, views=["C"])
     instance = dg.DagsterInstance.ephemeral()
 
@@ -270,11 +270,11 @@ def test_transparent_views_basic() -> None:
     assert result.total_requested == 0
 
 
-def test_transparent_views_recursive() -> None:
+def test_resolve_through_virtual_recursive() -> None:
     """Looking through views B and C from D should find A as the effective dep."""
     condition = AutomationCondition.any_deps_match(
         AutomationCondition.missing()
-    ).with_transparent_views()
+    ).resolve_through_virtual()
     assets = _make_linear_four_assets(condition, views=["B", "C"])
     instance = dg.DagsterInstance.ephemeral()
 
@@ -288,11 +288,11 @@ def test_transparent_views_recursive() -> None:
     assert result.total_requested == 0
 
 
-def test_transparent_views_with_allow() -> None:
-    """transparent_views applied first, then allow filters the expanded set."""
+def test_resolve_through_virtual_with_allow() -> None:
+    """resolve_through_virtual applied first, then allow filters the expanded set."""
     condition = (
         AutomationCondition.any_deps_match(AutomationCondition.missing())
-        .with_transparent_views()
+        .resolve_through_virtual()
         .allow(AssetSelection.keys("A"))
     )
     # C is a view, so D's effective dep becomes B — but allow only permits A
@@ -303,11 +303,11 @@ def test_transparent_views_with_allow() -> None:
     assert result.total_requested == 0
 
 
-def test_transparent_views_with_ignore() -> None:
-    """transparent_views applied first, then ignore filters the expanded set."""
+def test_resolve_through_virtual_with_ignore() -> None:
+    """resolve_through_virtual applied first, then ignore filters the expanded set."""
     condition = (
         AutomationCondition.any_deps_match(AutomationCondition.missing())
-        .with_transparent_views()
+        .resolve_through_virtual()
         .ignore(AssetSelection.keys("B"))
     )
     # C is a view, so D's effective dep becomes B — but B is ignored
@@ -318,11 +318,11 @@ def test_transparent_views_with_ignore() -> None:
     assert result.total_requested == 0
 
 
-def test_transparent_views_all_deps() -> None:
-    """all_deps_match works with transparent_views."""
+def test_resolve_through_virtual_all_deps() -> None:
+    """all_deps_match works with resolve_through_virtual."""
     condition = AutomationCondition.all_deps_match(
         AutomationCondition.missing()
-    ).with_transparent_views()
+    ).resolve_through_virtual()
     # B and C are views, so D's only effective dep is A
     assets = _make_linear_four_assets(condition, views=["B", "C"])
     instance = dg.DagsterInstance.ephemeral()
@@ -337,11 +337,11 @@ def test_transparent_views_all_deps() -> None:
     assert result.total_requested == 0
 
 
-def test_transparent_views_no_views() -> None:
-    """No assets are views — behavior unchanged from without transparent_views."""
+def test_resolve_through_virtual_no_views() -> None:
+    """No assets are views — behavior unchanged from without resolve_through_virtual."""
     condition = AutomationCondition.any_deps_match(
         AutomationCondition.missing()
-    ).with_transparent_views()
+    ).resolve_through_virtual()
     assets = _make_linear_four_assets(condition, views=[])
     instance = dg.DagsterInstance.ephemeral()
 
@@ -355,8 +355,8 @@ def test_transparent_views_no_views() -> None:
     assert result.total_requested == 0
 
 
-def test_on_cron_with_transparent_views() -> None:
-    r"""on_cron().with_transparent_views() propagates through the AndAutomationCondition
+def test_on_cron_resolve_through_virtual() -> None:
+    r"""on_cron().resolve_through_virtual() propagates through the AndAutomationCondition
     down to the dep conditions.
 
     Graph:
@@ -369,7 +369,7 @@ def test_on_cron_with_transparent_views() -> None:
             target
 
     target has 3 direct deps: NV1 (non-view), V1 (view -> NV2), V2 (view -> V3 (view) -> E1, E2).
-    With transparent_views, effective deps are: NV1, NV2, E1, E2.
+    With resolve_through_virtual, effective deps are: NV1, NV2, E1, E2.
     """
     import datetime
 
@@ -385,18 +385,18 @@ def test_on_cron_with_transparent_views() -> None:
     @dg.asset
     def E2() -> None: ...
 
-    @dg.asset(deps=["E1", "E2"], is_view=True)
+    @dg.asset(deps=["E1", "E2"], is_virtual=True)
     def V3() -> None: ...
 
-    @dg.asset(deps=["V3"], is_view=True)
+    @dg.asset(deps=["V3"], is_virtual=True)
     def V2() -> None: ...
 
-    @dg.asset(deps=["NV2"], is_view=True)
+    @dg.asset(deps=["NV2"], is_virtual=True)
     def V1() -> None: ...
 
     @dg.asset(
         deps=["NV1", "V1", "V2"],
-        automation_condition=AutomationCondition.on_cron("0 * * * *").with_transparent_views(),
+        automation_condition=AutomationCondition.on_cron("0 * * * *").resolve_through_virtual(),
     )
     def target() -> None: ...
 
@@ -436,11 +436,11 @@ def test_on_cron_with_transparent_views() -> None:
     assert result.total_requested == 1
 
 
-def test_eager_with_transparent_views() -> None:
-    r"""eager().with_transparent_views() propagates through the AndAutomationCondition
+def test_eager_resolve_through_virtual() -> None:
+    r"""eager().resolve_through_virtual() propagates through the AndAutomationCondition
     down to all dep conditions (any_deps_updated, any_deps_missing, any_deps_in_progress).
 
-    Same graph as test_on_cron_with_transparent_views:
+    Same graph as test_on_cron_resolve_through_virtual:
         NV1   NV2   E1   E2
          |     |     \\  /
          |    V1      V3   (view, chain)
@@ -449,7 +449,7 @@ def test_eager_with_transparent_views() -> None:
             \\ |    /
             target
 
-    Effective deps with transparent_views: NV1, NV2, E1, E2.
+    Effective deps with resolve_through_virtual: NV1, NV2, E1, E2.
     """
 
     @dg.asset
@@ -464,18 +464,18 @@ def test_eager_with_transparent_views() -> None:
     @dg.asset
     def E2() -> None: ...
 
-    @dg.asset(deps=["E1", "E2"], is_view=True)
+    @dg.asset(deps=["E1", "E2"], is_virtual=True)
     def V3() -> None: ...
 
-    @dg.asset(deps=["V3"], is_view=True)
+    @dg.asset(deps=["V3"], is_virtual=True)
     def V2() -> None: ...
 
-    @dg.asset(deps=["NV2"], is_view=True)
+    @dg.asset(deps=["NV2"], is_virtual=True)
     def V1() -> None: ...
 
     @dg.asset(
         deps=["NV1", "V1", "V2"],
-        automation_condition=AutomationCondition.eager().with_transparent_views(),
+        automation_condition=AutomationCondition.eager().resolve_through_virtual(),
     )
     def target() -> None: ...
 

@@ -117,7 +117,7 @@ class DepsAutomationCondition(BuiltinAutomationCondition[T_EntityKey]):
     allow_selection: Any | None = None
     ignore_selection: Any | None = None
 
-    transparent_views: bool = False
+    resolves_virtual_deps: bool = False
 
     @property
     @abstractmethod
@@ -131,8 +131,8 @@ class DepsAutomationCondition(BuiltinAutomationCondition[T_EntityKey]):
             props.append(f"allow_selection={self.allow_selection}")
         if self.ignore_selection is not None:
             props.append(f"ignore_selection={self.ignore_selection}")
-        if self.transparent_views:
-            props.append("transparent_views=True")
+        if self.resolves_virtual_deps:
+            props.append("resolves_virtual_deps=True")
 
         if props:
             name += f"({','.join(props)})"
@@ -183,15 +183,15 @@ class DepsAutomationCondition(BuiltinAutomationCondition[T_EntityKey]):
         )
         return copy(self, ignore_selection=ignore_selection)
 
-    def with_transparent_views(self, value: bool = True) -> "DepsAutomationCondition":
-        return copy(self, transparent_views=value)
+    def resolve_through_virtual(self, value: bool = True) -> "DepsAutomationCondition":
+        return copy(self, resolves_virtual_deps=value)
 
     def _get_dep_keys(
         self, key: T_EntityKey, asset_graph: BaseAssetGraph[BaseAssetNode]
     ) -> AbstractSet[AssetKey]:
         dep_keys = (
-            set(asset_graph.get_non_view_ancestor_keys(key))
-            if self.transparent_views
+            set(asset_graph.get_non_virtual_ancestor_keys(key))
+            if self.resolves_virtual_deps
             else set(asset_graph.get(key).parent_entity_keys)
         )
         if self.allow_selection is not None:
