@@ -1,6 +1,8 @@
 from collections.abc import Iterable, Mapping, Sequence
 from typing import AbstractSet, Any, Callable, NamedTuple, overload  # noqa: UP035
 
+from dagster_shared.utils.warnings import preview_warning
+
 import dagster._check as check
 from dagster._annotations import (
     beta_param,
@@ -151,7 +153,6 @@ def _validate_hidden_non_argument_dep_param(
     emit_runtime_warning=False,
     breaking_version="1.10.0",
 )
-@hidden_param(param="is_virtual", breaking_version="", emit_runtime_warning=False)
 def asset(
     compute_fn: Callable[..., Any] | None = None,
     *,
@@ -314,6 +315,9 @@ def asset(
     }
 
     only_allow_hidden_params_in_kwargs(asset, kwargs)
+
+    if is_virtual:
+        preview_warning("Virtual assets")
 
     args = AssetDecoratorArgs(
         name=name,

@@ -5,6 +5,7 @@ from types import EllipsisType
 from typing import TYPE_CHECKING, AbstractSet, Any, Callable, Union, overload  # noqa: UP035
 
 from dagster_shared.serdes import whitelist_for_serdes
+from dagster_shared.utils.warnings import preview_warning
 
 import dagster._check as check
 from dagster._annotations import (
@@ -103,7 +104,6 @@ def validate_kind_tags(kinds: AbstractSet[str] | None) -> None:
     breaking_version="1.10.0",
     additional_warn_text="use `automation_condition` instead",
 )
-@hidden_param(param="is_virtual", breaking_version="", emit_runtime_warning=False)
 @public
 @record_custom
 class AssetSpec(IHasInternalInit, IHaveNew, LegacyNamedTupleMixin):
@@ -180,6 +180,9 @@ class AssetSpec(IHasInternalInit, IHaveNew, LegacyNamedTupleMixin):
         )
 
         only_allow_hidden_params_in_kwargs(AssetSpec, kwargs)
+
+        if is_virtual:
+            preview_warning("Virtual assets")
 
         key = AssetKey.from_coercible(key)
         asset_deps = coerce_to_deps_and_check_duplicates(deps, key)
