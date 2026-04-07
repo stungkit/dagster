@@ -114,6 +114,18 @@ def test_invalid_external_asset_creation() -> None:
             external_assets_from_specs(specs=[invalid_spec])
 
 
+def test_invalid_external_asset_creation_via_definitions() -> None:
+    invalid_specs = [
+        dg.AssetSpec("invalid_asset1", auto_materialize_policy=AutoMaterializePolicy.eager()),
+        dg.AssetSpec("invalid_asset2", code_version="ksjdfljs"),
+        dg.AssetSpec("invalid_asset2", skippable=True),
+    ]
+
+    for invalid_spec in invalid_specs:
+        with pytest.raises(check.CheckError):
+            dg.Definitions(assets=[invalid_spec]).get_repository_def()
+
+
 def test_normal_asset_materializeable() -> None:
     @dg.asset
     def an_asset() -> None: ...
