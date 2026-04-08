@@ -19,7 +19,7 @@ def _report_asset_materialization_to_dagster_plus(
     new_organization: str,
     new_deployment: str,
     new_dagster_cloud_api_token: str,
-    asset_key: str,
+    asset_key: list[str],
     partition: str | None,
     metadata: dict | None,
 ):
@@ -74,7 +74,7 @@ def migrate_metadata_asset(context: AssetExecutionContext, config: MetadataMigra
             new_organization=new_organization,
             new_deployment=new_deployment,
             new_dagster_cloud_api_token=new_dagster_cloud_api_token,
-            asset_key=asset_key,
+            asset_key=AssetKey.from_user_string(asset_key).path,
             partition=partition_to_report,  # type: ignore
             metadata=metadata_to_report,  # type: ignore
         )
