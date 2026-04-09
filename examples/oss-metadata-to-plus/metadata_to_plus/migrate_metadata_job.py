@@ -1,6 +1,7 @@
 # Docs: https://docs.dagster.io/api/python-api/external-assets-rest-api
 
 import os
+from collections.abc import Sequence
 
 import requests
 from dagster import (
@@ -19,7 +20,7 @@ def _report_asset_materialization_to_dagster_plus(
     new_organization: str,
     new_deployment: str,
     new_dagster_cloud_api_token: str,
-    asset_key: list[str],
+    asset_key: Sequence[str],
     partition: str | None,
     metadata: dict | None,
 ):
