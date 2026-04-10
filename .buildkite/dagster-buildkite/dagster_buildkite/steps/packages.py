@@ -826,7 +826,7 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
         PackageSpec(
             oss_path("python_modules/libraries/dagster-dg-cli"),
             pytest_tox_factors=[
-                ToxFactor("general", splits=3),
+                ToxFactor("general"),
                 ToxFactor("plus"),
             ],
             env_vars=["SHELL"],
