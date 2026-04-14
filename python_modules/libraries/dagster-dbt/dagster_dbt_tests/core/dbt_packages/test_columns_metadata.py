@@ -1,3 +1,4 @@
+import gc
 import json
 import os
 import subprocess
@@ -29,6 +30,19 @@ from dagster_dbt_tests.dbt_projects import (
 )
 
 pytestmark: pytest.MarkDecorator = pytest.mark.derived_metadata
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_duckdb_connections():
+    """Force garbage collection after each test to close lingering DuckDB adapter connections.
+
+    The dbt adapter opens a READ_ONLY DuckDB connection during ``fetch_column_metadata``.
+    If this connection is not closed before the next test's ``dbt build`` subprocess tries
+    to acquire a write lock on the same file, DuckDB raises an IO lock error. Forcing GC
+    ensures the adapter (and its connection) is collected promptly.
+    """
+    yield
+    gc.collect()
 
 
 def test_no_column_schema(test_jaffle_shop_manifest: dict[str, Any]) -> None:
