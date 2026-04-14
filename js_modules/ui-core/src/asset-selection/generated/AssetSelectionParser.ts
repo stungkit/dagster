@@ -1,4 +1,4 @@
-// Generated from /Users/bengotow/Work/F376/Projects/dagster-internal/dagster-oss/python_modules/dagster/dagster/_core/definitions/antlr_asset_selection/AssetSelection.g4 by ANTLR 4.13.1
+// Generated from /home/user/internal/dagster-oss/python_modules/dagster/dagster/_core/definitions/antlr_asset_selection/AssetSelection.g4 by ANTLR 4.13.1
 
 import * as antlr from 'antlr4ng';
 import {Token} from 'antlr4ng';
@@ -34,13 +34,14 @@ export class AssetSelectionParser extends antlr.Parser {
   public static readonly COLUMN_TAG = 21;
   public static readonly CHANGED_IN_BRANCH = 22;
   public static readonly PARTITIONS = 23;
-  public static readonly SINKS = 24;
-  public static readonly ROOTS = 25;
-  public static readonly QUOTED_STRING = 26;
-  public static readonly UNQUOTED_STRING = 27;
-  public static readonly UNQUOTED_WILDCARD_STRING = 28;
-  public static readonly NULL_STRING = 29;
-  public static readonly WS = 30;
+  public static readonly AUTOMATION_TYPE = 24;
+  public static readonly SINKS = 25;
+  public static readonly ROOTS = 26;
+  public static readonly QUOTED_STRING = 27;
+  public static readonly UNQUOTED_STRING = 28;
+  public static readonly UNQUOTED_WILDCARD_STRING = 29;
+  public static readonly NULL_STRING = 30;
+  public static readonly WS = 31;
   public static readonly RULE_start = 0;
   public static readonly RULE_expr = 1;
   public static readonly RULE_traversalAllowedExpr = 2;
@@ -76,6 +77,7 @@ export class AssetSelectionParser extends antlr.Parser {
     "'column_tag'",
     "'changed_in_branch'",
     "'partitions'",
+    "'automation_type'",
     "'sinks'",
     "'roots'",
     null,
@@ -109,6 +111,7 @@ export class AssetSelectionParser extends antlr.Parser {
     'COLUMN_TAG',
     'CHANGED_IN_BRANCH',
     'PARTITIONS',
+    'AUTOMATION_TYPE',
     'SINKS',
     'ROOTS',
     'QUOTED_STRING',
@@ -364,6 +367,7 @@ export class AssetSelectionParser extends antlr.Parser {
         case AssetSelectionParser.COLUMN_TAG:
         case AssetSelectionParser.CHANGED_IN_BRANCH:
         case AssetSelectionParser.PARTITIONS:
+        case AssetSelectionParser.AUTOMATION_TYPE:
           localContext = new AttributeExpressionContext(localContext);
           this.enterOuterAlt(localContext, 1);
           {
@@ -485,7 +489,7 @@ export class AssetSelectionParser extends antlr.Parser {
       {
         this.state = 70;
         _la = this.tokenStream.LA(1);
-        if (!(_la === 24 || _la === 25)) {
+        if (!(_la === 25 || _la === 26)) {
           this.errorHandler.recoverInline(this);
         } else {
           this.errorHandler.reportMatch(this);
@@ -508,7 +512,7 @@ export class AssetSelectionParser extends antlr.Parser {
     let localContext = new AttributeExprContext(this.context, this.state);
     this.enterRule(localContext, 12, AssetSelectionParser.RULE_attributeExpr);
     try {
-      this.state = 116;
+      this.state = 119;
       this.errorHandler.sync(this);
       switch (this.tokenStream.LA(1)) {
         case AssetSelectionParser.KEY:
@@ -679,6 +683,18 @@ export class AssetSelectionParser extends antlr.Parser {
             this.value();
           }
           break;
+        case AssetSelectionParser.AUTOMATION_TYPE:
+          localContext = new AutomationTypeAttributeExprContext(localContext);
+          this.enterOuterAlt(localContext, 13);
+          {
+            this.state = 116;
+            this.match(AssetSelectionParser.AUTOMATION_TYPE);
+            this.state = 117;
+            this.match(AssetSelectionParser.COLON);
+            this.state = 118;
+            this.value();
+          }
+          break;
         default:
           throw new antlr.NoViableAltException(this);
       }
@@ -701,9 +717,9 @@ export class AssetSelectionParser extends antlr.Parser {
     try {
       this.enterOuterAlt(localContext, 1);
       {
-        this.state = 118;
+        this.state = 121;
         _la = this.tokenStream.LA(1);
-        if (!((_la & ~0x1f) === 0 && ((1 << _la) & 738197504) !== 0)) {
+        if (!((_la & ~0x1f) === 0 && ((1 << _la) & 1476395008) !== 0)) {
           this.errorHandler.recoverInline(this);
         } else {
           this.errorHandler.reportMatch(this);
@@ -729,9 +745,9 @@ export class AssetSelectionParser extends antlr.Parser {
     try {
       this.enterOuterAlt(localContext, 1);
       {
-        this.state = 120;
+        this.state = 123;
         _la = this.tokenStream.LA(1);
-        if (!((_la & ~0x1f) === 0 && ((1 << _la) & 469762048) !== 0)) {
+        if (!((_la & ~0x1f) === 0 && ((1 << _la) & 939524096) !== 0)) {
           this.errorHandler.recoverInline(this);
         } else {
           this.errorHandler.reportMatch(this);
@@ -773,46 +789,47 @@ export class AssetSelectionParser extends antlr.Parser {
   }
 
   public static readonly _serializedATN: number[] = [
-    4, 1, 30, 123, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7, 4, 2, 5, 7, 5, 2, 6, 7,
+    4, 1, 31, 126, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7, 4, 2, 5, 7, 5, 2, 6, 7,
     6, 2, 7, 7, 7, 2, 8, 7, 8, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 37, 8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 5, 1,
     45, 8, 1, 10, 1, 12, 1, 48, 9, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 3,
     2, 60, 8, 2, 1, 3, 3, 3, 63, 8, 3, 1, 3, 1, 3, 1, 4, 1, 4, 3, 4, 69, 8, 4, 1, 5, 1, 5, 1, 6, 1,
     6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 3, 6, 81, 8, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6,
     1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6,
-    3, 6, 106, 8, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 3, 6, 117, 8, 6, 1, 7, 1,
-    7, 1, 8, 1, 8, 1, 8, 0, 1, 2, 9, 0, 2, 4, 6, 8, 10, 12, 14, 16, 0, 3, 1, 0, 24, 25, 2, 0, 26,
-    27, 29, 29, 1, 0, 26, 28, 137, 0, 18, 1, 0, 0, 0, 2, 36, 1, 0, 0, 0, 4, 59, 1, 0, 0, 0, 6, 62,
-    1, 0, 0, 0, 8, 66, 1, 0, 0, 0, 10, 70, 1, 0, 0, 0, 12, 116, 1, 0, 0, 0, 14, 118, 1, 0, 0, 0, 16,
-    120, 1, 0, 0, 0, 18, 19, 3, 2, 1, 0, 19, 20, 5, 0, 0, 1, 20, 1, 1, 0, 0, 0, 21, 22, 6, 1, -1, 0,
-    22, 37, 3, 4, 2, 0, 23, 24, 3, 6, 3, 0, 24, 25, 3, 4, 2, 0, 25, 26, 3, 8, 4, 0, 26, 37, 1, 0, 0,
-    0, 27, 28, 3, 6, 3, 0, 28, 29, 3, 4, 2, 0, 29, 37, 1, 0, 0, 0, 30, 31, 3, 4, 2, 0, 31, 32, 3, 8,
-    4, 0, 32, 37, 1, 0, 0, 0, 33, 34, 5, 4, 0, 0, 34, 37, 3, 2, 1, 4, 35, 37, 5, 5, 0, 0, 36, 21, 1,
-    0, 0, 0, 36, 23, 1, 0, 0, 0, 36, 27, 1, 0, 0, 0, 36, 30, 1, 0, 0, 0, 36, 33, 1, 0, 0, 0, 36, 35,
-    1, 0, 0, 0, 37, 46, 1, 0, 0, 0, 38, 39, 10, 3, 0, 0, 39, 40, 5, 2, 0, 0, 40, 45, 3, 2, 1, 4, 41,
-    42, 10, 2, 0, 0, 42, 43, 5, 3, 0, 0, 43, 45, 3, 2, 1, 3, 44, 38, 1, 0, 0, 0, 44, 41, 1, 0, 0, 0,
-    45, 48, 1, 0, 0, 0, 46, 44, 1, 0, 0, 0, 46, 47, 1, 0, 0, 0, 47, 3, 1, 0, 0, 0, 48, 46, 1, 0, 0,
-    0, 49, 60, 3, 12, 6, 0, 50, 51, 3, 10, 5, 0, 51, 52, 5, 9, 0, 0, 52, 53, 3, 2, 1, 0, 53, 54, 5,
-    10, 0, 0, 54, 60, 1, 0, 0, 0, 55, 56, 5, 9, 0, 0, 56, 57, 3, 2, 1, 0, 57, 58, 5, 10, 0, 0, 58,
-    60, 1, 0, 0, 0, 59, 49, 1, 0, 0, 0, 59, 50, 1, 0, 0, 0, 59, 55, 1, 0, 0, 0, 60, 5, 1, 0, 0, 0,
-    61, 63, 5, 7, 0, 0, 62, 61, 1, 0, 0, 0, 62, 63, 1, 0, 0, 0, 63, 64, 1, 0, 0, 0, 64, 65, 5, 6, 0,
-    0, 65, 7, 1, 0, 0, 0, 66, 68, 5, 6, 0, 0, 67, 69, 5, 7, 0, 0, 68, 67, 1, 0, 0, 0, 68, 69, 1, 0,
-    0, 0, 69, 9, 1, 0, 0, 0, 70, 71, 7, 0, 0, 0, 71, 11, 1, 0, 0, 0, 72, 73, 5, 12, 0, 0, 73, 74, 5,
-    8, 0, 0, 74, 117, 3, 16, 8, 0, 75, 76, 5, 15, 0, 0, 76, 77, 5, 8, 0, 0, 77, 80, 3, 14, 7, 0, 78,
-    79, 5, 1, 0, 0, 79, 81, 3, 14, 7, 0, 80, 78, 1, 0, 0, 0, 80, 81, 1, 0, 0, 0, 81, 117, 1, 0, 0,
-    0, 82, 83, 5, 13, 0, 0, 83, 84, 5, 8, 0, 0, 84, 117, 3, 14, 7, 0, 85, 86, 5, 14, 0, 0, 86, 87,
-    5, 8, 0, 0, 87, 117, 3, 14, 7, 0, 88, 89, 5, 16, 0, 0, 89, 90, 5, 8, 0, 0, 90, 117, 3, 14, 7, 0,
-    91, 92, 5, 18, 0, 0, 92, 93, 5, 8, 0, 0, 93, 117, 3, 14, 7, 0, 94, 95, 5, 19, 0, 0, 95, 96, 5,
-    8, 0, 0, 96, 117, 3, 14, 7, 0, 97, 98, 5, 20, 0, 0, 98, 99, 5, 8, 0, 0, 99, 117, 3, 14, 7, 0,
-    100, 101, 5, 21, 0, 0, 101, 102, 5, 8, 0, 0, 102, 105, 3, 14, 7, 0, 103, 104, 5, 1, 0, 0, 104,
-    106, 3, 14, 7, 0, 105, 103, 1, 0, 0, 0, 105, 106, 1, 0, 0, 0, 106, 117, 1, 0, 0, 0, 107, 108, 5,
-    17, 0, 0, 108, 109, 5, 8, 0, 0, 109, 117, 3, 14, 7, 0, 110, 111, 5, 22, 0, 0, 111, 112, 5, 8, 0,
-    0, 112, 117, 3, 14, 7, 0, 113, 114, 5, 23, 0, 0, 114, 115, 5, 8, 0, 0, 115, 117, 3, 14, 7, 0,
-    116, 72, 1, 0, 0, 0, 116, 75, 1, 0, 0, 0, 116, 82, 1, 0, 0, 0, 116, 85, 1, 0, 0, 0, 116, 88, 1,
-    0, 0, 0, 116, 91, 1, 0, 0, 0, 116, 94, 1, 0, 0, 0, 116, 97, 1, 0, 0, 0, 116, 100, 1, 0, 0, 0,
-    116, 107, 1, 0, 0, 0, 116, 110, 1, 0, 0, 0, 116, 113, 1, 0, 0, 0, 117, 13, 1, 0, 0, 0, 118, 119,
-    7, 1, 0, 0, 119, 15, 1, 0, 0, 0, 120, 121, 7, 2, 0, 0, 121, 17, 1, 0, 0, 0, 9, 36, 44, 46, 59,
-    62, 68, 80, 105, 116,
+    3, 6, 106, 8, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 3, 6,
+    120, 8, 6, 1, 7, 1, 7, 1, 8, 1, 8, 1, 8, 0, 1, 2, 9, 0, 2, 4, 6, 8, 10, 12, 14, 16, 0, 3, 1, 0,
+    25, 26, 2, 0, 27, 28, 30, 30, 1, 0, 27, 29, 141, 0, 18, 1, 0, 0, 0, 2, 36, 1, 0, 0, 0, 4, 59, 1,
+    0, 0, 0, 6, 62, 1, 0, 0, 0, 8, 66, 1, 0, 0, 0, 10, 70, 1, 0, 0, 0, 12, 119, 1, 0, 0, 0, 14, 121,
+    1, 0, 0, 0, 16, 123, 1, 0, 0, 0, 18, 19, 3, 2, 1, 0, 19, 20, 5, 0, 0, 1, 20, 1, 1, 0, 0, 0, 21,
+    22, 6, 1, -1, 0, 22, 37, 3, 4, 2, 0, 23, 24, 3, 6, 3, 0, 24, 25, 3, 4, 2, 0, 25, 26, 3, 8, 4, 0,
+    26, 37, 1, 0, 0, 0, 27, 28, 3, 6, 3, 0, 28, 29, 3, 4, 2, 0, 29, 37, 1, 0, 0, 0, 30, 31, 3, 4, 2,
+    0, 31, 32, 3, 8, 4, 0, 32, 37, 1, 0, 0, 0, 33, 34, 5, 4, 0, 0, 34, 37, 3, 2, 1, 4, 35, 37, 5, 5,
+    0, 0, 36, 21, 1, 0, 0, 0, 36, 23, 1, 0, 0, 0, 36, 27, 1, 0, 0, 0, 36, 30, 1, 0, 0, 0, 36, 33, 1,
+    0, 0, 0, 36, 35, 1, 0, 0, 0, 37, 46, 1, 0, 0, 0, 38, 39, 10, 3, 0, 0, 39, 40, 5, 2, 0, 0, 40,
+    45, 3, 2, 1, 4, 41, 42, 10, 2, 0, 0, 42, 43, 5, 3, 0, 0, 43, 45, 3, 2, 1, 3, 44, 38, 1, 0, 0, 0,
+    44, 41, 1, 0, 0, 0, 45, 48, 1, 0, 0, 0, 46, 44, 1, 0, 0, 0, 46, 47, 1, 0, 0, 0, 47, 3, 1, 0, 0,
+    0, 48, 46, 1, 0, 0, 0, 49, 60, 3, 12, 6, 0, 50, 51, 3, 10, 5, 0, 51, 52, 5, 9, 0, 0, 52, 53, 3,
+    2, 1, 0, 53, 54, 5, 10, 0, 0, 54, 60, 1, 0, 0, 0, 55, 56, 5, 9, 0, 0, 56, 57, 3, 2, 1, 0, 57,
+    58, 5, 10, 0, 0, 58, 60, 1, 0, 0, 0, 59, 49, 1, 0, 0, 0, 59, 50, 1, 0, 0, 0, 59, 55, 1, 0, 0, 0,
+    60, 5, 1, 0, 0, 0, 61, 63, 5, 7, 0, 0, 62, 61, 1, 0, 0, 0, 62, 63, 1, 0, 0, 0, 63, 64, 1, 0, 0,
+    0, 64, 65, 5, 6, 0, 0, 65, 7, 1, 0, 0, 0, 66, 68, 5, 6, 0, 0, 67, 69, 5, 7, 0, 0, 68, 67, 1, 0,
+    0, 0, 68, 69, 1, 0, 0, 0, 69, 9, 1, 0, 0, 0, 70, 71, 7, 0, 0, 0, 71, 11, 1, 0, 0, 0, 72, 73, 5,
+    12, 0, 0, 73, 74, 5, 8, 0, 0, 74, 120, 3, 16, 8, 0, 75, 76, 5, 15, 0, 0, 76, 77, 5, 8, 0, 0, 77,
+    80, 3, 14, 7, 0, 78, 79, 5, 1, 0, 0, 79, 81, 3, 14, 7, 0, 80, 78, 1, 0, 0, 0, 80, 81, 1, 0, 0,
+    0, 81, 120, 1, 0, 0, 0, 82, 83, 5, 13, 0, 0, 83, 84, 5, 8, 0, 0, 84, 120, 3, 14, 7, 0, 85, 86,
+    5, 14, 0, 0, 86, 87, 5, 8, 0, 0, 87, 120, 3, 14, 7, 0, 88, 89, 5, 16, 0, 0, 89, 90, 5, 8, 0, 0,
+    90, 120, 3, 14, 7, 0, 91, 92, 5, 18, 0, 0, 92, 93, 5, 8, 0, 0, 93, 120, 3, 14, 7, 0, 94, 95, 5,
+    19, 0, 0, 95, 96, 5, 8, 0, 0, 96, 120, 3, 14, 7, 0, 97, 98, 5, 20, 0, 0, 98, 99, 5, 8, 0, 0, 99,
+    120, 3, 14, 7, 0, 100, 101, 5, 21, 0, 0, 101, 102, 5, 8, 0, 0, 102, 105, 3, 14, 7, 0, 103, 104,
+    5, 1, 0, 0, 104, 106, 3, 14, 7, 0, 105, 103, 1, 0, 0, 0, 105, 106, 1, 0, 0, 0, 106, 120, 1, 0,
+    0, 0, 107, 108, 5, 17, 0, 0, 108, 109, 5, 8, 0, 0, 109, 120, 3, 14, 7, 0, 110, 111, 5, 22, 0, 0,
+    111, 112, 5, 8, 0, 0, 112, 120, 3, 14, 7, 0, 113, 114, 5, 23, 0, 0, 114, 115, 5, 8, 0, 0, 115,
+    120, 3, 14, 7, 0, 116, 117, 5, 24, 0, 0, 117, 118, 5, 8, 0, 0, 118, 120, 3, 14, 7, 0, 119, 72,
+    1, 0, 0, 0, 119, 75, 1, 0, 0, 0, 119, 82, 1, 0, 0, 0, 119, 85, 1, 0, 0, 0, 119, 88, 1, 0, 0, 0,
+    119, 91, 1, 0, 0, 0, 119, 94, 1, 0, 0, 0, 119, 97, 1, 0, 0, 0, 119, 100, 1, 0, 0, 0, 119, 107,
+    1, 0, 0, 0, 119, 110, 1, 0, 0, 0, 119, 113, 1, 0, 0, 0, 119, 116, 1, 0, 0, 0, 120, 13, 1, 0, 0,
+    0, 121, 122, 7, 1, 0, 0, 122, 15, 1, 0, 0, 0, 123, 124, 7, 2, 0, 0, 124, 17, 1, 0, 0, 0, 9, 36,
+    44, 46, 59, 62, 68, 80, 105, 119,
   ];
 
   private static __ATN: antlr.ATN;
@@ -1338,38 +1355,6 @@ export class AttributeExprContext extends antlr.ParserRuleContext {
     super.copyFrom(ctx);
   }
 }
-export class GroupAttributeExprContext extends AttributeExprContext {
-  public constructor(ctx: AttributeExprContext) {
-    super(ctx.parent, ctx.invokingState);
-    super.copyFrom(ctx);
-  }
-  public GROUP(): antlr.TerminalNode {
-    return this.getToken(AssetSelectionParser.GROUP, 0)!;
-  }
-  public COLON(): antlr.TerminalNode {
-    return this.getToken(AssetSelectionParser.COLON, 0)!;
-  }
-  public value(): ValueContext {
-    return this.getRuleContext(0, ValueContext)!;
-  }
-  public override enterRule(listener: AssetSelectionListener): void {
-    if (listener.enterGroupAttributeExpr) {
-      listener.enterGroupAttributeExpr(this);
-    }
-  }
-  public override exitRule(listener: AssetSelectionListener): void {
-    if (listener.exitGroupAttributeExpr) {
-      listener.exitGroupAttributeExpr(this);
-    }
-  }
-  public override accept<Result>(visitor: AssetSelectionVisitor<Result>): Result | null {
-    if (visitor.visitGroupAttributeExpr) {
-      return visitor.visitGroupAttributeExpr(this);
-    } else {
-      return visitor.visitChildren(this);
-    }
-  }
-}
 export class PartitionsAttributeExprContext extends AttributeExprContext {
   public constructor(ctx: AttributeExprContext) {
     super(ctx.parent, ctx.invokingState);
@@ -1603,13 +1588,13 @@ export class OwnerAttributeExprContext extends AttributeExprContext {
     }
   }
 }
-export class ChangedInBranchAttributeExprContext extends AttributeExprContext {
+export class AutomationTypeAttributeExprContext extends AttributeExprContext {
   public constructor(ctx: AttributeExprContext) {
     super(ctx.parent, ctx.invokingState);
     super.copyFrom(ctx);
   }
-  public CHANGED_IN_BRANCH(): antlr.TerminalNode {
-    return this.getToken(AssetSelectionParser.CHANGED_IN_BRANCH, 0)!;
+  public AUTOMATION_TYPE(): antlr.TerminalNode {
+    return this.getToken(AssetSelectionParser.AUTOMATION_TYPE, 0)!;
   }
   public COLON(): antlr.TerminalNode {
     return this.getToken(AssetSelectionParser.COLON, 0)!;
@@ -1618,18 +1603,18 @@ export class ChangedInBranchAttributeExprContext extends AttributeExprContext {
     return this.getRuleContext(0, ValueContext)!;
   }
   public override enterRule(listener: AssetSelectionListener): void {
-    if (listener.enterChangedInBranchAttributeExpr) {
-      listener.enterChangedInBranchAttributeExpr(this);
+    if (listener.enterAutomationTypeAttributeExpr) {
+      listener.enterAutomationTypeAttributeExpr(this);
     }
   }
   public override exitRule(listener: AssetSelectionListener): void {
-    if (listener.exitChangedInBranchAttributeExpr) {
-      listener.exitChangedInBranchAttributeExpr(this);
+    if (listener.exitAutomationTypeAttributeExpr) {
+      listener.exitAutomationTypeAttributeExpr(this);
     }
   }
   public override accept<Result>(visitor: AssetSelectionVisitor<Result>): Result | null {
-    if (visitor.visitChangedInBranchAttributeExpr) {
-      return visitor.visitChangedInBranchAttributeExpr(this);
+    if (visitor.visitAutomationTypeAttributeExpr) {
+      return visitor.visitAutomationTypeAttributeExpr(this);
     } else {
       return visitor.visitChildren(this);
     }
@@ -1676,38 +1661,6 @@ export class ColumnTagAttributeExprContext extends AttributeExprContext {
     }
   }
 }
-export class TableNameAttributeExprContext extends AttributeExprContext {
-  public constructor(ctx: AttributeExprContext) {
-    super(ctx.parent, ctx.invokingState);
-    super.copyFrom(ctx);
-  }
-  public TABLE_NAME(): antlr.TerminalNode {
-    return this.getToken(AssetSelectionParser.TABLE_NAME, 0)!;
-  }
-  public COLON(): antlr.TerminalNode {
-    return this.getToken(AssetSelectionParser.COLON, 0)!;
-  }
-  public value(): ValueContext {
-    return this.getRuleContext(0, ValueContext)!;
-  }
-  public override enterRule(listener: AssetSelectionListener): void {
-    if (listener.enterTableNameAttributeExpr) {
-      listener.enterTableNameAttributeExpr(this);
-    }
-  }
-  public override exitRule(listener: AssetSelectionListener): void {
-    if (listener.exitTableNameAttributeExpr) {
-      listener.exitTableNameAttributeExpr(this);
-    }
-  }
-  public override accept<Result>(visitor: AssetSelectionVisitor<Result>): Result | null {
-    if (visitor.visitTableNameAttributeExpr) {
-      return visitor.visitTableNameAttributeExpr(this);
-    } else {
-      return visitor.visitChildren(this);
-    }
-  }
-}
 export class StatusAttributeExprContext extends AttributeExprContext {
   public constructor(ctx: AttributeExprContext) {
     super(ctx.parent, ctx.invokingState);
@@ -1735,6 +1688,102 @@ export class StatusAttributeExprContext extends AttributeExprContext {
   public override accept<Result>(visitor: AssetSelectionVisitor<Result>): Result | null {
     if (visitor.visitStatusAttributeExpr) {
       return visitor.visitStatusAttributeExpr(this);
+    } else {
+      return visitor.visitChildren(this);
+    }
+  }
+}
+export class GroupAttributeExprContext extends AttributeExprContext {
+  public constructor(ctx: AttributeExprContext) {
+    super(ctx.parent, ctx.invokingState);
+    super.copyFrom(ctx);
+  }
+  public GROUP(): antlr.TerminalNode {
+    return this.getToken(AssetSelectionParser.GROUP, 0)!;
+  }
+  public COLON(): antlr.TerminalNode {
+    return this.getToken(AssetSelectionParser.COLON, 0)!;
+  }
+  public value(): ValueContext {
+    return this.getRuleContext(0, ValueContext)!;
+  }
+  public override enterRule(listener: AssetSelectionListener): void {
+    if (listener.enterGroupAttributeExpr) {
+      listener.enterGroupAttributeExpr(this);
+    }
+  }
+  public override exitRule(listener: AssetSelectionListener): void {
+    if (listener.exitGroupAttributeExpr) {
+      listener.exitGroupAttributeExpr(this);
+    }
+  }
+  public override accept<Result>(visitor: AssetSelectionVisitor<Result>): Result | null {
+    if (visitor.visitGroupAttributeExpr) {
+      return visitor.visitGroupAttributeExpr(this);
+    } else {
+      return visitor.visitChildren(this);
+    }
+  }
+}
+export class ChangedInBranchAttributeExprContext extends AttributeExprContext {
+  public constructor(ctx: AttributeExprContext) {
+    super(ctx.parent, ctx.invokingState);
+    super.copyFrom(ctx);
+  }
+  public CHANGED_IN_BRANCH(): antlr.TerminalNode {
+    return this.getToken(AssetSelectionParser.CHANGED_IN_BRANCH, 0)!;
+  }
+  public COLON(): antlr.TerminalNode {
+    return this.getToken(AssetSelectionParser.COLON, 0)!;
+  }
+  public value(): ValueContext {
+    return this.getRuleContext(0, ValueContext)!;
+  }
+  public override enterRule(listener: AssetSelectionListener): void {
+    if (listener.enterChangedInBranchAttributeExpr) {
+      listener.enterChangedInBranchAttributeExpr(this);
+    }
+  }
+  public override exitRule(listener: AssetSelectionListener): void {
+    if (listener.exitChangedInBranchAttributeExpr) {
+      listener.exitChangedInBranchAttributeExpr(this);
+    }
+  }
+  public override accept<Result>(visitor: AssetSelectionVisitor<Result>): Result | null {
+    if (visitor.visitChangedInBranchAttributeExpr) {
+      return visitor.visitChangedInBranchAttributeExpr(this);
+    } else {
+      return visitor.visitChildren(this);
+    }
+  }
+}
+export class TableNameAttributeExprContext extends AttributeExprContext {
+  public constructor(ctx: AttributeExprContext) {
+    super(ctx.parent, ctx.invokingState);
+    super.copyFrom(ctx);
+  }
+  public TABLE_NAME(): antlr.TerminalNode {
+    return this.getToken(AssetSelectionParser.TABLE_NAME, 0)!;
+  }
+  public COLON(): antlr.TerminalNode {
+    return this.getToken(AssetSelectionParser.COLON, 0)!;
+  }
+  public value(): ValueContext {
+    return this.getRuleContext(0, ValueContext)!;
+  }
+  public override enterRule(listener: AssetSelectionListener): void {
+    if (listener.enterTableNameAttributeExpr) {
+      listener.enterTableNameAttributeExpr(this);
+    }
+  }
+  public override exitRule(listener: AssetSelectionListener): void {
+    if (listener.exitTableNameAttributeExpr) {
+      listener.exitTableNameAttributeExpr(this);
+    }
+  }
+  public override accept<Result>(visitor: AssetSelectionVisitor<Result>): Result | null {
+    if (visitor.visitTableNameAttributeExpr) {
+      return visitor.visitTableNameAttributeExpr(this);
     } else {
       return visitor.visitChildren(this);
     }

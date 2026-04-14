@@ -1195,6 +1195,27 @@ class StatusAssetSelection(AssetSelection):
 
 @whitelist_for_serdes
 @record
+class AutomationTypeAssetSelection(AssetSelection):
+    """Used to represent a UI asset selection by automation type. This should not be resolved against
+    an in-process asset graph.
+    """
+
+    selected_automation_type: str | None
+
+    def resolve_inner(
+        self, asset_graph: BaseAssetGraph, allow_missing: bool
+    ) -> AbstractSet[AssetKey]:
+        """This should not be invoked in user code."""
+        raise NotImplementedError
+
+    def to_selection_str(self) -> str:
+        if self.selected_automation_type is None:
+            return "automation_type:<null>"
+        return f'automation_type:"{self.selected_automation_type}"'
+
+
+@whitelist_for_serdes
+@record
 class KeysAssetSelection(AssetSelection):
     selected_keys: Sequence[AssetKey]
 

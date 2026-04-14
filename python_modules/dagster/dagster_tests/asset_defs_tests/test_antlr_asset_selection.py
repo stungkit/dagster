@@ -9,6 +9,7 @@ from dagster._core.definitions.antlr_asset_selection.generated.AssetSelectionPar
 )
 from dagster._core.definitions.asset_selection import (
     AssetSelection,
+    AutomationTypeAssetSelection,
     ChangedInBranchAssetSelection,
     CodeLocationAssetSelection,
     ColumnAssetSelection,
@@ -204,6 +205,10 @@ def test_antlr_tree_invalid(selection_str):
         ("column_tag:my_key=my_value", ColumnTagAssetSelection(key="my_key", value="my_value")),
         ("changed_in_branch:any", ChangedInBranchAssetSelection(selected_changed_in_branch="any")),
         ("partitions:static", PartitionsAssetSelection(selected_partitions="static")),
+        (
+            "automation_type:sensor/run_status",
+            AutomationTypeAssetSelection(selected_automation_type="sensor/run_status"),
+        ),
         ('tag:"<null>"', AssetSelection.tag("<null>", "", include_sources=True)),
         ('tag:""', AssetSelection.tag("", "", include_sources=True)),
         ('tag:"fake"=""', AssetSelection.tag("fake", "", include_sources=True)),
@@ -225,6 +230,10 @@ def test_antlr_tree_invalid(selection_str):
             ChangedInBranchAssetSelection(selected_changed_in_branch=None),
         ),
         ("partitions:<null>", PartitionsAssetSelection(selected_partitions=None)),
+        (
+            "automation_type:<null>",
+            AutomationTypeAssetSelection(selected_automation_type=None),
+        ),
     ],
 )
 def test_antlr_visit_basic(selection_str, expected_assets) -> None:

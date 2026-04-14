@@ -1,4 +1,4 @@
-// Generated from /Users/bengotow/Work/F376/Projects/dagster-internal/dagster-oss/python_modules/dagster/dagster/_core/definitions/antlr_asset_selection/AssetSelection.g4 by ANTLR 4.13.1
+// Generated from /home/user/internal/dagster-oss/python_modules/dagster/dagster/_core/definitions/antlr_asset_selection/AssetSelection.g4 by ANTLR 4.13.1
 
 import {AbstractParseTreeVisitor} from 'antlr4ng';
 
@@ -29,6 +29,7 @@ import {ColumnTagAttributeExprContext} from './AssetSelectionParser.js';
 import {CodeLocationAttributeExprContext} from './AssetSelectionParser.js';
 import {ChangedInBranchAttributeExprContext} from './AssetSelectionParser.js';
 import {PartitionsAttributeExprContext} from './AssetSelectionParser.js';
+import {AutomationTypeAttributeExprContext} from './AssetSelectionParser.js';
 import {ValueContext} from './AssetSelectionParser.js';
 import {KeyValueContext} from './AssetSelectionParser.js';
 
@@ -225,6 +226,13 @@ export class AssetSelectionVisitor<Result> extends AbstractParseTreeVisitor<Resu
    * @return the visitor result
    */
   visitPartitionsAttributeExpr?: (ctx: PartitionsAttributeExprContext) => Result;
+  /**
+   * Visit a parse tree produced by the `AutomationTypeAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   * @return the visitor result
+   */
+  visitAutomationTypeAttributeExpr?: (ctx: AutomationTypeAttributeExprContext) => Result;
   /**
    * Visit a parse tree produced by `AssetSelectionParser.value`.
    * @param ctx the parse tree

@@ -1,6 +1,7 @@
 /* eslint-disable jest/expect-expect */
 import {AssetGraphQueryItem} from '../../asset-graph/types';
 import {
+  buildAssetKey,
   buildAssetNode,
   buildDefinitionTag,
   buildDimensionDefinitionType,
@@ -11,6 +12,8 @@ import {
 } from '../../graphql/builders';
 import {PartitionDefinitionType} from '../../graphql/types';
 import {parseAssetSelectionQuery} from '../parseAssetSelectionQuery';
+import {SupplementaryInformation} from '../types';
+import {getSupplementaryDataKey} from '../util';
 
 const TEST_GRAPH: AssetGraphQueryItem[] = [
   // Top Layer
@@ -292,6 +295,118 @@ describe('parseAssetSelectionQuery - partitions', () => {
       'dynamic_asset',
       'time_asset',
       'multi_asset',
+    ]);
+  });
+});
+
+// automation_type tests
+
+function buildAutomationAsset(name: string): AssetGraphQueryItem {
+  return {
+    name,
+    node: buildAssetNode({assetKey: buildAssetKey({path: [name]})}),
+    inputs: [{dependsOn: []}],
+    outputs: [{dependedBy: []}],
+  };
+}
+
+const AUTOMATION_GRAPH: AssetGraphQueryItem[] = [
+  buildAutomationAsset('no_automation'),
+  buildAutomationAsset('with_schedule'),
+  buildAutomationAsset('with_sensor'),
+  buildAutomationAsset('with_disabled'),
+  buildAutomationAsset('with_run_status_sensor'),
+];
+
+function buildAutomationSupplementaryData(): SupplementaryInformation {
+  const data: Record<string, {path: string[]}[]> = {};
+
+  function addValue(value: string, name: string) {
+    const key = getSupplementaryDataKey({field: 'automation_type', value});
+    const existing = data[key] ?? [];
+    existing.push({path: [name]});
+    data[key] = existing;
+  }
+
+  // no_automation has none
+  addValue('none', 'no_automation');
+
+  // with_schedule has schedule
+  addValue('any', 'with_schedule');
+  addValue('schedule', 'with_schedule');
+
+  // with_sensor has sensor
+  addValue('any', 'with_sensor');
+  addValue('sensor', 'with_sensor');
+  addValue('sensor/standard', 'with_sensor');
+
+  // with_disabled has a disabled automation
+  addValue('any', 'with_disabled');
+  addValue('sensor', 'with_disabled');
+  addValue('disabled', 'with_disabled');
+
+  // with_run_status_sensor has a run status sensor
+  addValue('any', 'with_run_status_sensor');
+  addValue('sensor', 'with_run_status_sensor');
+  addValue('sensor/run_status', 'with_run_status_sensor');
+
+  return data;
+}
+
+const AUTOMATION_SUPPLEMENTARY_DATA = buildAutomationSupplementaryData();
+
+function assertAutomationQueryResult(query: string, expectedNames: string[]) {
+  const result = parseAssetSelectionQuery(AUTOMATION_GRAPH, query, AUTOMATION_SUPPLEMENTARY_DATA);
+  if (result instanceof Error) {
+    throw result;
+  }
+  expect(new Set(result.all.map((asset) => asset.name))).toEqual(new Set(expectedNames));
+}
+
+describe('parseAssetSelectionQuery - automation_type', () => {
+  it('should filter to assets with no automations', () => {
+    assertAutomationQueryResult('automation_type:none', ['no_automation']);
+  });
+
+  it('should filter to assets with any automation', () => {
+    assertAutomationQueryResult('automation_type:any', [
+      'with_schedule',
+      'with_sensor',
+      'with_disabled',
+      'with_run_status_sensor',
+    ]);
+  });
+
+  it('should filter to assets with disabled automations', () => {
+    assertAutomationQueryResult('automation_type:disabled', ['with_disabled']);
+  });
+
+  it('should filter to assets with schedules', () => {
+    assertAutomationQueryResult('automation_type:schedule', ['with_schedule']);
+  });
+
+  it('should filter to assets with sensors', () => {
+    assertAutomationQueryResult('automation_type:sensor', [
+      'with_sensor',
+      'with_disabled',
+      'with_run_status_sensor',
+    ]);
+  });
+
+  it('should filter by sensor subtype', () => {
+    assertAutomationQueryResult('automation_type:sensor/standard', ['with_sensor']);
+    assertAutomationQueryResult('automation_type:sensor/run_status', ['with_run_status_sensor']);
+  });
+
+  it('should compose with other filters', () => {
+    assertAutomationQueryResult('automation_type:sensor and automation_type:disabled', [
+      'with_disabled',
+    ]);
+    assertAutomationQueryResult('not automation_type:none', [
+      'with_schedule',
+      'with_sensor',
+      'with_disabled',
+      'with_run_status_sensor',
     ]);
   });
 });

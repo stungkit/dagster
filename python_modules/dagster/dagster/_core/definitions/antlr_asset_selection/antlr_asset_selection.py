@@ -12,6 +12,7 @@ from dagster._core.definitions.antlr_asset_selection.generated.AssetSelectionVis
 )
 from dagster._core.definitions.asset_selection import (
     AssetSelection,
+    AutomationTypeAssetSelection,
     ChangedInBranchAssetSelection,
     CodeLocationAssetSelection,
     ColumnAssetSelection,
@@ -187,6 +188,12 @@ class AntlrAssetSelectionVisitor(AssetSelectionVisitor):
     ):
         partitions = self.visit(ctx.value())
         return PartitionsAssetSelection(selected_partitions=partitions)
+
+    def visitAutomationTypeAttributeExpr(
+        self, ctx: AssetSelectionParser.AutomationTypeAttributeExprContext
+    ):
+        automation_type = self.visit(ctx.value())
+        return AutomationTypeAssetSelection(selected_automation_type=automation_type)
 
 
 class AntlrAssetSelectionParser:

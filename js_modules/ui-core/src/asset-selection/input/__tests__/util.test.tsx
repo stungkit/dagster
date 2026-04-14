@@ -65,6 +65,19 @@ describe('getAttributesMap', () => {
       kind: [''],
       code_location: ['repo1@location1', 'repo2@location2'],
       partitions: ['none', 'static', 'dynamic', 'time', 'multipartitions'],
+      automation_type: [
+        'any',
+        'none',
+        'disabled',
+        'schedule',
+        'sensor',
+        'sensor/standard',
+        'sensor/run_status',
+        'sensor/asset',
+        'sensor/multi_asset',
+        'sensor/automation_condition',
+        'sensor/unknown',
+      ],
     });
   });
 
@@ -89,6 +102,19 @@ describe('getAttributesMap', () => {
       kind: [],
       code_location: [],
       partitions: ['none', 'static', 'dynamic', 'time', 'multipartitions'],
+      automation_type: [
+        'any',
+        'none',
+        'disabled',
+        'schedule',
+        'sensor',
+        'sensor/standard',
+        'sensor/run_status',
+        'sensor/asset',
+        'sensor/multi_asset',
+        'sensor/automation_condition',
+        'sensor/unknown',
+      ],
       status: [
         AssetHealthStatus.HEALTHY,
         AssetHealthStatus.DEGRADED,

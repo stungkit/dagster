@@ -81,6 +81,19 @@ export const getAttributesMap = (assets: AssetGraphQueryItem[]) => {
     kind: kinds,
     code_location: codeLocations,
     partitions: ['none', 'static', 'dynamic', 'time', 'multipartitions'],
+    automation_type: [
+      'any',
+      'none',
+      'disabled',
+      'schedule',
+      'sensor',
+      'sensor/standard',
+      'sensor/run_status',
+      'sensor/asset',
+      'sensor/multi_asset',
+      'sensor/automation_condition',
+      'sensor/unknown',
+    ],
   };
   if (assetHealthEnabled()) {
     const statuses = [
@@ -115,6 +128,7 @@ export const attributeToIcon: Record<Attribute, IconName> = {
   tag: 'tag',
   status: 'status',
   partitions: 'partition',
+  automation_type: 'automation',
 };
 
 export const assetSelectionSyntaxSupportedAttributes: Attribute[] = Object.keys(
