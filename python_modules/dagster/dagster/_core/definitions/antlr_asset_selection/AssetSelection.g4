@@ -39,13 +39,16 @@ attributeExpr:
 	| CODE_LOCATION COLON value				# CodeLocationAttributeExpr
 	| CHANGED_IN_BRANCH COLON value			# ChangedInBranchAttributeExpr
 	| PARTITIONS COLON value				# PartitionsAttributeExpr
-	| AUTOMATION_TYPE COLON value			# AutomationTypeAttributeExpr;
+	| AUTOMATION_TYPE COLON value			# AutomationTypeAttributeExpr
+	| SENSOR COLON value					# SensorAttributeExpr
+	| SCHEDULE COLON value					# ScheduleAttributeExpr
+	| JOB COLON value						# JobAttributeExpr;
 
 // Define EQUAL token for tag:value=value syntax
 EQUAL: '=';
 
-// Value can be a quoted or unquoted string
-value: NULL_STRING | QUOTED_STRING | UNQUOTED_STRING;
+// Value can be a quoted or unquoted string (keyword tokens are also valid values)
+value: NULL_STRING | QUOTED_STRING | UNQUOTED_STRING | SENSOR | SCHEDULE | JOB;
 keyValue:
 	QUOTED_STRING
 	| UNQUOTED_STRING
@@ -82,6 +85,9 @@ COLUMN_TAG: 'column_tag';
 CHANGED_IN_BRANCH: 'changed_in_branch';
 PARTITIONS: 'partitions';
 AUTOMATION_TYPE: 'automation_type';
+SENSOR: 'sensor';
+SCHEDULE: 'schedule';
+JOB: 'job';
 // Function names
 SINKS: 'sinks';
 ROOTS: 'roots';

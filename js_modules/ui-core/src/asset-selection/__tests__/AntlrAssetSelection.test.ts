@@ -410,3 +410,111 @@ describe('parseAssetSelectionQuery - automation_type', () => {
     ]);
   });
 });
+
+// sensor: and schedule: name filtering tests (supplementary data)
+
+function buildSensorScheduleSupplementaryData(): SupplementaryInformation {
+  const data: Record<string, {path: string[]}[]> = {};
+
+  function addValue(field: string, value: string, name: string) {
+    const key = getSupplementaryDataKey({field, value});
+    const existing = data[key] ?? [];
+    existing.push({path: [name]});
+    data[key] = existing;
+  }
+
+  addValue('sensor', 'my_sensor', 'with_sensor');
+  addValue('sensor', 'my_sensor', 'with_run_status_sensor');
+  addValue('sensor', 'other_sensor', 'with_disabled');
+  addValue('schedule', 'daily_schedule', 'with_schedule');
+
+  return data;
+}
+
+const SENSOR_SCHEDULE_SUPPLEMENTARY = buildSensorScheduleSupplementaryData();
+
+describe('parseAssetSelectionQuery - sensor/schedule name', () => {
+  it('should filter by sensor name', () => {
+    const result = parseAssetSelectionQuery(
+      AUTOMATION_GRAPH,
+      'sensor:my_sensor',
+      SENSOR_SCHEDULE_SUPPLEMENTARY,
+    );
+    if (result instanceof Error) {
+      throw result;
+    }
+    expect(new Set(result.all.map((a) => a.name))).toEqual(
+      new Set(['with_sensor', 'with_run_status_sensor']),
+    );
+  });
+
+  it('should filter by schedule name', () => {
+    const result = parseAssetSelectionQuery(
+      AUTOMATION_GRAPH,
+      'schedule:daily_schedule',
+      SENSOR_SCHEDULE_SUPPLEMENTARY,
+    );
+    if (result instanceof Error) {
+      throw result;
+    }
+    expect(new Set(result.all.map((a) => a.name))).toEqual(new Set(['with_schedule']));
+  });
+});
+
+// job: filtering tests (direct node filtering)
+
+const JOB_GRAPH: AssetGraphQueryItem[] = [
+  {
+    name: 'in_job_a',
+    node: buildAssetNode({
+      assetKey: buildAssetKey({path: ['in_job_a']}),
+      jobNames: ['job_alpha', 'job_beta'],
+    }),
+    inputs: [{dependsOn: []}],
+    outputs: [{dependedBy: []}],
+  },
+  {
+    name: 'in_job_b',
+    node: buildAssetNode({
+      assetKey: buildAssetKey({path: ['in_job_b']}),
+      jobNames: ['job_beta'],
+    }),
+    inputs: [{dependsOn: []}],
+    outputs: [{dependedBy: []}],
+  },
+  {
+    name: 'no_job',
+    node: buildAssetNode({
+      assetKey: buildAssetKey({path: ['no_job']}),
+      jobNames: [],
+    }),
+    inputs: [{dependsOn: []}],
+    outputs: [{dependedBy: []}],
+  },
+];
+
+describe('parseAssetSelectionQuery - job', () => {
+  it('should filter by job name', () => {
+    const result = parseAssetSelectionQuery(JOB_GRAPH, 'job:job_alpha');
+    if (result instanceof Error) {
+      throw result;
+    }
+    expect(new Set(result.all.map((a) => a.name))).toEqual(new Set(['in_job_a']));
+  });
+
+  it('should match multiple assets in the same job', () => {
+    const result = parseAssetSelectionQuery(JOB_GRAPH, 'job:job_beta');
+    if (result instanceof Error) {
+      throw result;
+    }
+    expect(new Set(result.all.map((a) => a.name))).toEqual(new Set(['in_job_a', 'in_job_b']));
+  });
+
+  it('should return empty for non-existent job', () => {
+    const result = parseAssetSelectionQuery(JOB_GRAPH, 'job:nonexistent');
+    if (result instanceof Error) {
+      throw result;
+    }
+    expect(result.all).toEqual([]);
+  });
+});

@@ -17,8 +17,11 @@ from dagster._core.definitions.asset_selection import (
     CodeLocationAssetSelection,
     ColumnAssetSelection,
     ColumnTagAssetSelection,
+    JobAssetSelection,
     KeyWildCardAssetSelection,
     PartitionsAssetSelection,
+    ScheduleNameAssetSelection,
+    SensorNameAssetSelection,
     StatusAssetSelection,
     TableNameAssetSelection,
 )
@@ -159,6 +162,9 @@ class AntlrAssetSelectionVisitor(AssetSelectionVisitor):
             return ctx.UNQUOTED_STRING().getText()
         elif ctx.NULL_STRING():
             return None
+        else:
+            # Keyword tokens (SENSOR, SCHEDULE, JOB) used as values
+            return ctx.getText()
 
     def visitStatusAttributeExpr(self, ctx: AssetSelectionParser.StatusAttributeExprContext):
         status = self.visit(ctx.value())
@@ -194,6 +200,18 @@ class AntlrAssetSelectionVisitor(AssetSelectionVisitor):
     ):
         automation_type = self.visit(ctx.value())
         return AutomationTypeAssetSelection(selected_automation_type=automation_type)
+
+    def visitSensorAttributeExpr(self, ctx: AssetSelectionParser.SensorAttributeExprContext):
+        sensor = self.visit(ctx.value())
+        return SensorNameAssetSelection(selected_sensor=sensor)
+
+    def visitScheduleAttributeExpr(self, ctx: AssetSelectionParser.ScheduleAttributeExprContext):
+        schedule = self.visit(ctx.value())
+        return ScheduleNameAssetSelection(selected_schedule=schedule)
+
+    def visitJobAttributeExpr(self, ctx: AssetSelectionParser.JobAttributeExprContext):
+        job = self.visit(ctx.value())
+        return JobAssetSelection(selected_job=job)
 
 
 class AntlrAssetSelectionParser:

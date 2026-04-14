@@ -23,6 +23,7 @@ describe('getAttributesMap', () => {
         owners: [],
         groupName: null,
         kinds: [],
+        jobNames: ['my_job'],
         repository: {
           name: 'repo1',
           location: {name: 'location1'},
@@ -39,6 +40,7 @@ describe('getAttributesMap', () => {
         owners: [],
         groupName: null,
         kinds: [],
+        jobNames: [],
         repository: {
           name: 'repo2',
           location: {name: 'location2'},
@@ -78,6 +80,9 @@ describe('getAttributesMap', () => {
         'sensor/automation_condition',
         'sensor/unknown',
       ],
+      sensor: [],
+      schedule: [],
+      job: ['my_job'],
     });
   });
 
@@ -115,6 +120,9 @@ describe('getAttributesMap', () => {
         'sensor/automation_condition',
         'sensor/unknown',
       ],
+      sensor: [],
+      schedule: [],
+      job: [],
       status: [
         AssetHealthStatus.HEALTHY,
         AssetHealthStatus.DEGRADED,

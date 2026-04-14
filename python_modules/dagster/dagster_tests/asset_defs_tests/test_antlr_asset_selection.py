@@ -14,7 +14,10 @@ from dagster._core.definitions.asset_selection import (
     CodeLocationAssetSelection,
     ColumnAssetSelection,
     ColumnTagAssetSelection,
+    JobAssetSelection,
     PartitionsAssetSelection,
+    ScheduleNameAssetSelection,
+    SensorNameAssetSelection,
     StatusAssetSelection,
     TableNameAssetSelection,
 )
@@ -209,6 +212,9 @@ def test_antlr_tree_invalid(selection_str):
             "automation_type:sensor/run_status",
             AutomationTypeAssetSelection(selected_automation_type="sensor/run_status"),
         ),
+        ("sensor:my_sensor", SensorNameAssetSelection(selected_sensor="my_sensor")),
+        ("schedule:my_schedule", ScheduleNameAssetSelection(selected_schedule="my_schedule")),
+        ("job:my_job", JobAssetSelection(selected_job="my_job")),
         ('tag:"<null>"', AssetSelection.tag("<null>", "", include_sources=True)),
         ('tag:""', AssetSelection.tag("", "", include_sources=True)),
         ('tag:"fake"=""', AssetSelection.tag("fake", "", include_sources=True)),
@@ -234,6 +240,9 @@ def test_antlr_tree_invalid(selection_str):
             "automation_type:<null>",
             AutomationTypeAssetSelection(selected_automation_type=None),
         ),
+        ("sensor:<null>", SensorNameAssetSelection(selected_sensor=None)),
+        ("schedule:<null>", ScheduleNameAssetSelection(selected_schedule=None)),
+        ("job:<null>", JobAssetSelection(selected_job=None)),
     ],
 )
 def test_antlr_visit_basic(selection_str, expected_assets) -> None:

@@ -30,6 +30,9 @@ import {CodeLocationAttributeExprContext} from './AssetSelectionParser.js';
 import {ChangedInBranchAttributeExprContext} from './AssetSelectionParser.js';
 import {PartitionsAttributeExprContext} from './AssetSelectionParser.js';
 import {AutomationTypeAttributeExprContext} from './AssetSelectionParser.js';
+import {SensorAttributeExprContext} from './AssetSelectionParser.js';
+import {ScheduleAttributeExprContext} from './AssetSelectionParser.js';
+import {JobAttributeExprContext} from './AssetSelectionParser.js';
 import {ValueContext} from './AssetSelectionParser.js';
 import {KeyValueContext} from './AssetSelectionParser.js';
 
@@ -233,6 +236,27 @@ export class AssetSelectionVisitor<Result> extends AbstractParseTreeVisitor<Resu
    * @return the visitor result
    */
   visitAutomationTypeAttributeExpr?: (ctx: AutomationTypeAttributeExprContext) => Result;
+  /**
+   * Visit a parse tree produced by the `SensorAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   * @return the visitor result
+   */
+  visitSensorAttributeExpr?: (ctx: SensorAttributeExprContext) => Result;
+  /**
+   * Visit a parse tree produced by the `ScheduleAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   * @return the visitor result
+   */
+  visitScheduleAttributeExpr?: (ctx: ScheduleAttributeExprContext) => Result;
+  /**
+   * Visit a parse tree produced by the `JobAttributeExpr`
+   * labeled alternative in `AssetSelectionParser.attributeExpr`.
+   * @param ctx the parse tree
+   * @return the visitor result
+   */
+  visitJobAttributeExpr?: (ctx: JobAttributeExprContext) => Result;
   /**
    * Visit a parse tree produced by `AssetSelectionParser.value`.
    * @param ctx the parse tree

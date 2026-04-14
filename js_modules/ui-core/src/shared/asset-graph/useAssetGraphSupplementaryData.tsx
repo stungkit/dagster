@@ -36,7 +36,13 @@ export const useAssetGraphSupplementaryData = (
   );
 
   const needsAutomationData = useMemo(
-    () => parsedFilters.some((filter) => filter.field === 'automation_type'),
+    () =>
+      parsedFilters.some(
+        (filter) =>
+          filter.field === 'automation_type' ||
+          filter.field === 'sensor' ||
+          filter.field === 'schedule',
+      ),
     [parsedFilters],
   );
 
@@ -180,8 +186,8 @@ const SENSOR_TYPE_TO_VALUE: Record<SensorType, string | null> = {
 };
 
 type InstigatorInfo =
-  | {type: 'schedule'; status: InstigationStatus}
-  | {type: 'sensor'; sensorType: SensorType};
+  | {type: 'schedule'; name: string; status: InstigationStatus}
+  | {type: 'sensor'; name: string; sensorType: SensorType};
 
 function buildAutomationTypeSupplementaryData(
   queryData: AssetInstigatorsQuery,
@@ -203,7 +209,7 @@ function buildAutomationTypeSupplementaryData(
             list = [];
             instigatorsByAssetToken.set(token, list);
           }
-          list.push({type: 'sensor', sensorType: sensor.sensorType});
+          list.push({type: 'sensor', name: sensor.name, sensorType: sensor.sensorType});
         }
       }
       for (const schedule of repo.schedules) {
@@ -217,7 +223,7 @@ function buildAutomationTypeSupplementaryData(
             list = [];
             instigatorsByAssetToken.set(token, list);
           }
-          list.push({type: 'schedule', status: schedule.scheduleState.status});
+          list.push({type: 'schedule', name: schedule.name, status: schedule.scheduleState.status});
         }
       }
     }
@@ -225,10 +231,11 @@ function buildAutomationTypeSupplementaryData(
 
   const acc: Record<string, AssetKey[]> = {};
 
-  function addValue(value: string, key: AssetKey) {
-    const supplementaryDataKey = getSupplementaryDataKey({field: 'automation_type', value});
-    acc[supplementaryDataKey] = acc[supplementaryDataKey] || [];
-    acc[supplementaryDataKey].push(key);
+  function addValue(field: string, value: string, key: AssetKey) {
+    const supplementaryDataKey = getSupplementaryDataKey({field, value});
+    const existing = acc[supplementaryDataKey] ?? [];
+    existing.push(key);
+    acc[supplementaryDataKey] = existing;
   }
 
   for (const node of nodes) {
@@ -236,27 +243,32 @@ function buildAutomationTypeSupplementaryData(
     const instigators = instigatorsByAssetToken.get(token) || [];
 
     if (instigators.length === 0) {
-      addValue('none', node.assetKey);
+      addValue('automation_type', 'none', node.assetKey);
       continue;
     }
 
-    addValue('any', node.assetKey);
+    // Has at least one automation
+    addValue('automation_type', 'any', node.assetKey);
 
     const hasDisabled = instigators.some(
       (i) => i.type === 'schedule' && i.status === InstigationStatus.STOPPED,
     );
     if (hasDisabled) {
-      addValue('disabled', node.assetKey);
+      addValue('automation_type', 'disabled', node.assetKey);
     }
 
     for (const instigator of instigators) {
       if (instigator.type === 'schedule') {
-        addValue('schedule', node.assetKey);
+        addValue('automation_type', 'schedule', node.assetKey);
+        // Index by schedule name for schedule: filter
+        addValue('schedule', instigator.name, node.assetKey);
       } else {
-        addValue('sensor', node.assetKey);
+        addValue('automation_type', 'sensor', node.assetKey);
+        // Index by sensor name for sensor: filter
+        addValue('sensor', instigator.name, node.assetKey);
         const sensorValue = SENSOR_TYPE_TO_VALUE[instigator.sensorType];
         if (sensorValue) {
-          addValue(sensorValue, node.assetKey);
+          addValue('automation_type', sensorValue, node.assetKey);
         }
       }
     }
