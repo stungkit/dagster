@@ -5,7 +5,7 @@ import time
 from collections.abc import Mapping
 from enum import Enum
 from importlib.metadata import version
-from typing import IO, Any, Final
+from typing import IO, Any, Final, Optional
 
 import dagster
 import dagster._check as check
@@ -53,7 +53,7 @@ class WorkspaceClientFactory:
         azure_client_id: str | None,
         azure_client_secret: str | None,
         azure_tenant_id: str | None,
-        credentials_strategy: CredentialsStrategy | None = None,
+        credentials_strategy: Optional[CredentialsStrategy] = None,  # noqa: UP045
     ):
         """Initialize the Databricks Workspace client. Users may provide explicit credentials for a PAT, databricks
         service principal oauth credentials, or azure service principal credentials. If no credentials are provided,
@@ -158,7 +158,7 @@ class WorkspaceClientFactory:
         azure_client_id: str | None = None,
         azure_client_secret: str | None = None,
         azure_tenant_id: str | None = None,
-        credentials_strategy: CredentialsStrategy | None = None,
+        credentials_strategy: Optional[CredentialsStrategy] = None,  # noqa: UP045
     ):
         more_than_one_auth_type_provided = (
             sum(
@@ -188,7 +188,7 @@ class WorkspaceClientFactory:
         azure_client_id: str | None,
         azure_client_secret: str | None,
         azure_tenant_id: str | None,
-        credentials_strategy: CredentialsStrategy | None = None,
+        credentials_strategy: Optional[CredentialsStrategy] = None,  # noqa: UP045
     ) -> AuthTypeEnum:
         """Get the type of authentication used to initialize the WorkspaceClient."""
         if credentials_strategy is not None:
@@ -256,7 +256,7 @@ class DatabricksClient:
         azure_client_secret: str | None = None,
         azure_tenant_id: str | None = None,
         workspace_id: str | None = None,
-        credentials_strategy: CredentialsStrategy | None = None,
+        credentials_strategy: Optional[CredentialsStrategy] = None,  # noqa: UP045
     ):
         self.host = host
         self.workspace_id = workspace_id
