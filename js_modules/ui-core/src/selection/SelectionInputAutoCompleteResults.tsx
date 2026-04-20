@@ -76,7 +76,10 @@ export const SelectionInputAutoCompleteResults = React.memo(
                           key={result.text}
                           text={result.jsx}
                           active={index === selectedIndex}
-                          onClick={() => onSelect(result)}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            onSelect(result);
+                          }}
                         />
                       )}
                     </div>
