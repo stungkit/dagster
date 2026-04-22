@@ -135,6 +135,11 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg | \
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /bin/
 
+# Install just (task runner-- replaces make for CI steps because it propagates
+# signal exit codes correctly, enabling Buildkite automatic retry on spot
+# reclamation)
+RUN apt-get update -yqq && apt-get install -yqq just
+
 # Install redis
 RUN wget http://download.redis.io/redis-stable.tar.gz \
     && tar xvzf redis-stable.tar.gz \
