@@ -66,7 +66,7 @@ def build_dagster_steps(ctx: BuildkiteContext) -> list[StepConfiguration]:
 
 def build_repo_wide_ruff_steps(ctx: BuildkiteContext) -> list[CommandStepConfiguration]:
     return [
-        CommandStepBuilder(":zap: ruff", retry_automatically=False)
+        CommandStepBuilder(":zap: ruff")
         .on_test_image()
         .run(
             f"uv pip install --system -e {oss_path('python_modules/dagster')}[ruff] -e {oss_path('python_modules/dagster-pipes')} -e {oss_path('python_modules/libraries/dagster-shared')}",
@@ -79,7 +79,7 @@ def build_repo_wide_ruff_steps(ctx: BuildkiteContext) -> list[CommandStepConfigu
 
 def build_repo_wide_prettier_steps(ctx: BuildkiteContext) -> list[CommandStepConfiguration]:
     return [
-        CommandStepBuilder(":prettier: prettier", key="prettier", retry_automatically=False)
+        CommandStepBuilder(":prettier: prettier", key="prettier")
         .on_test_image()
         .run(
             f"make -C {oss_path('.')} install_prettier",
@@ -95,7 +95,7 @@ def build_repo_wide_pyright_steps(ctx: BuildkiteContext) -> list[StepConfigurati
         GroupStepBuilder(
             name=":pyright: pyright",
             steps=[
-                CommandStepBuilder(":pyright: make pyright", retry_automatically=False)
+                CommandStepBuilder(":pyright: make pyright")
                 .on_test_image()
                 .run(
                     "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y",
@@ -115,7 +115,7 @@ def build_repo_wide_pyright_steps(ctx: BuildkiteContext) -> list[StepConfigurati
                 # Run on a larger instance
                 .on_queue(BuildkiteQueue.DOCKER)
                 .build(),
-                CommandStepBuilder(":pyright: make rebuild_pyright_pins", retry_automatically=False)
+                CommandStepBuilder(":pyright: make rebuild_pyright_pins")
                 .on_test_image()
                 .run(
                     "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y",
