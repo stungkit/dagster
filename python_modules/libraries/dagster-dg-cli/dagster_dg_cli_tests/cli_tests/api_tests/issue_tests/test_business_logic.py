@@ -313,7 +313,7 @@ class TestIssueDataProcessing:
 def _make_mock_client(issues: list[dict[str, Any]] | None = None) -> MagicMock:
     """Build a mock GraphQL client that returns a minimal IssueConnection response."""
     client = MagicMock()
-    client.execute.return_value = {
+    client.execute_generic.return_value = {
         "issues": {
             "__typename": "IssueConnection",
             "issues": issues or [],
@@ -343,35 +343,35 @@ class TestListIssuesGraphQLVariables:
         """No filters: only limit variable is sent."""
         client = _make_mock_client()
         list_issues_via_graphql(client, limit=5)
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_status_filter_single(self, snapshot):
         """Single status filter is included in variables."""
         client = _make_mock_client()
         list_issues_via_graphql(client, statuses=["OPEN"])
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_status_filter_multiple(self, snapshot):
         """Multiple status filters are included in variables."""
         client = _make_mock_client()
         list_issues_via_graphql(client, statuses=["OPEN", "TRIAGE"])
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_created_after_filter(self, snapshot):
         """created_after timestamp is included in variables."""
         client = _make_mock_client()
         list_issues_via_graphql(client, created_after=1700000000.0)
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_created_before_filter(self, snapshot):
         """created_before timestamp is included in variables."""
         client = _make_mock_client()
         list_issues_via_graphql(client, created_before=1710000000.0)
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_combined_filters(self, snapshot):
@@ -385,21 +385,21 @@ class TestListIssuesGraphQLVariables:
             created_after=1700000000.0,
             created_before=1710000000.0,
         )
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_empty_statuses_omitted(self, snapshot):
         """Empty statuses list does not add filters to variables."""
         client = _make_mock_client()
         list_issues_via_graphql(client, statuses=None)
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
 
 def _make_mock_link_client(mutation_key: str) -> MagicMock:
     """Build a mock GraphQL client for add/remove link mutations."""
     client = MagicMock()
-    client.execute.return_value = {
+    client.execute_generic.return_value = {
         mutation_key: {
             "__typename": "UpdateIssueSuccess",
             "issue": {
@@ -424,14 +424,14 @@ class TestAddLinkToIssueGraphQLVariables:
         """Adding a run link sends runId in linkedObject."""
         client = _make_mock_link_client("addLinkToIssue")
         add_link_to_issue_via_graphql(client, issue_id="1", run_id="run-abc-456")
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_with_asset_key(self, snapshot):
         """Adding an asset link sends assetKey path in linkedObject."""
         client = _make_mock_link_client("addLinkToIssue")
         add_link_to_issue_via_graphql(client, issue_id="1", asset_key=["my", "asset"])
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_with_both(self, snapshot):
@@ -443,7 +443,7 @@ class TestAddLinkToIssueGraphQLVariables:
             run_id="run-abc-456",
             asset_key=["my", "asset"],
         )
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_returns_parsed_issue(self):
@@ -457,7 +457,7 @@ class TestAddLinkToIssueGraphQLVariables:
     def test_raises_on_unauthorized(self):
         """UnauthorizedError response raises an exception."""
         client = MagicMock()
-        client.execute.return_value = {
+        client.execute_generic.return_value = {
             "addLinkToIssue": {
                 "__typename": "UnauthorizedError",
                 "message": "Not authorized",
@@ -474,14 +474,14 @@ class TestRemoveLinkFromIssueGraphQLVariables:
         """Removing a run link sends runId in linkedObject."""
         client = _make_mock_link_client("removeLinkFromIssue")
         remove_link_from_issue_via_graphql(client, issue_id="1", run_id="run-abc-456")
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_with_asset_key(self, snapshot):
         """Removing an asset link sends assetKey path in linkedObject."""
         client = _make_mock_link_client("removeLinkFromIssue")
         remove_link_from_issue_via_graphql(client, issue_id="1", asset_key=["my", "asset"])
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_with_both(self, snapshot):
@@ -493,7 +493,7 @@ class TestRemoveLinkFromIssueGraphQLVariables:
             run_id="run-abc-456",
             asset_key=["my", "asset"],
         )
-        _, kwargs = client.execute.call_args
+        _, kwargs = client.execute_generic.call_args
         snapshot.assert_match(kwargs["variables"])
 
     def test_returns_parsed_issue(self):
@@ -507,7 +507,7 @@ class TestRemoveLinkFromIssueGraphQLVariables:
     def test_raises_on_unauthorized(self):
         """UnauthorizedError response raises an exception."""
         client = MagicMock()
-        client.execute.return_value = {
+        client.execute_generic.return_value = {
             "removeLinkFromIssue": {
                 "__typename": "UnauthorizedError",
                 "message": "Not authorized",

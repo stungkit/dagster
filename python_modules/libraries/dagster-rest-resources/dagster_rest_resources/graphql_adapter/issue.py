@@ -185,7 +185,7 @@ mutation CliRemoveLinkFromIssueMutation($issueId: String!, $linkedObject: IssueL
 
 def get_issue_via_graphql(client: IGraphQLClient, issue_id: str) -> DgApiIssue:
     """Get a single issue via GraphQL."""
-    result = client.execute(GET_ISSUE_WITH_CONTEXT_QUERY, variables={"issueId": issue_id})
+    result = client.execute_generic(GET_ISSUE_WITH_CONTEXT_QUERY, variables={"issueId": issue_id})
     issue = result["issue"]
 
     typename = issue.get("__typename")
@@ -220,7 +220,7 @@ def list_issues_via_graphql(
     if filters:
         variables["filters"] = filters
 
-    result = client.execute(LIST_ISSUES_QUERY, variables=variables)
+    result = client.execute_generic(LIST_ISSUES_QUERY, variables=variables)
     issues_result = result["issues"]
 
     typename = issues_result.get("__typename")
@@ -279,7 +279,7 @@ def create_issue_via_graphql(
 ) -> DgApiIssue:
     """Create a new issue via GraphQL."""
     variables: dict[str, Any] = {"title": title, "description": description, "chatId": None}
-    result = client.execute(CREATE_ISSUE_MUTATION, variables=variables)
+    result = client.execute_generic(CREATE_ISSUE_MUTATION, variables=variables)
     create_result = result["createIssue"]
 
     typename = create_result.get("__typename")
@@ -305,7 +305,7 @@ def add_link_to_issue_via_graphql(
         linked_object["assetKey"] = {"path": asset_key}
 
     variables: dict[str, Any] = {"issueId": issue_id, "linkedObject": linked_object}
-    result = client.execute(ADD_LINK_TO_ISSUE_MUTATION, variables=variables)
+    result = client.execute_generic(ADD_LINK_TO_ISSUE_MUTATION, variables=variables)
     add_result = result["addLinkToIssue"]
 
     typename = add_result.get("__typename")
@@ -331,7 +331,7 @@ def remove_link_from_issue_via_graphql(
         linked_object["assetKey"] = {"path": asset_key}
 
     variables: dict[str, Any] = {"issueId": issue_id, "linkedObject": linked_object}
-    result = client.execute(REMOVE_LINK_FROM_ISSUE_MUTATION, variables=variables)
+    result = client.execute_generic(REMOVE_LINK_FROM_ISSUE_MUTATION, variables=variables)
     remove_result = result["removeLinkFromIssue"]
 
     typename = remove_result.get("__typename")
@@ -362,7 +362,7 @@ def update_issue_via_graphql(
     if context is not None:
         variables["context"] = context
 
-    result = client.execute(UPDATE_ISSUE_MUTATION, variables=variables)
+    result = client.execute_generic(UPDATE_ISSUE_MUTATION, variables=variables)
     update_result = result["updateIssue"]
 
     typename = update_result.get("__typename")
