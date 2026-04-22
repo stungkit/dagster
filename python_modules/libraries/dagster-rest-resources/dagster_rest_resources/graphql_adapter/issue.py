@@ -13,7 +13,7 @@ from dagster_rest_resources.schemas.issue import (
 
 ISSUE_FRAGMENT = """
 fragment IssueFragment on Issue {
-    id
+    publicId
     title
     description
     status
@@ -112,7 +112,7 @@ query FetchIssues($limit: Int!, $cursor: String, $filters: IssuesFilter) {
         ... on IssueConnection {
             __typename
             issues {
-                id
+                publicId
                 title
                 status
                 createdBy {
@@ -233,7 +233,7 @@ def list_issues_via_graphql(
     for issue_data in issues_result.get("issues", []):
         items.append(
             DgApiIssue(
-                id=issue_data["id"],
+                id=issue_data["publicId"],
                 title=issue_data["title"],
                 description="",
                 status=DgApiIssueStatus(issue_data["status"]),
@@ -262,7 +262,7 @@ def _parse_issue_from_graphql(issue: dict[str, Any]) -> DgApiIssue:
             )
 
     return DgApiIssue(
-        id=issue["id"],
+        id=issue["publicId"],
         title=issue["title"],
         description=issue["description"],
         status=DgApiIssueStatus(issue["status"]),
