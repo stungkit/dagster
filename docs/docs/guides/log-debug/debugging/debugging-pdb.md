@@ -41,7 +41,7 @@ In the terminal where `dagster dev` is running, you should now see a `pdb` debug
 2025-03-03 15:24:55 -0600 - dagster - DEBUG - __ASSET_JOB - 202cd42f-ecf3-4504-838c-e41f58dbdf78 - 52540 - pdb_asset - STEP_WORKER_STARTED - Executing step "pdb_asset" in subprocess.
 2025-03-03 15:24:55 -0600 - dagster - DEBUG - __ASSET_JOB - 202cd42f-ecf3-4504-838c-e41f58dbdf78 - 52540 - pdb_asset - RESOURCE_INIT_STARTED - Starting initialization of resources [io_manager].
 2025-03-03 15:24:55 -0600 - dagster - DEBUG - __ASSET_JOB - 202cd42f-ecf3-4504-838c-e41f58dbdf78 - 52540 - pdb_asset - RESOURCE_INIT_SUCCESS - Finished initialization of resources [io_manager].
-2025-03-03 15:24:55 -0600 - dagster - DEBUG - __ASSET_JOB - 202cd42f-ecf3-4504-838c-e41f58dbdf78 - 52540 - LOGS_CAPTURED - Started capturing logs in process (pid: 52540).
+2025-03-03 15:24:55 -0600 - dagster - DEBUG - __ASSET_JOB - 202cd42f-ecf3-4504-838c-e41f58dbdf78 - 52540 - LOGS_CAPTURED - Capturing logs for process (pid: 52540).
 2025-03-03 15:24:55 -0600 - dagster - DEBUG - __ASSET_JOB - 202cd42f-ecf3-4504-838c-e41f58dbdf78 - 52540 - pdb_asset - STEP_START - Started execution of step "pdb_asset".
 --Return--
 > /dagster/debugging.py(11)pdb_asset()

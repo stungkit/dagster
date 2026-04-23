@@ -22,7 +22,7 @@ During these events, logs like the following are generated:
 12:40:07 - DEBUG - STEP_WORKER_STARTED - Executing step "taxi_zones_file" in subprocess.
 12:40:07 - DEBUG - taxi_zones_file - RESOURCE_INIT_STARTED - Starting initialization of resources [io_manager].
 12:40:07 - DEBUG - taxi_zones_file - RESOURCE_INIT_SUCCESS - Finished initialization of resources [io_manager].
-12:40:07 - DEBUG - LOGS_CAPTURED - Started capturing logs in process (pid: 86390).
+12:40:07 - DEBUG - LOGS_CAPTURED - Capturing logs for process (pid: 86390).
 12:40:07 - DEBUG - taxi_zones_file - STEP_START - Started execution of step "taxi_zones_file".
 12:40:09 - DEBUG - taxi_zones_file - STEP_OUTPUT - Yielded output "result" of type "Any". (Type check passed).
 12:40:09 - DEBUG - __ASSET_JOB_0 - taxi_zones_file - Writing file at: /Users/erincochran/Desktop/dagster-examples/project-dagster-university/tmpfxsoltsc/storage/taxi_zones_file using PickledObjectFilesystemIOManager...
