@@ -62,7 +62,7 @@ ENV JAVA_HOME /opt/java/openjdk
 RUN update-alternatives --install /usr/bin/java java /opt/java/openjdk/bin/java 1
 
 # Install various packages used in running/installing/testing Dagster:
-# - git/make (cloning dagster, running checks defined in Makefile)
+# - git/just (cloning dagster, running checks)
 # - nodejs/yarn (dagster UI)
 # - assorted others-- some may no longer be required, but leaving in place for now
 #
@@ -184,6 +184,11 @@ COPY --from=snapshot_builder /snapshot-reqs.txt .
 # builds faster in Buildkite.
 RUN uv pip install --system -r /snapshot-reqs.txt \
     && rm /snapshot-reqs.txt
+
+# Remove make from the final image-- CI steps should use just instead, which
+# propagates signal exit codes correctly. make is still available in the
+# system_base stage for building redis etc.
+RUN apt-get remove -yqq make && apt-get autoremove -yqq
 
 # New versions of debian require allowlisting folders where `git` can run
 RUN git config --system --add safe.directory \*
