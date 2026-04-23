@@ -118,6 +118,10 @@ class CommandStepBuilder:
                     "exit_status": 28,
                     "limit": 2,
                 },  # node ran out of space, try to reschedule
+                {
+                    "signal_reason": "agent_stop",
+                    "limit": 2,
+                },  # agent stopped (e.g. spot eviction, pod termination)
             ]
 
         self._step = {
