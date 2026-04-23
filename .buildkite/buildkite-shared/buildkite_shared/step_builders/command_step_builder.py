@@ -255,13 +255,6 @@ class CommandStepBuilder:
             self._step["timeout_in_minutes"] = num_minutes
         return self
 
-    def with_retry(self, num_retries: int | None) -> Self:
-        # Update default retry config to blanket limit with num_retries
-        if num_retries is not None and num_retries > 0:
-            self._step["retry"]["automatic"] = {"limit": num_retries}
-
-        return self
-
     def on_queue(self, queue: BuildkiteQueue) -> Self:
         self._step["agents"]["queue"] = queue.value
         return self

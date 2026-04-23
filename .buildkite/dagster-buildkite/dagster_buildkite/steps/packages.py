@@ -114,8 +114,6 @@ class PackageSpec:
             test environment. These must also be listed in the target toxfile under `passenv`.
             Defaults to None.
         tox_file (str, optional): The tox file to use. Defaults to {directory}/tox.ini.
-        retries (int, optional): Whether to retry these tests on failure
-            for packages of type "core" or "library", disabled for other packages.
         timeout_in_minutes (int, optional): Fail after this many minutes.
         queue (BuildkiteQueue, optional): Schedule steps to this queue.
         run_pytest (bool, optional): Whether to run pytest. Enabled by default.
@@ -134,7 +132,6 @@ class PackageSpec:
     pytest_tox_factors: list[ToxFactor] | None = None
     env_vars: list[str] | None = None
     tox_file: str | None = None
-    retries: int | None = None
     timeout_in_minutes: int | None = None
     queue: BuildkiteQueue | None = None
     run_pytest: bool = True
@@ -234,7 +231,6 @@ class PackageSpec:
                                 tox_file=self.tox_file,
                                 timeout_in_minutes=self.timeout_in_minutes,
                                 queue=self.queue,
-                                retries=self.retries,
                                 skip_reason=skip_reason_str,
                                 pytest_args=pytest_args,
                                 concurrency=other_factor.concurrency if other_factor else None,
@@ -656,7 +652,6 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
             # test suite also installs a ton of packages in the same environment, which is liable to
             # cause dependency collisions.
             unsupported_python_versions=AvailablePythonVersion.get_all_except_default(),
-            retries=0,
             # automation validates public API consistency across all published packages,
             # so it must run whenever any published package changes.
             force_run_fn=BuildkiteContext.has_published_python_package_changes,
@@ -928,8 +923,6 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
                 "GCP_PROJECT_ID",
             ],
             pytest_extra_cmds=gcp_creds_extra_cmds,
-            # Remove once https://github.com/dagster-io/dagster/issues/2511 is resolved
-            retries=2,
         ),
         PackageSpec(
             oss_path("python_modules/libraries/dagster-gcp-pandas"),
@@ -940,7 +933,6 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
                 "GCP_PROJECT_ID",
             ],
             pytest_extra_cmds=gcp_creds_extra_cmds,
-            retries=2,
         ),
         PackageSpec(
             oss_path("python_modules/libraries/dagster-gcp-pyspark"),
@@ -1022,8 +1014,6 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
         PackageSpec(
             oss_path("python_modules/libraries/dagster-twilio"),
             env_vars=["TWILIO_TEST_ACCOUNT_SID", "TWILIO_TEST_AUTH_TOKEN"],
-            # Remove once https://github.com/dagster-io/dagster/issues/2511 is resolved
-            retries=2,
         ),
         PackageSpec(
             oss_path("python_modules/libraries/dagster-wandb"),
@@ -1039,7 +1029,6 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
                 ToxFactor("papermill1", splits=2),
                 ToxFactor("papermill2", splits=2),
             ],
-            retries=2,  # Workaround for flaky kernel issues
             unsupported_python_versions=(
                 lambda tox_factor: (
                     [
