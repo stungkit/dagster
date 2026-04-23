@@ -20,18 +20,18 @@ Resources
 .. autoconfigurable:: ClickhouseResource
   :annotation: ResourceDefinition
 
-*******
+***********
 I/O manager
-*******
+***********
 
 .. autoconfigurable:: ClickhouseIOManager
   :annotation: IOManagerDefinition
 
 .. autofunction:: build_clickhouse_io_manager
 
-*****************
+******************
 Database utilities
-*****************
+******************
 
 .. autoclass:: ClickhouseDbClient
   :members:
