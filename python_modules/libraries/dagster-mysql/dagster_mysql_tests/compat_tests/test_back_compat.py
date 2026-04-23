@@ -53,7 +53,9 @@ def _reconstruct_from_file(conn_string, path, _username="root", _password="test"
     env = os.environ.copy()
     env["MYSQL_PWD"] = "test"
     subprocess.check_call(
-        f"mysql -uroot -h{hostname} -P{port} -ptest test < {path}", shell=True, env=env
+        f"mysql -uroot --ssl-mode=DISABLED -h{hostname} -P{port} -ptest test < {path}",
+        shell=True,
+        env=env,
     )
     return hostname, port
 
