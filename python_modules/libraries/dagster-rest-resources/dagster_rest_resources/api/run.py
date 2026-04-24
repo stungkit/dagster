@@ -37,14 +37,14 @@ class DgApiRunApi:
         self,
         limit: int = 50,
         cursor: str | None = None,
-        statuses: tuple[str, ...] = (),
+        statuses: list[RunStatus] | None = None,
         job_name: str | None = None,
     ) -> "DgApiRunList":
         run_filter = None
         if statuses or job_name:
             run_filter = RunsFilter(
-                statuses=[RunStatus(s) for s in statuses] if statuses else None,
-                pipelineName=job_name,
+                statuses=statuses if statuses else None,
+                pipelineName=job_name if job_name else None,
             )
 
         result = self._client.list_runs(filter=run_filter, cursor=cursor, limit=limit).runs_or_error
@@ -67,7 +67,7 @@ class DgApiRunApi:
                 )
             case "InvalidPipelineRunsFilterError":
                 raise DagsterPlusGraphqlError(
-                    f"Invalid runs filter:\n  statuses: {', '.join(statuses)}\n  job_name: {job_name}"
+                    f"Invalid runs filter:\n  statuses: {', '.join(statuses or [])}\n  job_name: {job_name}"
                 )
             case "PythonError":
                 raise DagsterPlusGraphqlError(f"Error fetching runs: {result.message}")

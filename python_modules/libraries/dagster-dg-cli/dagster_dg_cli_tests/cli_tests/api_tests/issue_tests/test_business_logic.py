@@ -6,7 +6,6 @@ GraphQL client mocking or external dependencies.
 
 import json
 
-import click
 from dagster_dg_cli.cli.api.formatters import format_issue, format_issues
 from dagster_rest_resources.schemas.enums import DgApiIssueStatus
 from dagster_rest_resources.schemas.issue import (
@@ -300,15 +299,3 @@ class TestIssueDataProcessing:
 
         assert issue.linked_objects == []
         assert issue.context is None
-
-
-class TestListIssuesCommandOptions:
-    """Test that CLI option definitions stay in sync with schema enums."""
-
-    def test_status_filter_choices_match_enum(self):
-        """--status choices must exactly match DgApiIssueStatus values."""
-        from dagster_dg_cli.cli.api.issues import list_issues_command
-
-        status_param = next(p for p in list_issues_command.params if p.name == "statuses")
-        assert isinstance(status_param.type, click.Choice)
-        assert set(status_param.type.choices) == {s.value for s in DgApiIssueStatus}

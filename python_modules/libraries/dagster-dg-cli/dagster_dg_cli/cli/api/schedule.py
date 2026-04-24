@@ -3,6 +3,7 @@
 import click
 from dagster_dg_core.utils import DgClickCommand, DgClickGroup
 from dagster_dg_core.utils.telemetry import cli_telemetry_wrapper
+from dagster_rest_resources.schemas.enums import DgApiInstigationTickStatus
 from dagster_shared.plus.config import DagsterPlusCliConfig
 from dagster_shared.plus.config_utils import dg_api_options
 
@@ -110,7 +111,10 @@ def get_schedule_command(
     "--status",
     "statuses",
     multiple=True,
-    type=click.Choice(["STARTED", "SKIPPED", "SUCCESS", "FAILURE"], case_sensitive=False),
+    type=click.Choice([e.value for e in DgApiInstigationTickStatus], case_sensitive=False),
+    callback=lambda ctx, param, values: tuple(
+        DgApiInstigationTickStatus(v.upper()) for v in values
+    ),
     help="Filter by tick status. Repeatable.",
 )
 @click.option("--limit", type=int, default=25, help="Maximum number of ticks to return")
@@ -129,7 +133,7 @@ def get_schedule_command(
 def get_schedule_ticks_command(
     ctx: click.Context,
     schedule_name: str,
-    statuses: tuple[str, ...],
+    statuses: tuple[DgApiInstigationTickStatus, ...],
     limit: int,
     cursor: str | None,
     before_timestamp: float | None,
@@ -142,7 +146,6 @@ def get_schedule_ticks_command(
 ) -> None:
     """Get tick history for a specific schedule."""
     from dagster_rest_resources.api.tick import DgApiTickApi
-    from dagster_rest_resources.schemas.enums import DgApiInstigationTickStatus
 
     config = DagsterPlusCliConfig.create_for_deployment(
         deployment=deployment,
@@ -153,12 +156,11 @@ def get_schedule_ticks_command(
     api = DgApiTickApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
-        statuses_list = [DgApiInstigationTickStatus(s.upper()) for s in statuses] or None
         ticks = api.get_schedule_ticks(
             schedule_name=schedule_name,
             limit=limit,
             cursor=cursor,
-            statuses=statuses_list,
+            statuses=list(statuses) if statuses else None,
             before_timestamp=before_timestamp,
             after_timestamp=after_timestamp,
         )

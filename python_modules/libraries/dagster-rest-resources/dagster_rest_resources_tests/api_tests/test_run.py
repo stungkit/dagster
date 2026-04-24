@@ -106,7 +106,7 @@ class TestListRuns:
         result = DgApiRunApi(client).list_runs(
             limit=10,
             cursor="run-99",
-            statuses=("SUCCESS", "FAILURE"),
+            statuses=[RunStatus.SUCCESS, RunStatus.FAILURE],
             job_name="my_job",
         )
 

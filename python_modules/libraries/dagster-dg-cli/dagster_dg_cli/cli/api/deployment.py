@@ -3,6 +3,7 @@
 import click
 from dagster_dg_core.utils import DgClickCommand, DgClickGroup
 from dagster_dg_core.utils.telemetry import cli_telemetry_wrapper
+from dagster_rest_resources.schemas.enums import DgApiPullRequestStatus
 from dagster_shared.plus.config import DagsterPlusCliConfig
 from dagster_shared.plus.config_utils import dg_api_options
 
@@ -34,7 +35,8 @@ from dagster_dg_cli.cli.response_schema import dg_response_schema
 @click.option(
     "--pr-status",
     "pr_status",
-    type=click.Choice(["OPEN", "CLOSED", "MERGED"], case_sensitive=True),
+    type=click.Choice([e.value for e in DgApiPullRequestStatus], case_sensitive=False),
+    callback=lambda ctx, param, v: DgApiPullRequestStatus(v.upper()) if v else None,
     default=None,
     help="Filter branch deployments by pull request status (only applies with --type branch or all)",
 )
@@ -46,7 +48,7 @@ def list_deployments_command(
     ctx: click.Context,
     output_json: bool,
     deployment_type: str,
-    pr_status: str | None,
+    pr_status: DgApiPullRequestStatus | None,
     organization: str,
     api_token: str,
     view_graphql: bool,
@@ -59,7 +61,6 @@ def list_deployments_command(
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
     from dagster_rest_resources.api.deployments import DgApiDeploymentApi
     from dagster_rest_resources.schemas.deployment import DgApiDeploymentList
-    from dagster_rest_resources.schemas.enums import DgApiPullRequestStatus
 
     api = DgApiDeploymentApi(_client=client)
 
@@ -67,10 +68,8 @@ def list_deployments_command(
         if deployment_type == "production":
             deployments = api.list_deployments()
         elif deployment_type == "branch":
-            pr_status = DgApiPullRequestStatus(pr_status.upper()) if pr_status else None
             deployments = api.list_branch_deployments(pull_request_status=pr_status)
         else:  # all
-            pr_status = DgApiPullRequestStatus(pr_status.upper()) if pr_status else None
             prod = api.list_deployments()
             branch = api.list_branch_deployments(pull_request_status=pr_status)
             all_items = [*prod.items, *branch.items]

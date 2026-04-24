@@ -5,6 +5,7 @@ import datetime
 import click
 from dagster_dg_core.utils import DgClickCommand, DgClickGroup
 from dagster_dg_core.utils.telemetry import cli_telemetry_wrapper
+from dagster_rest_resources.schemas.enums import DgApiIssueStatus
 from dagster_shared.plus.config import DagsterPlusCliConfig
 from dagster_shared.plus.config_utils import dg_api_options
 
@@ -69,7 +70,8 @@ def get_issue_command(
     "--status",
     "statuses",
     multiple=True,
-    type=click.Choice(["OPEN", "CLOSED", "TRIAGE"], case_sensitive=False),
+    type=click.Choice([e.value for e in DgApiIssueStatus], case_sensitive=False),
+    callback=lambda ctx, param, values: tuple(DgApiIssueStatus(v.upper()) for v in values),
     help="Filter by issue status. Repeatable.",
 )
 @click.option(
@@ -98,7 +100,7 @@ def list_issues_command(
     ctx: click.Context,
     limit: int,
     cursor: str | None,
-    statuses: tuple[str, ...],
+    statuses: tuple[DgApiIssueStatus, ...],
     created_after: datetime.datetime | None,
     created_before: datetime.datetime | None,
     output_json: bool,
@@ -115,7 +117,6 @@ def list_issues_command(
         organization=organization,
         user_token=api_token,
     )
-    from dagster_rest_resources.schemas.enums import DgApiIssueStatus
 
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
     api = DgApiIssueApi(_client=client)
@@ -124,7 +125,7 @@ def list_issues_command(
         issue_list = api.list_issues(
             limit=limit,
             cursor=cursor,
-            statuses=[DgApiIssueStatus(s) for s in statuses] if statuses else None,
+            statuses=list(statuses) if statuses else None,
             created_after=created_after.timestamp() if created_after else None,
             created_before=created_before.timestamp() if created_before else None,
         )
@@ -186,7 +187,8 @@ def create_issue_command(
 @click.argument("issue_id", type=str)
 @click.option(
     "--status",
-    type=click.Choice(["OPEN", "CLOSED", "TRIAGE"], case_sensitive=False),
+    type=click.Choice([e.value for e in DgApiIssueStatus], case_sensitive=False),
+    callback=lambda ctx, param, v: DgApiIssueStatus(v.upper()) if v else None,
     default=None,
     help="New status for the issue",
 )
@@ -221,7 +223,7 @@ def create_issue_command(
 def update_issue_command(
     ctx: click.Context,
     issue_id: str,
-    status: str | None,
+    status: DgApiIssueStatus | None,
     title: str | None,
     description: str | None,
     context: str | None,
@@ -233,7 +235,6 @@ def update_issue_command(
 ) -> None:
     """Update an existing issue."""
     from dagster_rest_resources.api.issue import DgApiIssueApi
-    from dagster_rest_resources.schemas.enums import DgApiIssueStatus
 
     config = DagsterPlusCliConfig.create_for_deployment(
         deployment=deployment,
@@ -246,7 +247,7 @@ def update_issue_command(
     with handle_api_errors(ctx, output_json):
         issue = api.update_issue(
             issue_id=issue_id,
-            status=DgApiIssueStatus(status) if status is not None else None,
+            status=status,
             title=title,
             description=description,
             context=context,
