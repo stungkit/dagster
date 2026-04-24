@@ -351,7 +351,7 @@ class GrapheneRepository(graphene.ObjectType):
         return self._batch_loader
 
     def resolve_id(self, _graphene_info: ResolveInfo) -> str:
-        return self._handle.get_compound_id().to_string()
+        return self._handle.selector_id
 
     def resolve_origin(self, _graphene_info: ResolveInfo):
         origin = self._handle.get_remote_origin()
