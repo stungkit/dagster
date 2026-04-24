@@ -10,7 +10,10 @@ if TYPE_CHECKING:
         DgApiAlertPolicyDocument,
         DgApiAlertPolicySyncResult,
     )
-    from dagster_rest_resources.schemas.artifact import ArtifactDownloadResult, ArtifactUploadResult
+    from dagster_rest_resources.schemas.artifact import (
+        DgApiArtifactDownloadResult,
+        DgApiArtifactUploadResult,
+    )
     from dagster_rest_resources.schemas.asset import (
         DgApiAsset,
         DgApiAssetEventList,
@@ -205,7 +208,7 @@ def format_saml_result(result: "SamlOperationResult", as_json: bool) -> str:
 # ---------------------------------------------------------------------------
 
 
-def format_artifact_upload(result: "ArtifactUploadResult", as_json: bool) -> str:
+def format_artifact_upload(result: "DgApiArtifactUploadResult", as_json: bool) -> str:
     """Format artifact upload result for output."""
     if as_json:
         return result.model_dump_json(indent=2)
@@ -214,7 +217,7 @@ def format_artifact_upload(result: "ArtifactUploadResult", as_json: bool) -> str
     return f"Uploaded artifact '{result.key}' to {scope_desc}."
 
 
-def format_artifact_download(result: "ArtifactDownloadResult", as_json: bool) -> str:
+def format_artifact_download(result: "DgApiArtifactDownloadResult", as_json: bool) -> str:
     """Format artifact download result for output."""
     if as_json:
         return result.model_dump_json(indent=2)

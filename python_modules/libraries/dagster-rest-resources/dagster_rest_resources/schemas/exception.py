@@ -8,3 +8,7 @@ class DagsterPlusGraphqlError(Exception):
 
 class UnconfirmedProdDeletionError(Exception):
     pass
+
+
+class S3Error(Exception):
+    pass
