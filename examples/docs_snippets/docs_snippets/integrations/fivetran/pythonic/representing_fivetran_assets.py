@@ -9,4 +9,11 @@ fivetran_workspace = FivetranWorkspace(
 )
 
 fivetran_specs = load_fivetran_asset_specs(fivetran_workspace)
-defs = dg.Definitions(assets=fivetran_specs, resources={"fivetran": fivetran_workspace})
+
+
+@dg.definitions
+def defs():
+    return dg.Definitions(
+        assets=fivetran_specs,
+        resources={"fivetran": fivetran_workspace},
+    )

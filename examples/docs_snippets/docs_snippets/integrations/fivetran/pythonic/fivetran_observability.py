@@ -19,8 +19,11 @@ fivetran_specs = load_fivetran_asset_specs(fivetran_workspace)
 # AssetMaterialization events into the Dagster event log
 fivetran_polling_sensor = build_fivetran_polling_sensor(workspace=fivetran_workspace)
 
-defs = dg.Definitions(
-    assets=fivetran_specs,
-    sensors=[fivetran_polling_sensor],
-    resources={"fivetran": fivetran_workspace},
-)
+
+@dg.definitions
+def defs():
+    return dg.Definitions(
+        assets=fivetran_specs,
+        sensors=[fivetran_polling_sensor],
+        resources={"fivetran": fivetran_workspace},
+    )

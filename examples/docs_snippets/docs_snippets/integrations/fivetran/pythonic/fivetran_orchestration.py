@@ -36,8 +36,11 @@ automation_sensor = dg.AutomationConditionSensorDefinition(
 # Polling sensor detects externally completed syncs
 fivetran_polling_sensor = build_fivetran_polling_sensor(workspace=fivetran_workspace)
 
-defs = dg.Definitions(
-    assets=all_fivetran_assets,
-    sensors=[automation_sensor, fivetran_polling_sensor],
-    resources={"fivetran": fivetran_workspace},
-)
+
+@dg.definitions
+def defs():
+    return dg.Definitions(
+        assets=all_fivetran_assets,
+        sensors=[automation_sensor, fivetran_polling_sensor],
+        resources={"fivetran": fivetran_workspace},
+    )

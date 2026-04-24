@@ -16,11 +16,13 @@ marketing_fivetran_workspace = FivetranWorkspace(
 sales_fivetran_specs = load_fivetran_asset_specs(sales_fivetran_workspace)
 marketing_fivetran_specs = load_fivetran_asset_specs(marketing_fivetran_workspace)
 
-# Merge the specs into a single set of definitions
-defs = dg.Definitions(
-    assets=[*sales_fivetran_specs, *marketing_fivetran_specs],
-    resources={
-        "marketing_fivetran": marketing_fivetran_workspace,
-        "sales_fivetran": sales_fivetran_workspace,
-    },
-)
+
+@dg.definitions
+def defs():
+    return dg.Definitions(
+        assets=[*sales_fivetran_specs, *marketing_fivetran_specs],
+        resources={
+            "marketing_fivetran": marketing_fivetran_workspace,
+            "sales_fivetran": sales_fivetran_workspace,
+        },
+    )

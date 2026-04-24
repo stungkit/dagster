@@ -12,22 +12,20 @@ fivetran_workspace = FivetranWorkspace(
 @fivetran_assets(
     connector_id="fivetran_connector_id",  # Replace with your connector ID
     name="fivetran_connector_name",  # Replace with your connection name
+    group_name="fivetran_connector_name",
     workspace=fivetran_workspace,
 )
 def fivetran_connector_assets(
     context: dg.AssetExecutionContext, fivetran: FivetranWorkspace
 ):
+    # Do something before the materialization...
     yield from fivetran.sync_and_poll(context=context)
+    # Do something after the materialization...
 
 
-fivetran_connector_assets_job = dg.define_asset_job(
-    name="fivetran_connector_assets_job",
-    selection=[fivetran_connector_assets],
-)
-
-
-defs = dg.Definitions(
-    assets=[fivetran_connector_assets],
-    jobs=[fivetran_connector_assets_job],
-    resources={"fivetran": fivetran_workspace},
-)
+@dg.definitions
+def defs():
+    return dg.Definitions(
+        assets=[fivetran_connector_assets],
+        resources={"fivetran": fivetran_workspace},
+    )

@@ -20,7 +20,9 @@ def fivetran_connector_assets(
     yield from fivetran.sync_and_poll(context=context).fetch_column_metadata()
 
 
-defs = dg.Definitions(
-    assets=[fivetran_connector_assets],
-    resources={"fivetran": fivetran_workspace},
-)
+@dg.definitions
+def defs():
+    return dg.Definitions(
+        assets=[fivetran_connector_assets],
+        resources={"fivetran": fivetran_workspace},
+    )

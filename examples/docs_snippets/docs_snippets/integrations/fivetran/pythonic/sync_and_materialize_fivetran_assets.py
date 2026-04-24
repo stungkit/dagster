@@ -8,18 +8,12 @@ fivetran_workspace = FivetranWorkspace(
     api_secret=dg.EnvVar("FIVETRAN_API_SECRET"),
 )
 
-
 all_fivetran_assets = build_fivetran_assets_definitions(workspace=fivetran_workspace)
 
 
-all_fivetran_assets_job = dg.define_asset_job(
-    name="all_fivetran_assets_job",
-    selection=all_fivetran_assets,
-)
-
-
-defs = dg.Definitions(
-    assets=all_fivetran_assets,
-    jobs=[all_fivetran_assets_job],
-    resources={"fivetran": fivetran_workspace},
-)
+@dg.definitions
+def defs():
+    return dg.Definitions(
+        assets=all_fivetran_assets,
+        resources={"fivetran": fivetran_workspace},
+    )

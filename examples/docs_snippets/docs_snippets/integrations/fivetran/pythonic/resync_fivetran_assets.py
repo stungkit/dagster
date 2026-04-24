@@ -52,7 +52,9 @@ def fivetran_connector_full_resync_assets(
 # end_resync_all
 
 
-defs = dg.Definitions(
-    assets=[fivetran_connector_assets, fivetran_connector_full_resync_assets],
-    resources={"fivetran": fivetran_workspace},
-)
+@dg.definitions
+def defs():
+    return dg.Definitions(
+        assets=[fivetran_connector_assets, fivetran_connector_full_resync_assets],
+        resources={"fivetran": fivetran_workspace},
+    )

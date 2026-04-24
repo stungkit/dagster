@@ -25,16 +25,11 @@ fivetran_connector_assets_job = dg.define_asset_job(
     selection=[fivetran_connector_assets],
 )
 
-# start_fivetran_schedule
-fivetran_connector_assets_schedule = dg.ScheduleDefinition(
-    job=fivetran_connector_assets_job,
-    cron_schedule="0 0 * * *",  # Runs at midnight daily
-)
 
-defs = dg.Definitions(
-    assets=[fivetran_connector_assets],
-    jobs=[fivetran_connector_assets_job],
-    schedules=[fivetran_connector_assets_schedule],
-    resources={"fivetran": fivetran_workspace},
-)
-# end_fivetran_schedule
+@dg.definitions
+def defs():
+    return dg.Definitions(
+        assets=[fivetran_connector_assets],
+        jobs=[fivetran_connector_assets_job],
+        resources={"fivetran": fivetran_workspace},
+    )
