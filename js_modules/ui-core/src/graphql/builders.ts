@@ -5145,7 +5145,7 @@ type RunTagsOrError = PythonError | RunTags;
 
 type Runs = PipelineRuns & {
   __typename: 'Runs';
-  count: Maybe<Scalars['Int']['output']>;
+  count: Scalars['Int']['output'];
   results: Array<Run>;
 };
 

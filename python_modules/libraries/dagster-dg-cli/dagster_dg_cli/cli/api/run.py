@@ -172,7 +172,7 @@ def get_run_command(
     is_flag=True,
     help="Output in JSON format for machine readability",
 )
-@dg_response_schema(module="dagster_rest_resources.schemas.run_event", cls="RunEventList")
+@dg_response_schema(module="dagster_rest_resources.schemas.run_event", cls="DgApiRunEventList")
 @dg_api_options(deployment_scoped=True)
 @cli_telemetry_wrapper
 @click.pass_context

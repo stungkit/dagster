@@ -4,3 +4,7 @@ class DagsterPlusUnauthorizedError(Exception):
 
 class DagsterPlusGraphqlError(Exception):
     pass
+
+
+class UnconfirmedProdDeletionError(Exception):
+    pass

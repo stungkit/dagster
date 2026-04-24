@@ -3413,7 +3413,7 @@ union RunsOrError = Runs | InvalidPipelineRunsFilterError | PythonError
 
 type Runs implements PipelineRuns {
   results: [Run!]!
-  count: Int
+  count: Int!
 }
 
 interface PipelineRuns {

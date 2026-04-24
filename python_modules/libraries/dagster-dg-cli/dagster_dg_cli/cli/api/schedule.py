@@ -46,23 +46,21 @@ def list_schedules_command(
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
     from dagster_rest_resources.api.schedule import DgApiScheduleApi
 
-    api = DgApiScheduleApi(client)
+    api = DgApiScheduleApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
         schedules = api.list_schedules()
 
         if status:
-            from dagster_rest_resources.schemas.schedule import (
-                DgApiScheduleList,
-                DgApiScheduleStatus,
-            )
+            from dagster_rest_resources.schemas.enums import DgApiInstigationStatus
+            from dagster_rest_resources.schemas.schedule import DgApiScheduleList
 
             filtered_schedules = [
                 schedule
                 for schedule in schedules.items
-                if schedule.status == DgApiScheduleStatus(status)
+                if schedule.status == DgApiInstigationStatus(status)
             ]
-            schedules = DgApiScheduleList(items=filtered_schedules, total=len(filtered_schedules))
+            schedules = DgApiScheduleList(items=filtered_schedules)
 
         output = format_schedules(schedules, as_json=output_json)
         click.echo(output)
@@ -98,7 +96,7 @@ def get_schedule_command(
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
     from dagster_rest_resources.api.schedule import DgApiScheduleApi
 
-    api = DgApiScheduleApi(client)
+    api = DgApiScheduleApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
         schedule = api.get_schedule_by_name(schedule_name=schedule_name)
@@ -144,6 +142,7 @@ def get_schedule_ticks_command(
 ) -> None:
     """Get tick history for a specific schedule."""
     from dagster_rest_resources.api.tick import DgApiTickApi
+    from dagster_rest_resources.schemas.enums import DgApiInstigationTickStatus
 
     config = DagsterPlusCliConfig.create_for_deployment(
         deployment=deployment,
@@ -151,15 +150,15 @@ def get_schedule_ticks_command(
         user_token=api_token,
     )
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
-    api = DgApiTickApi(client)
+    api = DgApiTickApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
-        normalized_statuses = tuple(s.upper() for s in statuses)
+        statuses_list = [DgApiInstigationTickStatus(s.upper()) for s in statuses] or None
         ticks = api.get_schedule_ticks(
             schedule_name=schedule_name,
             limit=limit,
             cursor=cursor,
-            statuses=normalized_statuses,
+            statuses=statuses_list,
             before_timestamp=before_timestamp,
             after_timestamp=after_timestamp,
         )

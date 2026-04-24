@@ -15,7 +15,7 @@ from dagster_dg_cli.cli.response_schema import dg_response_schema
 @click.command(name="list", cls=DgClickCommand)
 @click.option(
     "--status",
-    type=click.Choice(["RUNNING", "STOPPED", "PAUSED"]),
+    type=click.Choice(["RUNNING", "STOPPED"]),
     help="Filter sensors by status",
 )
 @click.option(
@@ -46,18 +46,21 @@ def list_sensors_command(
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
     from dagster_rest_resources.api.sensor import DgApiSensorApi
 
-    api = DgApiSensorApi(client)
+    api = DgApiSensorApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
         sensors = api.list_sensors()
 
         if status:
-            from dagster_rest_resources.schemas.sensor import DgApiSensorList, DgApiSensorStatus
+            from dagster_rest_resources.schemas.enums import DgApiInstigationStatus
+            from dagster_rest_resources.schemas.sensor import DgApiSensorList
 
             filtered_sensors = [
-                sensor for sensor in sensors.items if sensor.status == DgApiSensorStatus(status)
+                sensor
+                for sensor in sensors.items
+                if sensor.status == DgApiInstigationStatus(status)
             ]
-            sensors = DgApiSensorList(items=filtered_sensors, total=len(filtered_sensors))
+            sensors = DgApiSensorList(items=filtered_sensors)
 
         output = format_sensors(sensors, as_json=output_json)
         click.echo(output)
@@ -93,7 +96,7 @@ def get_sensor_command(
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
     from dagster_rest_resources.api.sensor import DgApiSensorApi
 
-    api = DgApiSensorApi(client)
+    api = DgApiSensorApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
         sensor = api.get_sensor_by_name(sensor_name=sensor_name)
@@ -139,6 +142,7 @@ def get_sensor_ticks_command(
 ) -> None:
     """Get tick history for a specific sensor."""
     from dagster_rest_resources.api.tick import DgApiTickApi
+    from dagster_rest_resources.schemas.enums import DgApiInstigationTickStatus
 
     config = DagsterPlusCliConfig.create_for_deployment(
         deployment=deployment,
@@ -146,15 +150,15 @@ def get_sensor_ticks_command(
         user_token=api_token,
     )
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
-    api = DgApiTickApi(client)
+    api = DgApiTickApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
-        normalized_statuses = tuple(s.upper() for s in statuses)
+        statuses_list = [DgApiInstigationTickStatus(s.upper()) for s in statuses] or None
         ticks = api.get_sensor_ticks(
             sensor_name=sensor_name,
             limit=limit,
             cursor=cursor,
-            statuses=normalized_statuses,
+            statuses=statuses_list,
             before_timestamp=before_timestamp,
             after_timestamp=after_timestamp,
         )

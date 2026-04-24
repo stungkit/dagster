@@ -44,10 +44,10 @@ def get_issue_command(
         user_token=api_token,
     )
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
-    api = DgApiIssueApi(client)
+    api = DgApiIssueApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
-        issue = api.get_issue(issue_id)
+        issue = api.get_issue(issue_id=issue_id)
         output = format_issue(issue, as_json=output_json)
         click.echo(output)
 
@@ -115,14 +115,16 @@ def list_issues_command(
         organization=organization,
         user_token=api_token,
     )
+    from dagster_rest_resources.schemas.enums import DgApiIssueStatus
+
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
-    api = DgApiIssueApi(client)
+    api = DgApiIssueApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
         issue_list = api.list_issues(
             limit=limit,
             cursor=cursor,
-            statuses=list(statuses) if statuses else None,
+            statuses=[DgApiIssueStatus(s) for s in statuses] if statuses else None,
             created_after=created_after.timestamp() if created_after else None,
             created_before=created_before.timestamp() if created_before else None,
         )
@@ -172,7 +174,7 @@ def create_issue_command(
         user_token=api_token,
     )
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
-    api = DgApiIssueApi(client)
+    api = DgApiIssueApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
         issue = api.create_issue(title=title, description=description)
@@ -231,7 +233,7 @@ def update_issue_command(
 ) -> None:
     """Update an existing issue."""
     from dagster_rest_resources.api.issue import DgApiIssueApi
-    from dagster_rest_resources.schemas.issue import DgApiIssueStatus
+    from dagster_rest_resources.schemas.enums import DgApiIssueStatus
 
     config = DagsterPlusCliConfig.create_for_deployment(
         deployment=deployment,
@@ -239,7 +241,7 @@ def update_issue_command(
         user_token=api_token,
     )
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
-    api = DgApiIssueApi(client)
+    api = DgApiIssueApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
         issue = api.update_issue(
@@ -300,7 +302,7 @@ def add_link_issue_command(
         user_token=api_token,
     )
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
-    api = DgApiIssueApi(client)
+    api = DgApiIssueApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
         issue = api.add_link_to_issue(
@@ -359,7 +361,7 @@ def remove_link_issue_command(
         user_token=api_token,
     )
     client = create_dg_api_graphql_client(ctx, config, view_graphql=view_graphql)
-    api = DgApiIssueApi(client)
+    api = DgApiIssueApi(_client=client)
 
     with handle_api_errors(ctx, output_json):
         issue = api.remove_link_from_issue(
