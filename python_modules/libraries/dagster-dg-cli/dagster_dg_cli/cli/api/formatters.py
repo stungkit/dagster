@@ -46,11 +46,12 @@ if TYPE_CHECKING:
     from dagster_rest_resources.schemas.organization import DgApiOrganizationSettings
     from dagster_rest_resources.schemas.run import DgApiRun, DgApiRunList
     from dagster_rest_resources.schemas.run_event import DgApiRunEventList
-    from dagster_rest_resources.schemas.saml import SamlOperationResult
     from dagster_rest_resources.schemas.schedule import DgApiSchedule, DgApiScheduleList
     from dagster_rest_resources.schemas.secret import DgApiSecret, DgApiSecretList
     from dagster_rest_resources.schemas.sensor import DgApiSensor, DgApiSensorList
     from dagster_rest_resources.schemas.tick import DgApiTickList
+
+    from dagster_dg_cli.cli.api.schema import SamlOperationResult
 
 MAX_COL_WIDTH = 60
 

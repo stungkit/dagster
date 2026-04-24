@@ -1,4 +1,4 @@
-"""SAML operation models."""
+"""Models returned from API commands."""
 
 from pydantic import BaseModel
 
