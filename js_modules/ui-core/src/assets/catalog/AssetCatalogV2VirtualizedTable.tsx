@@ -13,7 +13,7 @@ import React, {forwardRef, useMemo, useRef} from 'react';
 import {Link} from 'react-router-dom';
 
 import {usePrefixedCacheKey} from '../../app/usePrefixedCacheKey';
-import {tokenForAssetKey} from '../../asset-graph/Utils';
+import {displayNameForAssetKey, tokenForAssetKey} from '../../asset-graph/Utils';
 import {useStateWithStorage} from '../../hooks/useStateWithStorage';
 import {TimeFromNow} from '../../ui/TimeFromNow';
 import {buildRepoAddress} from '../../workspace/buildRepoAddress';
@@ -256,7 +256,7 @@ const AssetRow = forwardRef(
         left={
           <Box flex={{direction: 'row', gap: 4, alignItems: 'center'}}>
             <Icon name="asset" />
-            {asset.key.path.join(' / ')}
+            {displayNameForAssetKey(asset.key)}
           </Box>
         }
         right={
