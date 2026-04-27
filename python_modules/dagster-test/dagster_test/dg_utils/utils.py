@@ -1,3 +1,4 @@
+import atexit
 import contextlib
 import json
 import os
@@ -7,6 +8,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import textwrap
 import time
 import traceback
@@ -86,28 +88,79 @@ def crawl_cli_commands() -> dict[tuple[str, ...], click.Command]:
     return commands
 
 
+# Process-wide cache of read-only components venvs, keyed by the sorted tuple of
+# additional_packages. `isolated_components_venv` creates a venv that tests use only for running
+# `dg` commands in; the venv itself is never mutated by the majority of callers. Creating a fresh
+# venv + installing editable dagster packages for every test is expensive (several seconds per
+# call). We instead build the venv once per (process, additional_packages) combination and reuse
+# it. Callers that need to mutate the venv (e.g. uninstall packages) must pass `fresh=True`.
+_CACHED_COMPONENTS_VENVS: "dict[tuple[str, ...], Path]" = {}
+
+
+@atexit.register
+def _cleanup_cached_components_venvs() -> None:
+    for venv_path in _CACHED_COMPONENTS_VENVS.values():
+        shutil.rmtree(venv_path.parent, ignore_errors=True)
+
+
+def _build_components_venv(additional_packages: Sequence[str] | None) -> Path:
+    venv_dir = Path(tempfile.mkdtemp(prefix="dg-components-venv-"))
+    venv_path = venv_dir / ".venv"
+    subprocess.run(["uv", "venv", str(venv_path)], check=True)
+    install_editable_dagster_packages_to_venv(
+        venv_path,
+        [
+            "dagster",
+            "dagster-pipes",
+            "libraries/dagster-shared",
+            "dagster-test",
+        ]
+        + list(additional_packages if additional_packages else []),
+    )
+    venv_exec_path = get_venv_executable(venv_path).parent
+    assert (venv_exec_path / "python").exists() or (venv_exec_path / "python.exe").exists()
+    return venv_path
+
+
 @contextmanager
 def isolated_components_venv(
-    runner: Union[CliRunner, "ProxyRunner"], additional_packages: Sequence[str] | None = None
+    runner: Union[CliRunner, "ProxyRunner"],
+    additional_packages: Sequence[str] | None = None,
+    fresh: bool = False,
 ) -> Iterator[Path]:
-    with runner.isolated_filesystem():
-        subprocess.run(["uv", "venv", ".venv"], check=True)
-        venv_path = Path.cwd() / ".venv"
-        install_editable_dagster_packages_to_venv(
-            venv_path,
-            [
-                "dagster",
-                "dagster-pipes",
-                "libraries/dagster-shared",
-                "dagster-test",
-            ]
-            + list(additional_packages if additional_packages else []),
-        )
+    """Run the wrapped test code with a venv that has editable dagster packages installed.
 
-        venv_exec_path = get_venv_executable(venv_path).parent
-        assert (venv_exec_path / "python").exists() or (venv_exec_path / "python.exe").exists()
-        with activate_venv(venv_path):
-            yield venv_path
+    By default the venv is cached on the process for reuse across tests with identical
+    ``additional_packages``. Callers that mutate the venv (installing/uninstalling packages)
+    must pass ``fresh=True`` to force a one-shot venv.
+    """
+    if fresh:
+        with runner.isolated_filesystem():
+            subprocess.run(["uv", "venv", ".venv"], check=True)
+            venv_path = Path.cwd() / ".venv"
+            install_editable_dagster_packages_to_venv(
+                venv_path,
+                [
+                    "dagster",
+                    "dagster-pipes",
+                    "libraries/dagster-shared",
+                    "dagster-test",
+                ]
+                + list(additional_packages if additional_packages else []),
+            )
+            venv_exec_path = get_venv_executable(venv_path).parent
+            assert (venv_exec_path / "python").exists() or (venv_exec_path / "python.exe").exists()
+            with activate_venv(venv_path):
+                yield venv_path
+        return
+
+    key = tuple(sorted(additional_packages)) if additional_packages else ()
+    if key not in _CACHED_COMPONENTS_VENVS:
+        _CACHED_COMPONENTS_VENVS[key] = _build_components_venv(additional_packages)
+
+    venv_path = _CACHED_COMPONENTS_VENVS[key]
+    with runner.isolated_filesystem(), activate_venv(venv_path):
+        yield venv_path
 
 
 @contextmanager
