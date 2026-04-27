@@ -385,7 +385,8 @@ class CommandStepBuilder:
     def _base_k8s_settings(self) -> Mapping[Any, Any]:
         buildkite_shell = "/bin/bash -e -c"
         assert self._docker_settings
-        if self._docker_settings["image"] == "hashicorp/terraform:light":
+        image = str(self._docker_settings["image"])
+        if image == "hashicorp/terraform:light" or "/datadog-ci:" in image:
             buildkite_shell = "/bin/sh -e -c"
 
         sidecars = []
