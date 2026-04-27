@@ -45,11 +45,16 @@ from dagster_dg_core.utils import (
     pushd,
     set_toml_node,
 )
+from dagster_shared.record import record
 from dagster_shared.utils import environ
 from packaging.version import Version
 from typing_extensions import Self
 
 STANDARD_TEST_COMPONENT_MODULE = "dagster_test.components"
+
+
+ConfigFileType: TypeAlias = Literal["dg.toml", "pyproject.toml"]
+PackageLayoutType: TypeAlias = Literal["root", "src"]
 
 
 def install_editable_dagster_packages_to_venv(
@@ -163,6 +168,74 @@ def isolated_components_venv(
         yield venv_path
 
 
+# Process-wide cache of foo-bar project venvs, keyed by ProjectVenvCacheKey.
+# `isolated_example_project_foo_bar(uv_sync=True)` builds a foo-bar project plus venv on every
+# call; the venv build dominates wall-clock and is duplicated work across the bulk of the slow tox
+# env. We build one venv per (xdist worker, key) combination, then symlink it into each test's
+# project directory. Each test re-runs `install_to_venv(venv, ["-e", "."])` to refresh foo-bar's
+# editable install with its own source path. Worker keying keeps writes serial since xdist workers
+# run their own tests sequentially. Callers that perform additional venv mutations (extra
+# `uv pip install`, package uninstall, renaming `.venv`) must pass `fresh=True`.
+@record
+class ProjectVenvCacheKey:
+    worker_id: str
+    use_editable_dagster: bool
+    package_layout: PackageLayoutType
+
+
+_CACHED_PROJECT_VENVS: dict[ProjectVenvCacheKey, Path] = {}
+
+
+@atexit.register
+def _cleanup_cached_project_venvs() -> None:
+    # Each cached venv lives at <tempdir>/foo-bar/.venv; remove the enclosing tempdir.
+    for venv_path in _CACHED_PROJECT_VENVS.values():
+        shutil.rmtree(venv_path.parent.parent, ignore_errors=True)
+
+
+def _build_cached_project_venv(
+    runner: "ProxyRunner",
+    use_editable_dagster: bool,
+) -> Path:
+    venv_dir = Path(tempfile.mkdtemp(prefix="dg-project-venv-"))
+    dagster_git_repo_dir = str(discover_repo_root(Path(__file__)))
+    # Force uv to use the same interpreter the tests are running under. The non-cached path runs uv
+    # sync inside the test runner subprocess where uv typically picks up that interpreter; here we
+    # build in a clean tempdir and uv would otherwise resolve `requires-python` against managed
+    # downloads (e.g. 3.14) which then breaks tests that subprocess into the cached venv.
+    with (
+        pushd(str(venv_dir)),
+        environ({"DAGSTER_GIT_REPO_DIR": dagster_git_repo_dir, "UV_PYTHON": sys.executable}),
+    ):
+        result = runner.invoke_create_dagster(
+            "project",
+            "foo-bar",
+            "--uv-sync",
+            *(["--use-editable-dagster"] if use_editable_dagster else []),
+        )
+        assert_runner_result(result)
+    return venv_dir / "foo-bar" / ".venv"
+
+
+def _get_cached_project_venv(
+    runner: "ProxyRunner",
+    use_editable_dagster: bool,
+    package_layout: "PackageLayoutType",
+) -> Path:
+    # `package_layout` is part of the cache key per the design even though `_build_cached_project_venv`
+    # produces an identical venv regardless of layout; the per-test `install_to_venv` refresh
+    # picks up the layout-specific source path.
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "master")
+    key = ProjectVenvCacheKey(
+        worker_id=worker_id,
+        use_editable_dagster=use_editable_dagster,
+        package_layout=package_layout,
+    )
+    if key not in _CACHED_PROJECT_VENVS:
+        _CACHED_PROJECT_VENVS[key] = _build_cached_project_venv(runner, use_editable_dagster)
+    return _CACHED_PROJECT_VENVS[key]
+
+
 @contextmanager
 def isolated_dg_venv(runner: Union[CliRunner, "ProxyRunner"]) -> Iterator[Path]:
     with runner.isolated_filesystem():
@@ -186,10 +259,6 @@ def isolated_dg_venv(runner: Union[CliRunner, "ProxyRunner"]) -> Iterator[Path]:
         assert (venv_exec_path / "python").exists() or (venv_exec_path / "python.exe").exists()
         with activate_venv(venv_path):
             yield venv_path
-
-
-ConfigFileType: TypeAlias = Literal["dg.toml", "pyproject.toml"]
-PackageLayoutType: TypeAlias = Literal["root", "src"]
 
 
 def install_editable_dg_dev_packages_to_venv(venv_path: Path) -> None:
@@ -273,6 +342,7 @@ _MIN_DAGSTER_COMPONENTS_MERGED_VERSION = Version("1.10.8")
 @contextmanager
 def isolated_example_project_foo_bar(
     runner: Union[CliRunner, "ProxyRunner"],
+    *,
     in_workspace: bool = True,
     component_dirs: Sequence[Path] = [],
     config_file_type: ConfigFileType = "pyproject.toml",
@@ -283,6 +353,7 @@ def isolated_example_project_foo_bar(
     use_uv_workspace: bool = False,
     project_name: str = "foo-bar",
     use_tempdir: bool = True,
+    fresh: bool = False,
 ) -> Iterator[Path]:
     """Scaffold a project named foo_bar in an isolated filesystem.
 
@@ -294,8 +365,17 @@ def isolated_example_project_foo_bar(
         in_workspace: Whether the project should be scaffolded inside a workspace directory.
         component_dirs: A list of component directories that will be copied into the project component root.
         use_editable_dagster: Whether to use an editable install of dagster.
+        fresh: When True (and ``uv_sync=True``), bypass the per-worker cached venv and rebuild the
+            project venv from scratch. Required for any caller that mutates the venv beyond the
+            normal ``install_to_venv(venv, ["-e", "."])`` refresh (e.g. installing additional
+            packages or moving ``.venv``); otherwise the mutation persists into subsequent tests on
+            the same xdist worker.
     """
-    uv_sync_args = ["--uv-sync"] if uv_sync else ["--no-uv-sync"]
+    use_cached_venv = uv_sync and not fresh and not use_uv_workspace and project_name == "foo-bar"
+    if use_cached_venv:
+        uv_sync_args = ["--no-uv-sync"]
+    else:
+        uv_sync_args = ["--uv-sync"] if uv_sync else ["--no-uv-sync"]
 
     hyph_name = project_name
     snake_name = project_name.replace("-", "_")
@@ -321,7 +401,7 @@ def isolated_example_project_foo_bar(
         elif use_uv_workspace:
             stack.enter_context(
                 isolated_example_component_library_foo_bar(
-                    runner, library_name="test-lib-baz", use_tempdir=False
+                    runner, library_name="test-lib-baz", use_tempdir=False, fresh=True
                 )
             )
             stack.enter_context(pushd(".."))  # pop out of library directory
@@ -352,6 +432,15 @@ def isolated_example_project_foo_bar(
         ]
         result = runner.invoke_create_dagster(*args)
         assert_runner_result(result)
+
+        if use_cached_venv:
+            cached_venv = _get_cached_project_venv(runner, use_editable_dagster, package_layout)
+            os.symlink(cached_venv, Path(hyph_name) / ".venv", target_is_directory=True)
+            # Copy uv.lock so the cached project matches a --uv-sync project. Symlinking would
+            # leak per-test mutations back into the cache.
+            cached_lock = cached_venv.parent / "uv.lock"
+            if cached_lock.exists():
+                shutil.copy(cached_lock, Path(hyph_name) / "uv.lock")
 
         # inject the baz dependency
         if use_uv_workspace:
@@ -389,6 +478,11 @@ def isolated_example_project_foo_bar(
                 # Reinstall to venv since package root changed
                 install_to_venv(Path(f"{hyph_name}/.venv"), ["-e", hyph_name])
 
+        if use_cached_venv:
+            # The cached venv has foo-bar editable-installed pointing at the cache project dir.
+            # Re-install foo-bar from this test's source so imports resolve here, not in the cache.
+            install_to_venv(Path(f"{hyph_name}/.venv"), ["-e", hyph_name])
+
         with clear_module_from_cache(snake_name), pushd(project_path):
             for src_dir in component_dirs:
                 component_name = src_dir.name
@@ -420,10 +514,12 @@ def isolated_example_project_foo_bar(
 @contextmanager
 def isolated_example_component_library_foo_bar(
     runner: Union[CliRunner, "ProxyRunner"],
+    *,
     library_name: str = "foo-bar",
     components_module_name: str | None = None,
     uv_sync: bool = True,
     use_tempdir: bool = True,
+    fresh: bool = False,
 ) -> Iterator[None]:
     hyph_name = library_name  # noqa: F841
     snake_name = library_name.replace("-", "_")
@@ -436,6 +532,7 @@ def isolated_example_component_library_foo_bar(
         uv_sync=uv_sync,
         project_name=library_name,
         use_tempdir=use_tempdir,
+        fresh=fresh,
     ):
         shutil.rmtree(Path(f"src/{snake_name}/defs"))
 
