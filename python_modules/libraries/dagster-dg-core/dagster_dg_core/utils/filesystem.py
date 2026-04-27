@@ -44,7 +44,7 @@ class PathChangeHandler(FileSystemEventHandler):
         clear_screen()
         self._callback(new_hash)
         current_time = datetime.datetime.now().strftime("%H:%M:%S")
-        print(f"\nUpdated at {current_time}, watching for changes...")  # noqa: T201
+        print(f"\nUpdated at {current_time}, watching for changes...", flush=True)  # noqa: T201
 
 
 # This is a global variable that is used to signal the watcher to exit in tests
