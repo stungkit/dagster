@@ -1,10 +1,12 @@
 from collections.abc import Sequence
 from typing import Self
 
+from buildkite_shared.step_builders.command_step_builder import BuildkiteQueue
 from typing_extensions import Required, TypedDict
 
 
 class TriggerStepConfiguration(TypedDict, closed=True, total=False):
+    agents: dict[str, str]
     trigger: Required[str]
     label: Required[str]
     build: dict[str, object]
@@ -23,7 +25,11 @@ class TriggerStepBuilder:
     _step: TriggerStepConfiguration
 
     def __init__(self, label: str, pipeline: str, key: str | None = None) -> None:
-        self._step: TriggerStepConfiguration = {"trigger": pipeline, "label": label}
+        self._step: TriggerStepConfiguration = {
+            "agents": {"queue": BuildkiteQueue.KUBERNETES_EKS.value},
+            "trigger": pipeline,
+            "label": label,
+        }
 
         if key is not None:
             self._step["key"] = key
