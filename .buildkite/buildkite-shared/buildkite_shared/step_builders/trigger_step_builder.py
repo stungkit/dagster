@@ -12,6 +12,7 @@ class TriggerStepConfiguration(TypedDict, closed=True, total=False):
     key: str | None
     depends_on: list[str] | None
     soft_fail: bool
+    cluster_id: str | None
     # Covers the "async" (bool | None) and "if" (str | None) keys, which are
     # Python reserved words and cannot be used as class attributes. Buildkite
     # uses "async" for asynchronous trigger execution and "if" for conditional
@@ -48,6 +49,10 @@ class TriggerStepBuilder:
 
     def soft_fail(self, soft_fail: bool) -> Self:
         self._step["soft_fail"] = soft_fail
+        return self
+
+    def with_cluster_id(self, cluster_id: str) -> Self:
+        self._step["cluster_id"] = cluster_id
         return self
 
     def with_branches(self, branches: list[str] | None) -> Self:
