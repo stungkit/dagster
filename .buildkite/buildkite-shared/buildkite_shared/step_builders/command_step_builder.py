@@ -388,6 +388,8 @@ class CommandStepBuilder:
         image = str(self._docker_settings["image"])
         if image == "hashicorp/terraform:light" or "/datadog-ci:" in image:
             buildkite_shell = "/bin/sh -e -c"
+        elif "kaniko-project/executor" in image:
+            buildkite_shell = "/busybox/sh -e -c"
 
         sidecars = []
         if self._requires_docker:
