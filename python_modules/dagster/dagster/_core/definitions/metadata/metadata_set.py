@@ -216,10 +216,12 @@ class TableMetadataSet(NamespacedMetadataSet):
             return None
 
     @classmethod
-    def extract_storage_address(cls, metadata: Mapping[str, Any]) -> "StorageAddress":
+    def extract_storage_address(cls, metadata: Mapping[str, Any]) -> "StorageAddress | None":
         from pydantic import ValidationError
 
         table_name = cls.extract_normalized_table_name(metadata)
+        if table_name is None:
+            return None
 
         metadata_subset = {
             key: metadata[key] for key in {"dagster/storage_kind"} if key in metadata
@@ -240,7 +242,7 @@ class StorageAddress:
     """
 
     storage_kind: str | None
-    table_name: str | None
+    table_name: str
 
 
 class UriMetadataSet(NamespacedMetadataSet):

@@ -5099,3 +5099,70 @@ class TestAssetsForSameStorageAddress(ExecutingGraphQLContextTestMatrix):
         assert result.data
         asset_node = result.data["assetNodeOrError"]
         assert asset_node["assetsForSameStorageAddress"] == []
+
+
+STORAGE_ADDRESS_QUERY = """
+    query StorageAddressQuery($assetKey: AssetKeyInput!) {
+        assetNodeOrError(assetKey: $assetKey) {
+            __typename
+            ... on AssetNode {
+                storageAddress {
+                    storageKind
+                    tableName
+                }
+            }
+        }
+    }
+"""
+
+
+class TestAssetNodeStorageAddress(ExecutingGraphQLContextTestMatrix):
+    def test_storage_address_lowercase(self, graphql_context: WorkspaceRequestContext):
+        # Already-lowercase table_name passes through unchanged; no kind tag -> storageKind null.
+        result = execute_dagster_graphql(
+            graphql_context,
+            STORAGE_ADDRESS_QUERY,
+            variables={"assetKey": {"path": ["table_asset_1"]}},
+        )
+        assert result.data
+        assert result.data["assetNodeOrError"]["storageAddress"] == {
+            "storageKind": None,
+            "tableName": "db.schema.shared_table",
+        }
+
+    def test_storage_address_uppercase_normalized(self, graphql_context: WorkspaceRequestContext):
+        # Uppercase metadata is normalized to lowercase so the frontend can compare directly.
+        result = execute_dagster_graphql(
+            graphql_context,
+            STORAGE_ADDRESS_QUERY,
+            variables={"assetKey": {"path": ["table_asset_2"]}},
+        )
+        assert result.data
+        assert result.data["assetNodeOrError"]["storageAddress"] == {
+            "storageKind": None,
+            "tableName": "db.schema.shared_table",
+        }
+
+    def test_storage_address_missing_returns_null(self, graphql_context: WorkspaceRequestContext):
+        # Asset with no table_name metadata returns null storageAddress.
+        result = execute_dagster_graphql(
+            graphql_context,
+            STORAGE_ADDRESS_QUERY,
+            variables={"assetKey": {"path": ["table_asset_4"]}},
+        )
+        assert result.data
+        assert result.data["assetNodeOrError"]["storageAddress"] is None
+
+    def test_storage_address_with_storage_kind(self, graphql_context: WorkspaceRequestContext):
+        # Asset with the dagster/storage_kind metadata field exposes it on storageAddress so
+        # the frontend doesn't have to dig through metadata.
+        result = execute_dagster_graphql(
+            graphql_context,
+            STORAGE_ADDRESS_QUERY,
+            variables={"assetKey": {"path": ["table_asset_with_kind"]}},
+        )
+        assert result.data
+        assert result.data["assetNodeOrError"]["storageAddress"] == {
+            "storageKind": "snowflake",
+            "tableName": "db.schema.snowflake_table",
+        }

@@ -161,6 +161,14 @@ class GrapheneAssetStaleCause(graphene.ObjectType):
         name = "StaleCause"
 
 
+class GrapheneStorageAddress(graphene.ObjectType):
+    storageKind = graphene.String()
+    tableName = graphene.NonNull(graphene.String)
+
+    class Meta:
+        name = "StorageAddress"
+
+
 class GrapheneAssetDependency(graphene.ObjectType):
     class Meta:
         name = "AssetDependency"
@@ -287,6 +295,7 @@ class GrapheneAssetNode(graphene.ObjectType):
     assetPartitionStatuses = graphene.NonNull(GrapheneAssetPartitionStatuses)
     partitionStats = graphene.Field(GraphenePartitionStats)
     metadata_entries = non_null_list(GrapheneMetadataEntry)
+    storageAddress = graphene.Field(GrapheneStorageAddress)
     tags = non_null_list(GrapheneDefinitionTag)
     kinds = non_null_list(graphene.String)
     op = graphene.Field(GrapheneSolidDefinition)
@@ -1188,6 +1197,16 @@ class GrapheneAssetNode(graphene.ObjectType):
         self, _graphene_info: ResolveInfo
     ) -> Sequence[GrapheneMetadataEntry]:
         return list(iterate_metadata_entries(self._asset_node_snap.metadata))
+
+    def resolve_storageAddress(self, _graphene_info: ResolveInfo) -> GrapheneStorageAddress | None:
+        from dagster._core.definitions.metadata.metadata_set import TableMetadataSet
+
+        address = TableMetadataSet.extract_storage_address(self._asset_node_snap.metadata)
+        if address is None:
+            return None
+        return GrapheneStorageAddress(
+            storageKind=address.storage_kind, tableName=address.table_name
+        )
 
     def resolve_isAutoCreatedStub(self, _graphene_info: ResolveInfo) -> bool:
         return (

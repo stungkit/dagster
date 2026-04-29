@@ -603,6 +603,14 @@
           }),
         }),
         dict({
+          'id': '["table_asset_with_kind"]',
+          'key': dict({
+            'path': list([
+              'table_asset_with_kind',
+            ]),
+          }),
+        }),
+        dict({
           'id': '["third_kinds_key"]',
           'key': dict({
             'path': list([
@@ -1119,6 +1127,11 @@
         'freshnessInfo': None,
         'freshnessPolicy': None,
         'id': 'w.table_asset_4',
+      }),
+      dict({
+        'freshnessInfo': None,
+        'freshnessPolicy': None,
+        'id': 'w.table_asset_with_kind',
       }),
       dict({
         'freshnessInfo': None,

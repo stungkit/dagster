@@ -177,9 +177,7 @@ def test_extract_normalized_table_name() -> None:
 
 
 def test_extract_storage_address() -> None:
-    assert TableMetadataSet.extract_storage_address({}) == StorageAddress(
-        storage_kind=None, table_name=None
-    )
+    assert TableMetadataSet.extract_storage_address({}) is None
 
     valid_metadata = {
         "dagster/storage_kind": "snowflake",
@@ -222,14 +220,10 @@ def test_extract_storage_address() -> None:
         "dagster/storage_kind": "snowflake",
         "dagster/table_name": dg.FloatMetadataValue(1.0),
     }
-    assert TableMetadataSet.extract_storage_address(invalid_table_name_metadata) == StorageAddress(
-        storage_kind="snowflake", table_name=None
-    )
+    assert TableMetadataSet.extract_storage_address(invalid_table_name_metadata) is None
 
     only_storage_kind = {"dagster/storage_kind": "snowflake"}
-    assert TableMetadataSet.extract_storage_address(only_storage_kind) == StorageAddress(
-        storage_kind="snowflake", table_name=None
-    )
+    assert TableMetadataSet.extract_storage_address(only_storage_kind) is None
 
     only_table_name = {"dagster/table_name": "BAR"}
     assert TableMetadataSet.extract_storage_address(only_table_name) == StorageAddress(
