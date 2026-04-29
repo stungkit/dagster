@@ -133,7 +133,7 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg | \
     && chmod +x /usr/local/bin/docker-compose
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.8 /uv /bin/
 
 # Install just (task runner-- replaces make for CI steps because it propagates
 # signal exit codes correctly, enabling Buildkite automatic retry on spot
