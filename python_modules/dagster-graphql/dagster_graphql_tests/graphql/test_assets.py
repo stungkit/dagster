@@ -1859,7 +1859,7 @@ class TestAssetAwareEventLog(ExecutingGraphQLContextTestMatrix):
 
         assert len(result.data["assetNodes"]) == 1
         asset_node = result.data["assetNodes"][0]
-        assert asset_node["id"] == f"{main_repo_location_name()}.test_repo.asset_one"
+        assert asset_node["id"] == f"r.{main_repo_location_name()}.test_repo.asset_one"
         assert asset_node["hasMaterializePermission"]
         assert asset_node["hasReportRunlessAssetEventPermission"]
 
@@ -1874,7 +1874,7 @@ class TestAssetAwareEventLog(ExecutingGraphQLContextTestMatrix):
 
         assert len(result.data["assetNodes"]) == 2
         asset_node = result.data["assetNodes"][0]
-        assert asset_node["id"] == f"{main_repo_location_name()}.test_repo.asset_one"
+        assert asset_node["id"] == f"r.{main_repo_location_name()}.test_repo.asset_one"
 
     def test_asset_node_is_executable(self, graphql_context: WorkspaceRequestContext):
         result = execute_dagster_graphql(
@@ -3410,9 +3410,7 @@ class TestAssetAwareEventLog(ExecutingGraphQLContextTestMatrix):
         assert result.data["assetNodes"]
 
         fresh_diamond_bottom = [
-            a
-            for a in result.data["assetNodes"]
-            if a["id"] == f"{main_repo_location_name()}.test_repo.fresh_diamond_bottom"
+            a for a in result.data["assetNodes"] if a["id"] == "w.fresh_diamond_bottom"
         ]
         assert len(fresh_diamond_bottom) == 1
         assert fresh_diamond_bottom[0]["autoMaterializePolicy"]["policyType"] == "LAZY"
@@ -3424,9 +3422,7 @@ class TestAssetAwareEventLog(ExecutingGraphQLContextTestMatrix):
         assert result.data["assetNodes"]
 
         automation_condition_asset = [
-            a
-            for a in result.data["assetNodes"]
-            if a["id"] == f"{main_repo_location_name()}.test_repo.asset_with_automation_condition"
+            a for a in result.data["assetNodes"] if a["id"] == "w.asset_with_automation_condition"
         ]
         assert len(automation_condition_asset) == 1
         condition = automation_condition_asset[0]["automationCondition"]
@@ -3436,8 +3432,7 @@ class TestAssetAwareEventLog(ExecutingGraphQLContextTestMatrix):
         custom_automation_condition_asset = [
             a
             for a in result.data["assetNodes"]
-            if a["id"]
-            == f"{main_repo_location_name()}.test_repo.asset_with_custom_automation_condition"
+            if a["id"] == "w.asset_with_custom_automation_condition"
         ]
         assert len(custom_automation_condition_asset) == 1
         condition = custom_automation_condition_asset[0]["automationCondition"]
@@ -4420,11 +4415,7 @@ class TestCrossRepoAssetDependedBy(AllRepositoryGraphQLContextTestMatrix):
             CROSS_REPO_ASSET_GRAPH,
         )
         asset_nodes = result.data["assetNodes"]
-        derived_asset = next(
-            node
-            for node in asset_nodes
-            if node["id"] == "cross_asset_repos.upstream_assets_repository.derived_asset"
-        )
+        derived_asset = next(node for node in asset_nodes if node["id"] == "w.derived_asset")
         dependent_asset_keys = [
             {"path": ["downstream_asset1"]},
             {"path": ["downstream_asset2"]},
@@ -4683,9 +4674,7 @@ def test_legacy_freshness_policy_killswitch(graphql_context: WorkspaceRequestCon
     assert result.data["assetNodes"]
 
     fresh_diamond_bottom = next(
-        a
-        for a in result.data["assetNodes"]
-        if a["id"] == f"{main_repo_location_name()}.test_repo.fresh_diamond_bottom"
+        a for a in result.data["assetNodes"] if a["id"] == "w.fresh_diamond_bottom"
     )
     assert fresh_diamond_bottom["freshnessInfo"] is None
     assert fresh_diamond_bottom["freshnessPolicy"] is None
