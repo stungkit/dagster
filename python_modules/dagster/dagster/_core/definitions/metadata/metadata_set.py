@@ -5,6 +5,8 @@ from typing import AbstractSet, Any  # noqa: UP035
 
 from dagster_shared.dagster_model import DagsterModel
 from dagster_shared.dagster_model.pydantic_compat_layer import model_fields
+from dagster_shared.record import record
+from pydantic import ValidationError
 from typing_extensions import TypeVar
 
 from dagster import _check as check
@@ -202,8 +204,6 @@ class TableMetadataSet(NamespacedMetadataSet):
 
     @classmethod
     def extract_normalized_table_name(cls, metadata: Mapping[str, Any]) -> str | None:
-        from pydantic import ValidationError
-
         metadata_subset = {
             key: metadata[key]
             for key in {"dagster/table_name", "dagster/relation_identifier"}
@@ -214,6 +214,33 @@ class TableMetadataSet(NamespacedMetadataSet):
             return table_name.lower() if table_name else None
         except ValidationError:
             return None
+
+    @classmethod
+    def extract_storage_address(cls, metadata: Mapping[str, Any]) -> "StorageAddress":
+        from pydantic import ValidationError
+
+        table_name = cls.extract_normalized_table_name(metadata)
+
+        metadata_subset = {
+            key: metadata[key] for key in {"dagster/storage_kind"} if key in metadata
+        }
+        try:
+            storage_kind = TableMetadataSet.extract(metadata_subset).storage_kind
+        except ValidationError:
+            storage_kind = None
+
+        return StorageAddress(storage_kind=storage_kind, table_name=table_name)
+
+
+@record
+class StorageAddress:
+    """Identifies a table by its storage system and normalized table name. Returned by
+    ``TableMetadataSet.extract_storage_address`` for tolerant lookup of these two fields
+    on arbitrary metadata mappings.
+    """
+
+    storage_kind: str | None
+    table_name: str | None
 
 
 class UriMetadataSet(NamespacedMetadataSet):

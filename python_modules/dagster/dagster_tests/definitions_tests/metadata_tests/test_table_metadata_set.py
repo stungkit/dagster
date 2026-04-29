@@ -2,6 +2,7 @@ import dagster as dg
 import pytest
 from dagster._check import CheckError
 from dagster._core.definitions.metadata import TableMetadataSet
+from dagster._core.definitions.metadata.metadata_set import StorageAddress
 from dagster._core.test_utils import ignore_warning, raise_exception_on_warnings
 from pydantic import ValidationError
 
@@ -172,4 +173,65 @@ def test_extract_normalized_table_name() -> None:
             invalid_metadata_with_valid_legacy_table_name
         )
         == "bar"
+    )
+
+
+def test_extract_storage_address() -> None:
+    assert TableMetadataSet.extract_storage_address({}) == StorageAddress(
+        storage_kind=None, table_name=None
+    )
+
+    valid_metadata = {
+        "dagster/storage_kind": "snowflake",
+        "dagster/table_name": "BAR",
+    }
+    assert TableMetadataSet.extract_storage_address(valid_metadata) == StorageAddress(
+        storage_kind="snowflake", table_name="bar"
+    )
+
+    valid_metadata_with_legacy_table_name = {
+        "dagster/storage_kind": "snowflake",
+        "dagster/relation_identifier": "BAR",
+    }
+    assert TableMetadataSet.extract_storage_address(
+        valid_metadata_with_legacy_table_name
+    ) == StorageAddress(storage_kind="snowflake", table_name="bar")
+
+    invalid_neighbor_metadata = {
+        "dagster/column_schema": "foo",
+        "dagster/storage_kind": "snowflake",
+        "dagster/table_name": "BAR",
+    }
+
+    with pytest.raises(ValidationError):
+        TableMetadataSet.extract(invalid_neighbor_metadata)
+
+    assert TableMetadataSet.extract_storage_address(invalid_neighbor_metadata) == StorageAddress(
+        storage_kind="snowflake", table_name="bar"
+    )
+
+    invalid_storage_kind_metadata = {
+        "dagster/storage_kind": dg.FloatMetadataValue(1.0),
+        "dagster/table_name": "BAR",
+    }
+    assert TableMetadataSet.extract_storage_address(
+        invalid_storage_kind_metadata
+    ) == StorageAddress(storage_kind=None, table_name="bar")
+
+    invalid_table_name_metadata = {
+        "dagster/storage_kind": "snowflake",
+        "dagster/table_name": dg.FloatMetadataValue(1.0),
+    }
+    assert TableMetadataSet.extract_storage_address(invalid_table_name_metadata) == StorageAddress(
+        storage_kind="snowflake", table_name=None
+    )
+
+    only_storage_kind = {"dagster/storage_kind": "snowflake"}
+    assert TableMetadataSet.extract_storage_address(only_storage_kind) == StorageAddress(
+        storage_kind="snowflake", table_name=None
+    )
+
+    only_table_name = {"dagster/table_name": "BAR"}
+    assert TableMetadataSet.extract_storage_address(only_table_name) == StorageAddress(
+        storage_kind=None, table_name="bar"
     )
