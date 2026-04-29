@@ -116,6 +116,10 @@ class CommandStepBuilder:
                     "exit_status": -10,
                     "limit": 2,
                 },  # example: https://buildkite.com/dagster/internal/builds/108316#0196fd13-d816-42e7-bf26-b264385b245d
+                {
+                    "exit_status": 94,
+                    "limit": 2,
+                },  # checkout failed (e.g. git-mirror clone lock timeout)
                 {"exit_status": 125, "limit": 2},  # docker daemon error
                 {"exit_status": 128, "limit": 2},  # k8s git clone error
                 {"exit_status": 130, "limit": 2},  # SIGINT (e.g. spot reclamation)
