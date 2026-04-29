@@ -13,7 +13,7 @@ from dagster_test.fixtures.utils import BUILDKITE
 # Hard upper bound on `docker compose up`. Set generously enough to cover cold image pulls
 # on a busy CI agent, but well below pytest-timeout so we fail with diagnostics rather than
 # being killed mid-syscall by the per-test timeout (which gives an unactionable traceback).
-_DOCKER_COMPOSE_UP_TIMEOUT = 180
+_DOCKER_COMPOSE_UP_TIMEOUT = 240
 
 # Tear-down should be fast; if it isn't, the daemon is already wedged and we shouldn't
 # block the rest of the suite trying to clean up.
