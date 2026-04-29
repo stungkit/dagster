@@ -916,20 +916,14 @@ def test_owners_validation():
     @dg.asset
     def asset1(): ...
 
-    asset_graph = dg.Definitions(assets=[asset1]).resolve_asset_graph()
-
-    # Invalid team name with special characters - validated when resolved into a JobDefinition
+    # Invalid team name with special characters
     with pytest.raises(dg.DagsterInvalidDefinitionError, match="contains invalid characters"):
-        dg.define_asset_job("bad_team", selection=[asset1], owners=["team:bad-name"]).resolve(
-            asset_graph
-        )
+        dg.define_asset_job("bad_team", selection=[asset1], owners=["team:bad-name"])
 
     # Empty team name
     with pytest.raises(dg.DagsterInvalidDefinitionError, match="Team name cannot be empty"):
-        dg.define_asset_job("empty_team", selection=[asset1], owners=["team:"]).resolve(asset_graph)
+        dg.define_asset_job("empty_team", selection=[asset1], owners=["team:"])
 
     # Invalid owner format
     with pytest.raises(dg.DagsterInvalidDefinitionError, match="Owner must be an email address"):
-        dg.define_asset_job(
-            "bad_owner", selection=[asset1], owners=["not-an-email-or-team"]
-        ).resolve(asset_graph)
+        dg.define_asset_job("bad_owner", selection=[asset1], owners=["not-an-email-or-team"])

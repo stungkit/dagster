@@ -25,6 +25,7 @@ from dagster._core.definitions.partitions.partitioned_config import PartitionedC
 from dagster._core.definitions.policy import RetryPolicy
 from dagster._core.definitions.resource_definition import ResourceDefinition
 from dagster._core.definitions.run_request import RunRequest
+from dagster._core.definitions.utils import validate_definition_owner
 from dagster._core.errors import DagsterInvalidDefinitionError
 from dagster._core.instance import DynamicPartitionsStore
 from dagster._utils.tags import normalize_tags
@@ -68,6 +69,10 @@ class UnresolvedAssetJobDefinition(IHaveNew):
         owners: Sequence[str] | None = None,
     ):
         from dagster._core.definitions.run_config import convert_config_input
+
+        if owners:
+            for owner in owners:
+                validate_definition_owner(owner, "job", name)
 
         return super().__new__(
             cls,
