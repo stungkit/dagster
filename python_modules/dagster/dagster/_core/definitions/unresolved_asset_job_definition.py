@@ -49,6 +49,7 @@ class UnresolvedAssetJobDefinition(IHaveNew):
     executor_def: ExecutorDefinition | None
     hooks: AbstractSet[HookDefinition] | None
     op_retry_policy: RetryPolicy | None
+    owners: Sequence[str] | None
 
     def __new__(
         cls,
@@ -64,6 +65,7 @@ class UnresolvedAssetJobDefinition(IHaveNew):
         executor_def: ExecutorDefinition | None = None,
         hooks: AbstractSet[HookDefinition] | None = None,
         op_retry_policy: RetryPolicy | None = None,
+        owners: Sequence[str] | None = None,
     ):
         from dagster._core.definitions.run_config import convert_config_input
 
@@ -83,6 +85,7 @@ class UnresolvedAssetJobDefinition(IHaveNew):
             executor_def=executor_def,
             hooks=hooks,
             op_retry_policy=op_retry_policy,
+            owners=owners,
         )
 
     @deprecated(
@@ -224,6 +227,7 @@ class UnresolvedAssetJobDefinition(IHaveNew):
             op_retry_policy=self.op_retry_policy,
             resource_defs=resource_defs,
             allow_different_partitions_defs=False,
+            owners=self.owners,
         )
 
     def with_metadata(
@@ -250,6 +254,7 @@ def define_asset_job(
     executor_def: ExecutorDefinition | None = None,
     hooks: AbstractSet[HookDefinition] | None = None,
     op_retry_policy: Optional["RetryPolicy"] = None,
+    owners: Sequence[str] | None = None,
 ) -> UnresolvedAssetJobDefinition:
     """Creates a definition of a job which will either materialize a selection of assets or observe
     a selection of source assets. This will only be resolved to a JobDefinition once placed in a
@@ -315,6 +320,9 @@ def define_asset_job(
         partitions_def (Optional[PartitionsDefinition]): (Deprecated)
             Defines the set of partitions for this job. Deprecated because partitioning is inferred
             from the selected assets, so setting this is redundant.
+        owners (Optional[Sequence[str]]): A list of strings representing owners of the job. Each
+            string can be a user's email address, or a team name prefixed with `team:`,
+            e.g. `team:finops`.
 
 
     Returns:
@@ -392,4 +400,5 @@ def define_asset_job(
         executor_def=executor_def,
         hooks=hooks,
         op_retry_policy=op_retry_policy,
+        owners=owners,
     )
