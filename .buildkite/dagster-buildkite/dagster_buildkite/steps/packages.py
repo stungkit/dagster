@@ -853,7 +853,7 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
             env_vars=[
                 "SNOWFLAKE_ACCOUNT",
                 "SNOWFLAKE_USER",
-                "SNOWFLAKE_BUILDKITE_PASSWORD",
+                "SNOWFLAKE_BUILDKITE_PRIVATE_KEY",
             ],
             unsupported_python_versions=[
                 AvailablePythonVersion.V3_14,  # dbt-core incompatible
@@ -864,7 +864,7 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
             env_vars=[
                 "SNOWFLAKE_ACCOUNT",
                 "SNOWFLAKE_USER",
-                "SNOWFLAKE_BUILDKITE_PASSWORD",
+                "SNOWFLAKE_DEMO_PRIVATE_KEY",
             ],
         ),
         PackageSpec(
@@ -1087,18 +1087,18 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
         ),
         PackageSpec(
             oss_path("python_modules/libraries/dagster-snowflake-pandas"),
-            env_vars=["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_BUILDKITE_PASSWORD"],
+            env_vars=["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_BUILDKITE_PRIVATE_KEY"],
         ),
         PackageSpec(
             oss_path("python_modules/libraries/dagster-snowflake-pyspark"),
-            env_vars=["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_BUILDKITE_PASSWORD"],
+            env_vars=["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_BUILDKITE_PRIVATE_KEY"],
             unsupported_python_versions=[
                 AvailablePythonVersion.V3_14,  # pyspark<4 not available
             ],
         ),
         PackageSpec(
             oss_path("python_modules/libraries/dagster-snowflake-polars"),
-            env_vars=["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_BUILDKITE_PASSWORD"],
+            env_vars=["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_BUILDKITE_PRIVATE_KEY"],
         ),
         PackageSpec(
             oss_path("python_modules/libraries/dagster-postgres"),
