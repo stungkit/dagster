@@ -63,6 +63,17 @@ def test_row_count() -> None:
     dg.AssetMaterialization(asset_key="a", metadata=splat_table_metadata)
 
 
+def test_storage_kind() -> None:
+    table_metadata = TableMetadataSet(storage_kind="snowflake")
+
+    dict_table_metadata = dict(table_metadata)
+    assert dict_table_metadata == {"dagster/storage_kind": "snowflake"}
+    dg.AssetMaterialization(asset_key="a", metadata=dict_table_metadata)
+
+    extracted = TableMetadataSet.extract(dict_table_metadata)
+    assert extracted.storage_kind == "snowflake"
+
+
 @ignore_warning("Class `TableColumnLineage` is currently in beta")
 def test_invalid_column_lineage() -> None:
     with pytest.raises(CheckError):

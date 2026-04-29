@@ -181,6 +181,8 @@ class TableMetadataSet(NamespacedMetadataSet):
         partition_row_count (Optional[int]): The number of rows in the materialized or observed partition.
         table_name (Optional[str]): A unique identifier for the table/view, typically fully qualified.
             For example, `my_database.my_schema.my_table`.
+        storage_kind (Optional[str]): The storage system that backs the table (e.g.,
+            ``snowflake``, ``databricks``, ``bigquery``).
     """
 
     column_schema: TableSchema | None = None
@@ -188,6 +190,7 @@ class TableMetadataSet(NamespacedMetadataSet):
     row_count: int | None = None
     partition_row_count: int | None = None
     table_name: str | None = None
+    storage_kind: str | None = None
 
     @classmethod
     def namespace(cls) -> str:
