@@ -58,6 +58,7 @@ const buildGraphNodeMock = (
     isPartitioned: false,
     isObservable: false,
     isMaterializable: true,
+    dependedByKeys: [],
     ...definitionOverrides,
   }),
 });

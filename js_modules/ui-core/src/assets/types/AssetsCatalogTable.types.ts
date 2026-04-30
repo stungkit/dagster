@@ -218,6 +218,6 @@ export type AssetCatalogGroupTableNodeFragment = {
   };
 };
 
-export const AssetCatalogTableQueryVersion = '9c59a1835a976dbc4f476a8d896056b63ff40a8ab8b482f941bfb963771831e5';
+export const AssetCatalogTableQueryVersion = '18bd8b9e1c88e08e3d4e69d0e51885dc5b362466e22d772fc4030293eb8f0946';
 
-export const AssetCatalogGroupTableQueryVersion = 'f696bb1f797be58919716f04b0ef6e16daa3c030cecb9df0c09c7de47ac5f7f0';
+export const AssetCatalogGroupTableQueryVersion = 'bc14134a9d60f15b82fabad700f47133e0f30cf10af6067abf1dd097fd172677';
