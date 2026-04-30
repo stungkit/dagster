@@ -28,15 +28,13 @@ export const ASSET_BASE_NODE_FRAGMENT = gql`
       ...FreshnessPolicyFragment
     }
     partitionDefinition {
-      description
       dimensionTypes {
         type
         dynamicPartitionsDefinitionName
       }
     }
     automationCondition {
-      label
-      expandedLabel
+      __typename
     }
     description
     owners {
@@ -51,7 +49,6 @@ export const ASSET_BASE_NODE_FRAGMENT = gql`
       key
       value
     }
-    pools
     jobNames
     kinds
   }

@@ -472,7 +472,6 @@ const MERGE_ARRAY_KEYS = [
   'jobNames',
   'kinds',
   'opNames',
-  'pools',
   'owners',
   'tags',
   'dependencyKeys',

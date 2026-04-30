@@ -176,7 +176,6 @@ export const REPOSITORY_ASSET_FRAGMENT = gql`
     id
     ...AssetBaseNodeFragment
     graphName
-    opVersion
     dependencyKeys {
       path
     }

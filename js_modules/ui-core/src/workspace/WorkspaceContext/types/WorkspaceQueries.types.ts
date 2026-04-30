@@ -344,7 +344,6 @@ export type RepositoryAssetFragment = {
   __typename: 'AssetNode';
   id: string;
   graphName: string | null;
-  opVersion: string | null;
   changedReasons: Array<Types.ChangeReason>;
   groupName: string;
   opNames: Array<string>;
@@ -359,7 +358,6 @@ export type RepositoryAssetFragment = {
   hasWipePermission: boolean;
   hasReportRunlessAssetEventPermission: boolean;
   description: string | null;
-  pools: Array<string>;
   jobNames: Array<string>;
   kinds: Array<string>;
   dependencyKeys: Array<{__typename: 'AssetKey'; path: Array<string>}>;
@@ -379,18 +377,13 @@ export type RepositoryAssetFragment = {
     | null;
   partitionDefinition: {
     __typename: 'PartitionDefinition';
-    description: string;
     dimensionTypes: Array<{
       __typename: 'DimensionDefinitionType';
       type: Types.PartitionDefinitionType;
       dynamicPartitionsDefinitionName: string | null;
     }>;
   } | null;
-  automationCondition: {
-    __typename: 'AutomationCondition';
-    label: string | null;
-    expandedLabel: Array<string>;
-  } | null;
+  automationCondition: {__typename: 'AutomationCondition'} | null;
   owners: Array<
     {__typename: 'TeamAssetOwner'; team: string} | {__typename: 'UserAssetOwner'; email: string}
   >;
@@ -407,7 +400,6 @@ export type WorkspaceRepositoryAssetsFragment = {
     __typename: 'AssetNode';
     id: string;
     graphName: string | null;
-    opVersion: string | null;
     changedReasons: Array<Types.ChangeReason>;
     groupName: string;
     opNames: Array<string>;
@@ -422,7 +414,6 @@ export type WorkspaceRepositoryAssetsFragment = {
     hasWipePermission: boolean;
     hasReportRunlessAssetEventPermission: boolean;
     description: string | null;
-    pools: Array<string>;
     jobNames: Array<string>;
     kinds: Array<string>;
     dependencyKeys: Array<{__typename: 'AssetKey'; path: Array<string>}>;
@@ -442,18 +433,13 @@ export type WorkspaceRepositoryAssetsFragment = {
       | null;
     partitionDefinition: {
       __typename: 'PartitionDefinition';
-      description: string;
       dimensionTypes: Array<{
         __typename: 'DimensionDefinitionType';
         type: Types.PartitionDefinitionType;
         dynamicPartitionsDefinitionName: string | null;
       }>;
     } | null;
-    automationCondition: {
-      __typename: 'AutomationCondition';
-      label: string | null;
-      expandedLabel: Array<string>;
-    } | null;
+    automationCondition: {__typename: 'AutomationCondition'} | null;
     owners: Array<
       {__typename: 'TeamAssetOwner'; team: string} | {__typename: 'UserAssetOwner'; email: string}
     >;
@@ -474,7 +460,6 @@ export type WorkspaceLocationAssetsFragment = {
       __typename: 'AssetNode';
       id: string;
       graphName: string | null;
-      opVersion: string | null;
       changedReasons: Array<Types.ChangeReason>;
       groupName: string;
       opNames: Array<string>;
@@ -489,7 +474,6 @@ export type WorkspaceLocationAssetsFragment = {
       hasWipePermission: boolean;
       hasReportRunlessAssetEventPermission: boolean;
       description: string | null;
-      pools: Array<string>;
       jobNames: Array<string>;
       kinds: Array<string>;
       dependencyKeys: Array<{__typename: 'AssetKey'; path: Array<string>}>;
@@ -509,18 +493,13 @@ export type WorkspaceLocationAssetsFragment = {
         | null;
       partitionDefinition: {
         __typename: 'PartitionDefinition';
-        description: string;
         dimensionTypes: Array<{
           __typename: 'DimensionDefinitionType';
           type: Types.PartitionDefinitionType;
           dynamicPartitionsDefinitionName: string | null;
         }>;
       } | null;
-      automationCondition: {
-        __typename: 'AutomationCondition';
-        label: string | null;
-        expandedLabel: Array<string>;
-      } | null;
+      automationCondition: {__typename: 'AutomationCondition'} | null;
       owners: Array<
         {__typename: 'TeamAssetOwner'; team: string} | {__typename: 'UserAssetOwner'; email: string}
       >;
@@ -614,7 +593,6 @@ export type WorkspaceLocationFragment = {
       __typename: 'AssetNode';
       id: string;
       graphName: string | null;
-      opVersion: string | null;
       changedReasons: Array<Types.ChangeReason>;
       groupName: string;
       opNames: Array<string>;
@@ -629,7 +607,6 @@ export type WorkspaceLocationFragment = {
       hasWipePermission: boolean;
       hasReportRunlessAssetEventPermission: boolean;
       description: string | null;
-      pools: Array<string>;
       jobNames: Array<string>;
       kinds: Array<string>;
       dependencyKeys: Array<{__typename: 'AssetKey'; path: Array<string>}>;
@@ -649,18 +626,13 @@ export type WorkspaceLocationFragment = {
         | null;
       partitionDefinition: {
         __typename: 'PartitionDefinition';
-        description: string;
         dimensionTypes: Array<{
           __typename: 'DimensionDefinitionType';
           type: Types.PartitionDefinitionType;
           dynamicPartitionsDefinitionName: string | null;
         }>;
       } | null;
-      automationCondition: {
-        __typename: 'AutomationCondition';
-        label: string | null;
-        expandedLabel: Array<string>;
-      } | null;
+      automationCondition: {__typename: 'AutomationCondition'} | null;
       owners: Array<
         {__typename: 'TeamAssetOwner'; team: string} | {__typename: 'UserAssetOwner'; email: string}
       >;
@@ -702,7 +674,6 @@ export type WorkspaceLocationAssetsEntryFragment = {
             __typename: 'AssetNode';
             id: string;
             graphName: string | null;
-            opVersion: string | null;
             changedReasons: Array<Types.ChangeReason>;
             groupName: string;
             opNames: Array<string>;
@@ -717,7 +688,6 @@ export type WorkspaceLocationAssetsEntryFragment = {
             hasWipePermission: boolean;
             hasReportRunlessAssetEventPermission: boolean;
             description: string | null;
-            pools: Array<string>;
             jobNames: Array<string>;
             kinds: Array<string>;
             dependencyKeys: Array<{__typename: 'AssetKey'; path: Array<string>}>;
@@ -737,18 +707,13 @@ export type WorkspaceLocationAssetsEntryFragment = {
               | null;
             partitionDefinition: {
               __typename: 'PartitionDefinition';
-              description: string;
               dimensionTypes: Array<{
                 __typename: 'DimensionDefinitionType';
                 type: Types.PartitionDefinitionType;
                 dynamicPartitionsDefinitionName: string | null;
               }>;
             } | null;
-            automationCondition: {
-              __typename: 'AutomationCondition';
-              label: string | null;
-              expandedLabel: Array<string>;
-            } | null;
+            automationCondition: {__typename: 'AutomationCondition'} | null;
             owners: Array<
               | {__typename: 'TeamAssetOwner'; team: string}
               | {__typename: 'UserAssetOwner'; email: string}
@@ -958,7 +923,6 @@ export type LocationWorkspaceAssetsQuery = {
                   __typename: 'AssetNode';
                   id: string;
                   graphName: string | null;
-                  opVersion: string | null;
                   changedReasons: Array<Types.ChangeReason>;
                   groupName: string;
                   opNames: Array<string>;
@@ -973,7 +937,6 @@ export type LocationWorkspaceAssetsQuery = {
                   hasWipePermission: boolean;
                   hasReportRunlessAssetEventPermission: boolean;
                   description: string | null;
-                  pools: Array<string>;
                   jobNames: Array<string>;
                   kinds: Array<string>;
                   dependencyKeys: Array<{__typename: 'AssetKey'; path: Array<string>}>;
@@ -993,18 +956,13 @@ export type LocationWorkspaceAssetsQuery = {
                     | null;
                   partitionDefinition: {
                     __typename: 'PartitionDefinition';
-                    description: string;
                     dimensionTypes: Array<{
                       __typename: 'DimensionDefinitionType';
                       type: Types.PartitionDefinitionType;
                       dynamicPartitionsDefinitionName: string | null;
                     }>;
                   } | null;
-                  automationCondition: {
-                    __typename: 'AutomationCondition';
-                    label: string | null;
-                    expandedLabel: Array<string>;
-                  } | null;
+                  automationCondition: {__typename: 'AutomationCondition'} | null;
                   owners: Array<
                     | {__typename: 'TeamAssetOwner'; team: string}
                     | {__typename: 'UserAssetOwner'; email: string}
@@ -1204,7 +1162,6 @@ export type WorkspaceLocationNodeFragment = {
             __typename: 'AssetNode';
             id: string;
             graphName: string | null;
-            opVersion: string | null;
             changedReasons: Array<Types.ChangeReason>;
             groupName: string;
             opNames: Array<string>;
@@ -1219,7 +1176,6 @@ export type WorkspaceLocationNodeFragment = {
             hasWipePermission: boolean;
             hasReportRunlessAssetEventPermission: boolean;
             description: string | null;
-            pools: Array<string>;
             jobNames: Array<string>;
             kinds: Array<string>;
             dependencyKeys: Array<{__typename: 'AssetKey'; path: Array<string>}>;
@@ -1239,18 +1195,13 @@ export type WorkspaceLocationNodeFragment = {
               | null;
             partitionDefinition: {
               __typename: 'PartitionDefinition';
-              description: string;
               dimensionTypes: Array<{
                 __typename: 'DimensionDefinitionType';
                 type: Types.PartitionDefinitionType;
                 dynamicPartitionsDefinitionName: string | null;
               }>;
             } | null;
-            automationCondition: {
-              __typename: 'AutomationCondition';
-              label: string | null;
-              expandedLabel: Array<string>;
-            } | null;
+            automationCondition: {__typename: 'AutomationCondition'} | null;
             owners: Array<
               | {__typename: 'TeamAssetOwner'; team: string}
               | {__typename: 'UserAssetOwner'; email: string}
@@ -1349,7 +1300,6 @@ export type WorkspaceRepositoryLocationFragment = {
       __typename: 'AssetNode';
       id: string;
       graphName: string | null;
-      opVersion: string | null;
       changedReasons: Array<Types.ChangeReason>;
       groupName: string;
       opNames: Array<string>;
@@ -1364,7 +1314,6 @@ export type WorkspaceRepositoryLocationFragment = {
       hasWipePermission: boolean;
       hasReportRunlessAssetEventPermission: boolean;
       description: string | null;
-      pools: Array<string>;
       jobNames: Array<string>;
       kinds: Array<string>;
       dependencyKeys: Array<{__typename: 'AssetKey'; path: Array<string>}>;
@@ -1384,18 +1333,13 @@ export type WorkspaceRepositoryLocationFragment = {
         | null;
       partitionDefinition: {
         __typename: 'PartitionDefinition';
-        description: string;
         dimensionTypes: Array<{
           __typename: 'DimensionDefinitionType';
           type: Types.PartitionDefinitionType;
           dynamicPartitionsDefinitionName: string | null;
         }>;
       } | null;
-      automationCondition: {
-        __typename: 'AutomationCondition';
-        label: string | null;
-        expandedLabel: Array<string>;
-      } | null;
+      automationCondition: {__typename: 'AutomationCondition'} | null;
       owners: Array<
         {__typename: 'TeamAssetOwner'; team: string} | {__typename: 'UserAssetOwner'; email: string}
       >;
@@ -1485,7 +1429,6 @@ export type WorkspaceRepositoryFragment = {
     __typename: 'AssetNode';
     id: string;
     graphName: string | null;
-    opVersion: string | null;
     changedReasons: Array<Types.ChangeReason>;
     groupName: string;
     opNames: Array<string>;
@@ -1500,7 +1443,6 @@ export type WorkspaceRepositoryFragment = {
     hasWipePermission: boolean;
     hasReportRunlessAssetEventPermission: boolean;
     description: string | null;
-    pools: Array<string>;
     jobNames: Array<string>;
     kinds: Array<string>;
     dependencyKeys: Array<{__typename: 'AssetKey'; path: Array<string>}>;
@@ -1520,18 +1462,13 @@ export type WorkspaceRepositoryFragment = {
       | null;
     partitionDefinition: {
       __typename: 'PartitionDefinition';
-      description: string;
       dimensionTypes: Array<{
         __typename: 'DimensionDefinitionType';
         type: Types.PartitionDefinitionType;
         dynamicPartitionsDefinitionName: string | null;
       }>;
     } | null;
-    automationCondition: {
-      __typename: 'AutomationCondition';
-      label: string | null;
-      expandedLabel: Array<string>;
-    } | null;
+    automationCondition: {__typename: 'AutomationCondition'} | null;
     owners: Array<
       {__typename: 'TeamAssetOwner'; team: string} | {__typename: 'UserAssetOwner'; email: string}
     >;
@@ -1546,6 +1483,6 @@ export const LocationWorkspaceQueryVersion = '13d0e674c559c7506419e36c9f30ecc793
 
 export const CodeLocationStatusQueryVersion = '5491629a2659feca3a6cf0cc976c6f59c8e78dff1193e07d7850ae4355698b04';
 
-export const LocationWorkspaceAssetsQueryVersion = '78386b2a76f3a1056d01c0bf7bb849fd764293613ae470f8c8f9d5d2d7a9d7f8';
+export const LocationWorkspaceAssetsQueryVersion = '7b38df240a251b176a84d2640ee424a4cba2c05b9c21103829c62cff0651b4b7';
 
 export const LocationWorkspaceAssetsManifestQueryVersion = '26f05a136fa06937c3c7c0536f69f2c5dde1956750e8de4eec7fcaf9dd684d94';

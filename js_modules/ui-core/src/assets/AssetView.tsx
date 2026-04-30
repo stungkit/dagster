@@ -432,6 +432,7 @@ export const ASSET_VIEW_DEFINITION_QUERY = gql`
   fragment AssetViewDefinitionNode on AssetNode {
     id
     pools
+    opVersion
     groupName
     isExecutable
     automationCondition {
