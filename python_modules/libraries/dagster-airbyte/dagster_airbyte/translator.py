@@ -229,6 +229,7 @@ class DagsterAirbyteTranslator:
             **TableMetadataSet(
                 column_schema=column_schema,
                 table_name=props.fully_qualified_table_name,
+                storage_kind=props.destination_type,
             ),
             **AirbyteMetadataSet(
                 connection_id=props.connection_id,

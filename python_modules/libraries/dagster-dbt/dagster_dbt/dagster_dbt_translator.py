@@ -16,6 +16,7 @@ from dagster import (
     PartitionMapping,
 )
 from dagster._annotations import beta, public
+from dagster._core.definitions.metadata import TableMetadataSet
 from dagster._core.definitions.metadata.source_code import (
     CodeReferencesMetadataSet,
     CodeReferencesMetadataValue,
@@ -195,7 +196,8 @@ class DagsterDbtTranslator:
         is_virtual = (
             self.settings.enable_dbt_views_as_virtual_assets and materialization_type == "view"
         )
-        kinds = {"dbt", manifest.get("metadata", {}).get("adapter_type", "dbt")}
+        adapter_type = manifest.get("metadata", {}).get("adapter_type")
+        kinds = {"dbt", adapter_type or "dbt"}
         if is_virtual:
             kinds.add("view")
 
@@ -222,6 +224,7 @@ class DagsterDbtTranslator:
                 DAGSTER_DBT_TRANSLATOR_METADATA_KEY: self,
                 DAGSTER_DBT_UNIQUE_ID_METADATA_KEY: resource_props["unique_id"],
                 **({DAGSTER_DBT_PROJECT_METADATA_KEY: project} if project else {}),
+                **TableMetadataSet(storage_kind=adapter_type),
             }
         )
 
