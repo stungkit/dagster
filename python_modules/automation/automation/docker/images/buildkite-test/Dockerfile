@@ -38,7 +38,8 @@ ENV LANG=en_US.UTF-8 \
     KIND_VERSION=v0.31.0 \
     KUBECTL_VERSION=v1.31.2 \
     HELM_VERSION=v3.20.2 \
-    FOSSA_VERSION=3.17.2
+    FOSSA_VERSION=3.17.2 \
+    AWSCLI_VERSION=2.34.38
 
 # Install Kubernetes tools: kubectl, kind, helm
 RUN curl --fail -LO "https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl" \
@@ -153,6 +154,14 @@ RUN curl --fail --silent --show-error --location \
     && mv duckdb /usr/local/bin/duckdb \
     && chmod +x /usr/local/bin/duckdb
 
+# Install AWS CLI v2 (ships as a standalone binary, not on PyPI)
+RUN curl --fail --silent --show-error --location \
+    --output /tmp/awscliv2.zip \
+    "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWSCLI_VERSION}.zip" \
+    && unzip -q /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/awscliv2.zip /tmp/aws
+
 # Clean up
 RUN apt-get remove -yqq \
     && apt-get autoremove -yqq --purge \
@@ -162,16 +171,14 @@ RUN apt-get remove -yqq \
 FROM system_base AS snapshot_builder
 
 # Build a requirements file with all non-Dagster packages that are dependencies of a Dagster
-# package. We also install `awscli` (used in Buildkite) at this stage so that it can be installed
-# together with Dagster dependencies. This allows pip's dependency resolver to account for
-# everything.
+# package.
 RUN git clone --depth 1 https://github.com/dagster-io/dagster.git
 
 WORKDIR dagster
 
 ENV VIRTUAL_ENV=/usr/local
 ENV UV_HTTP_TIMEOUT=300
-RUN python scripts/install_dev_python_modules.py --system awscli || exit 1
+RUN python scripts/install_dev_python_modules.py --system || exit 1
 RUN uv pip freeze --exclude-editable > /snapshot-reqs.txt
 
 # Final image includes both system deps and preinstalled non-Dagster python deps
