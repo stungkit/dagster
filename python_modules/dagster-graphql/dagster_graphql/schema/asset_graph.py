@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Union, cast
 
 import graphene
@@ -26,6 +26,7 @@ from dagster._core.definitions.data_version import (
     StaleCauseCategory,
     StaleStatus,
 )
+from dagster._core.definitions.metadata.metadata_set import TableMetadataSet
 from dagster._core.definitions.partitions.context import (
     PartitionLoadingContext,
     partition_loading_context,
@@ -167,6 +168,17 @@ class GrapheneStorageAddress(graphene.ObjectType):
 
     class Meta:
         name = "StorageAddress"
+
+    @staticmethod
+    def to_manifest_dict(metadata: Mapping[str, Any]) -> dict | None:
+        address = TableMetadataSet.extract_storage_address(metadata)
+        if address is None:
+            return None
+        return {
+            "__typename": "StorageAddress",
+            "storageKind": address.storage_kind,
+            "tableName": address.table_name,
+        }
 
 
 class GrapheneAssetDependency(graphene.ObjectType):
@@ -1206,8 +1218,6 @@ class GrapheneAssetNode(graphene.ObjectType):
         return list(iterate_metadata_entries(self._asset_node_snap.metadata))
 
     def resolve_storageAddress(self, _graphene_info: ResolveInfo) -> GrapheneStorageAddress | None:
-        from dagster._core.definitions.metadata.metadata_set import TableMetadataSet
-
         address = TableMetadataSet.extract_storage_address(self._asset_node_snap.metadata)
         if address is None:
             return None
@@ -1543,6 +1553,7 @@ class GrapheneAssetNode(graphene.ObjectType):
             if asset_graph_differ is not None
             else []
         )
+        storage_address_dict = GrapheneStorageAddress.to_manifest_dict(snap.metadata)
 
         return {
             "__typename": "AssetNode",
@@ -1586,6 +1597,7 @@ class GrapheneAssetNode(graphene.ObjectType):
             "jobNames": snap.job_names,
             "kinds": GrapheneAssetNode._get_compute_kinds(snap),
             "repository": repository_dict,
+            "storageAddress": storage_address_dict,
         }
 
 

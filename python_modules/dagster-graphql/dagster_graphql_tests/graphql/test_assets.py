@@ -3817,10 +3817,13 @@ class TestAssetAwareEventLog(ExecutingGraphQLContextTestMatrix):
             assert set(gql_by_key.keys()) == set(manifest_by_key.keys())
 
             for key in gql_by_key:
-                assert gql_by_key[key] == manifest_by_key[key], (
+                manifest_node = {
+                    k: v for k, v in manifest_by_key[key].items() if k != "storageAddress"
+                }
+                assert gql_by_key[key] == manifest_node, (
                     f"Mismatch for asset {key!r}:\n"
                     f"  GQL:      {gql_by_key[key]}\n"
-                    f"  Manifest: {manifest_by_key[key]}"
+                    f"  Manifest: {manifest_node}"
                 )
 
 
