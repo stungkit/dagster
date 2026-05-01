@@ -14,6 +14,7 @@ from dagster import (
     MetadataValue,
     multi_asset_check,
 )
+from dagster._annotations import preview
 from dagster._core.definitions.asset_checks.asset_checks_definition import AssetChecksDefinition
 from dagster._core.execution.context.asset_check_execution_context import AssetCheckExecutionContext
 from dagster.components import Component, ComponentLoadContext, Model, Resolvable
@@ -201,6 +202,7 @@ def _build_soda_result_map(
 
 
 @scaffold_with(SodaScanComponentScaffolder)
+@preview
 class SodaScanComponent(Component, Model, Resolvable):
     """A Dagster component that runs Soda Core scans and maps SodaCL check results to Dagster asset checks."""
 

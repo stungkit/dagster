@@ -22,6 +22,8 @@ from dagster_soda.component import (
     _to_dagster_severity,
 )
 
+pytestmark = pytest.mark.filterwarnings("ignore::dagster.PreviewWarning")
+
 # ----- SodaCL parsing (definition-time) -----
 
 
