@@ -498,3 +498,50 @@ def test_execution_scan_exception_yields_failed_for_all(tmp_path: Path) -> None:
     err_text = str(err.value) if hasattr(err, "value") else str(err)
     assert "Soda scan failed" in err_text
     assert "Connection refused" in err_text
+
+
+def test_execution_scan_internal_errors_yields_failed_for_all(tmp_path: Path) -> None:
+    """When scan.execute() records internal Soda errors, yield failed for all with error metadata."""
+    (tmp_path / "checks.yml").write_text(
+        textwrap.dedent("""
+            checks for my_table:
+              - row_count > 0
+        """)
+    )
+    (tmp_path / "configuration.yml").write_text("data_source ds: {}")
+
+    component = SodaScanComponent(
+        checks_paths=[str(tmp_path / "checks.yml")],
+        configuration_path=str(tmp_path / "configuration.yml"),
+        data_source_name="ds",
+        asset_key_map={"my_table": "my_table"},
+    )
+    tree = TestComponentTree(defs_module=mock.Mock(), project_root=tmp_path)
+    defs = component.build_defs(tree.load_context)
+
+    asset_checks = list(defs.asset_checks) if defs.asset_checks else []
+    assert len(asset_checks) == 1
+    check_def = asset_checks[0]
+
+    with mock.patch("dagster_soda.component.Scan") as MockScan:
+        mock_scan = mock.Mock()
+        MockScan.return_value = mock_scan
+        mock_scan.has_errors.return_value = True
+        mock_scan.get_error_traceback_str_list.return_value = [
+            "Connection failure",
+            "YAML parse error",
+        ]
+
+        results = list(cast("Iterable[AssetCheckResult]", check_def(build_op_context())))
+
+    assert len(results) == 1
+    r = results[0]
+    assert r.passed is False
+    assert r.asset_key == AssetKey("my_table")
+    assert r.check_name == "row_count___0"
+    err = r.metadata.get("error")
+    assert err is not None
+    err_text = str(err.value) if hasattr(err, "value") else str(err)
+    assert "Soda scan reported errors" in err_text
+    assert "Connection failure" in err_text
+    assert "YAML parse error" in err_text

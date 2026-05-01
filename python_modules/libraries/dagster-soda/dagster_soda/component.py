@@ -331,6 +331,29 @@ class SodaScanComponent(Component, Model, Resolvable):
 
                             scan.execute()
 
+                            has_errors = getattr(scan, "has_errors", None)
+                            if callable(has_errors):
+                                scan_has_errors = has_errors()
+                                if scan_has_errors is True:
+                                    get_error_tracebacks = getattr(
+                                        scan, "get_error_traceback_str_list", None
+                                    )
+                                    error_msgs_raw = (
+                                        get_error_tracebacks()
+                                        if callable(get_error_tracebacks)
+                                        else []
+                                    )
+                                    error_msgs = (
+                                        [str(msg) for msg in error_msgs_raw]
+                                        if isinstance(error_msgs_raw, list)
+                                        else []
+                                    )
+                                    message = "; ".join(error_msgs) if error_msgs else "unknown"
+                                    yield from _yield_failed_all(
+                                        f"Soda scan reported errors: {message}"
+                                    )
+                                    return
+
                             if hasattr(scan, "get_scan_results"):
                                 scan_results = scan.get_scan_results()
                             elif hasattr(scan, "build_scan_results"):
