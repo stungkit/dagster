@@ -351,6 +351,17 @@ GET_ASSET_DATA_VERSIONS = """
     }
 """
 
+GET_ASSET_NODE_DESCRIPTION = """
+    query AssetNodeDescriptionQuery($assetKey: AssetKeyInput!, $characterLimit: Int) {
+        assetNodeOrError(assetKey: $assetKey) {
+            ... on AssetNode {
+                id
+                description(characterLimit: $characterLimit)
+            }
+        }
+    }
+"""
+
 GET_ASSET_DATA_VERSIONS_BY_PARTITION = """
     query AssetNodeQuery($assetKey: AssetKeyInput!, $partition: String, $partitions: [String!]) {
         assetNodeOrError(assetKey: $assetKey) {
@@ -1895,6 +1906,54 @@ class TestAssetAwareEventLog(ExecutingGraphQLContextTestMatrix):
         assert exec_asset_node["isExecutable"] is True
         unexec_asset_node = result.data["assetNodes"][1]
         assert unexec_asset_node["isExecutable"] is False
+
+    def test_asset_node_description_character_limit(self, graphql_context: WorkspaceRequestContext):
+        full_description = "A" * 100
+
+        # No characterLimit -> full description.
+        result = execute_dagster_graphql(
+            graphql_context,
+            GET_ASSET_NODE_DESCRIPTION,
+            variables={"assetKey": {"path": ["asset_with_long_description"]}},
+        )
+        assert result.data
+        assert result.data["assetNodeOrError"]["description"] == full_description
+
+        # characterLimit smaller than description -> truncated.
+        result = execute_dagster_graphql(
+            graphql_context,
+            GET_ASSET_NODE_DESCRIPTION,
+            variables={
+                "assetKey": {"path": ["asset_with_long_description"]},
+                "characterLimit": 10,
+            },
+        )
+        assert result.data
+        assert result.data["assetNodeOrError"]["description"] == full_description[:10]
+
+        # characterLimit >= description length -> full description unchanged.
+        result = execute_dagster_graphql(
+            graphql_context,
+            GET_ASSET_NODE_DESCRIPTION,
+            variables={
+                "assetKey": {"path": ["asset_with_long_description"]},
+                "characterLimit": 1000,
+            },
+        )
+        assert result.data
+        assert result.data["assetNodeOrError"]["description"] == full_description
+
+        # Asset without a description -> None regardless of characterLimit.
+        result = execute_dagster_graphql(
+            graphql_context,
+            GET_ASSET_NODE_DESCRIPTION,
+            variables={
+                "assetKey": {"path": ["asset_without_description"]},
+                "characterLimit": 10,
+            },
+        )
+        assert result.data
+        assert result.data["assetNodeOrError"]["description"] is None
 
     def test_asset_partitions_in_pipeline(self, graphql_context: WorkspaceRequestContext):
         selector = infer_job_selector(graphql_context, "two_assets_job")

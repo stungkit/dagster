@@ -268,7 +268,7 @@ class GrapheneAssetNode(graphene.ObjectType):
     dependedByKeys = non_null_list(GrapheneAssetKey)
     dependencies = non_null_list(GrapheneAssetDependency)
     dependencyKeys = non_null_list(GrapheneAssetKey)
-    description = graphene.String()
+    description = graphene.Field(graphene.String, characterLimit=graphene.Int())
     freshnessInfo = graphene.Field(GrapheneAssetFreshnessInfo)
     freshnessPolicy = graphene.Field(GrapheneFreshnessPolicy)
     freshnessStatusInfo = graphene.Field(GrapheneFreshnessStatusInfo)
@@ -387,7 +387,6 @@ class GrapheneAssetNode(graphene.ObjectType):
         super().__init__(
             id=asset_id,
             assetKey=self._asset_node_snap.asset_key,
-            description=self._asset_node_snap.description,
             opName=self._asset_node_snap.op_name,
             opVersion=self._asset_node_snap.code_version,
             groupName=self._asset_node_snap.group_name,
@@ -873,6 +872,14 @@ class GrapheneAssetNode(graphene.ObjectType):
             )
             for key in self._remote_node.parent_keys
         ]
+
+    def resolve_description(
+        self, _graphene_info: ResolveInfo, characterLimit: int | None = None
+    ) -> str | None:
+        description = self._asset_node_snap.description
+        if description is None or characterLimit is None:
+            return description
+        return description[:characterLimit]
 
     def resolve_freshnessInfo(
         self, graphene_info: ResolveInfo
