@@ -35,18 +35,22 @@ RUN apt-get update -yqq \
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8 \
-    KIND_VERSION=v0.14.0 \
-    KUBECTL_VERSION=v1.20.1 \
-    FOSSA_VERSION=1.1.10
+    KIND_VERSION=v0.31.0 \
+    KUBECTL_VERSION=v1.31.2 \
+    HELM_VERSION=v3.20.2 \
+    FOSSA_VERSION=3.17.2
 
 # Install Kubernetes tools: kubectl, kind, helm
-RUN curl -LO "https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl" \
+RUN curl --fail -LO "https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl" \
     && chmod +x ./kubectl \
     && mv ./kubectl /usr/local/bin/kubectl \
-    && curl -L "https://github.com/kubernetes-sigs/kind/releases/download/$KIND_VERSION/kind-linux-amd64" -o ./kind \
+    && curl --fail -L "https://github.com/kubernetes-sigs/kind/releases/download/$KIND_VERSION/kind-linux-amd64" -o ./kind \
     && chmod +x ./kind \
     && mv ./kind /usr/local/bin/kind \
-    && curl "https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3" | bash
+    && curl --fail -LO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
+    && tar -zxvf "helm-${HELM_VERSION}-linux-amd64.tar.gz" \
+    && mv linux-amd64/helm /usr/local/bin/helm \
+    && rm -rf linux-amd64 "helm-${HELM_VERSION}-linux-amd64.tar.gz"
 
 # Install libxmlsec to use xmlsec and libffi for cffi
 RUN apt-get update -yqq \
@@ -97,11 +101,11 @@ RUN curl -sL https://deb.nodesource.com/setup_22.x | bash - \
 
 # Install FOSSA cli for analyzing our open-source dependencies
 # https://github.com/fossas/fossa-cli
-RUN wget https://github.com/fossas/fossa-cli/releases/download/v${FOSSA_VERSION}/fossa-cli_${FOSSA_VERSION}_linux_amd64.tar.gz \
-    && tar xvzf fossa-cli_${FOSSA_VERSION}_linux_amd64.tar.gz fossa \
+RUN wget https://github.com/fossas/fossa-cli/releases/download/v${FOSSA_VERSION}/fossa_${FOSSA_VERSION}_linux_amd64.tar.gz \
+    && tar xvzf fossa_${FOSSA_VERSION}_linux_amd64.tar.gz fossa \
     && chmod +x ./fossa \
     && mv ./fossa /usr/local/bin/fossa \
-    && rm fossa-cli_${FOSSA_VERSION}_linux_amd64.tar.gz \
+    && rm fossa_${FOSSA_VERSION}_linux_amd64.tar.gz \
     && fossa --version
 
 # Install Google Cloud SDK
@@ -134,15 +138,17 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.8 /uv /bin/
 RUN apt-get update -yqq && apt-get install -yqq just
 
 # Install redis
-RUN wget http://download.redis.io/redis-stable.tar.gz \
-    && tar xvzf redis-stable.tar.gz \
-    && cd redis-stable \
+ENV REDIS_VERSION=7.4.8
+RUN wget https://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz \
+    && tar xvzf redis-${REDIS_VERSION}.tar.gz \
+    && cd redis-${REDIS_VERSION} \
     && make install
 
 # Install the DuckDB CLI
+ENV DUCKDB_VERSION=v1.5.2
 RUN curl --fail --silent --show-error --location \
     --output duckdb_cli-linux-amd64.zip \
-    https://github.com/duckdb/duckdb/releases/download/v1.1.3/duckdb_cli-linux-amd64.zip \
+    https://github.com/duckdb/duckdb/releases/download/${DUCKDB_VERSION}/duckdb_cli-linux-amd64.zip \
     && unzip duckdb_cli-linux-amd64.zip \
     && mv duckdb /usr/local/bin/duckdb \
     && chmod +x /usr/local/bin/duckdb
@@ -177,11 +183,6 @@ COPY --from=snapshot_builder /snapshot-reqs.txt .
 # builds faster in Buildkite.
 RUN uv pip install --system -r /snapshot-reqs.txt \
     && rm /snapshot-reqs.txt
-
-# Remove make from the final image-- CI steps should use just instead, which
-# propagates signal exit codes correctly. make is still available in the
-# system_base stage for building redis etc.
-RUN apt-get remove -yqq make && apt-get autoremove -yqq
 
 # New versions of debian require allowlisting folders where `git` can run
 RUN git config --system --add safe.directory \*
