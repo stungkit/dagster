@@ -43,6 +43,8 @@ _INFRASTRUCTURE_PACKAGES = [
 
 _DAGSTER_DBT_DEPS_FACTORS = ["dbt17", "dbt18", "dbt19", "dbt110", "dbt111"]
 _DAGSTER_DBT_CORE_MAIN_RESOURCE_TEST = "dagster_dbt_tests/core/test_resource.py"
+_DAGSTER_DBT_CORE_MAIN_ASSET_CHECKS_TEST = "dagster_dbt_tests/core/test_asset_checks.py"
+_DAGSTER_DBT_CORE_MAIN_CLI_TESTS = "dagster_dbt_tests/cli"
 
 
 def _infer_package_type(directory: str | Path) -> str:
@@ -836,8 +838,12 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
                     ToxFactor(
                         f"{deps_factor}-core-main",
                         label_suffix="rest",
-                        splits=3,
-                        pytest_args=[f"--ignore={_DAGSTER_DBT_CORE_MAIN_RESOURCE_TEST}"],
+                        splits=5,
+                        pytest_args=[
+                            f"--ignore={_DAGSTER_DBT_CORE_MAIN_RESOURCE_TEST}",
+                            f"--ignore={_DAGSTER_DBT_CORE_MAIN_ASSET_CHECKS_TEST}",
+                            f"--ignore={_DAGSTER_DBT_CORE_MAIN_CLI_TESTS}",
+                        ],
                     )
                     for deps_factor in _DAGSTER_DBT_DEPS_FACTORS
                 ],
@@ -847,6 +853,24 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
                         label_suffix="test_resource",
                         splits=2,
                         pytest_args=[_DAGSTER_DBT_CORE_MAIN_RESOURCE_TEST],
+                    )
+                    for deps_factor in _DAGSTER_DBT_DEPS_FACTORS
+                ],
+                *[
+                    ToxFactor(
+                        f"{deps_factor}-core-main",
+                        label_suffix="test_asset_checks",
+                        splits=2,
+                        pytest_args=[_DAGSTER_DBT_CORE_MAIN_ASSET_CHECKS_TEST],
+                    )
+                    for deps_factor in _DAGSTER_DBT_DEPS_FACTORS
+                ],
+                *[
+                    ToxFactor(
+                        f"{deps_factor}-core-main",
+                        label_suffix="cli",
+                        splits=2,
+                        pytest_args=[_DAGSTER_DBT_CORE_MAIN_CLI_TESTS],
                     )
                     for deps_factor in _DAGSTER_DBT_DEPS_FACTORS
                 ],
