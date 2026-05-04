@@ -12,3 +12,4 @@
 
 paths:
   - python_modules/libraries/dagster-prometheus
+  - python_modules/libraries/dagster-pandera
