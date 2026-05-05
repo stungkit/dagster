@@ -27,3 +27,4 @@ paths:
   - python_modules/libraries/dagster-snowflake-polars
   - python_modules/libraries/dagster-deltalake-polars
   - python_modules/libraries/dagster-celery-docker
+  - python_modules/libraries/dagster-celery-k8s
