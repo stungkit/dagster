@@ -19,3 +19,4 @@ paths:
   - python_modules/libraries/dagster-datadog
   - python_modules/libraries/dagster-datahub
   - python_modules/libraries/dagster-deltalake-pandas
+  - python_modules/libraries/dagster-duckdb-pandas
