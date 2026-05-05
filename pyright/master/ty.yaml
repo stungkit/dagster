@@ -59,3 +59,4 @@ paths:
   - examples/use_case_repository
   - examples/with_pyspark
   - examples/with_wandb
+  - python_modules/libraries/dagster-docker
