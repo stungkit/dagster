@@ -63,3 +63,4 @@ paths:
   - python_modules/libraries/dagster-gcp-pandas
   - python_modules/libraries/dagster-dlt
   - python_modules/libraries/dagster-fivetran
+  - python_modules/libraries/dagster-gcp-pyspark
