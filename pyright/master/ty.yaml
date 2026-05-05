@@ -30,3 +30,4 @@ paths:
   - python_modules/libraries/dagster-celery-k8s
   - python_modules/libraries/dagster-celery
   - python_modules/libraries/dagster-airbyte
+  - python_modules/libraries/dagster-clickhouse
