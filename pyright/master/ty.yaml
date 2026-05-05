@@ -32,6 +32,7 @@ paths:
   - python_modules/libraries/dagster-airbyte
   - python_modules/libraries/dagster-clickhouse
   - python_modules/libraries/dagster-census
+  - python_modules/libraries/dagster-pagerduty
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
