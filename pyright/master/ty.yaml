@@ -20,3 +20,4 @@ paths:
   - python_modules/libraries/dagster-datahub
   - python_modules/libraries/dagster-deltalake-pandas
   - python_modules/libraries/dagster-duckdb-pandas
+  - python_modules/libraries/dagster-duckdb-polars
