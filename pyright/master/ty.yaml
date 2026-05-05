@@ -66,3 +66,4 @@ paths:
   - python_modules/libraries/dagster-gcp-pyspark
   - python_modules/libraries/dagster-duckdb
   - python_modules/libraries/dagster-looker
+  - python_modules/libraries/dagster-managed-elements
