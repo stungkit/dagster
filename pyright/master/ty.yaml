@@ -21,3 +21,4 @@ paths:
   - python_modules/libraries/dagster-deltalake-pandas
   - python_modules/libraries/dagster-duckdb-pandas
   - python_modules/libraries/dagster-duckdb-polars
+  - python_modules/libraries/dagster-duckdb-pyspark
