@@ -62,3 +62,4 @@ paths:
   - python_modules/libraries/dagster-docker
   - python_modules/libraries/dagster-gcp-pandas
   - python_modules/libraries/dagster-dlt
+  - python_modules/libraries/dagster-fivetran
