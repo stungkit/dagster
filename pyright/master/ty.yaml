@@ -26,3 +26,4 @@ paths:
   - python_modules/libraries/dagster-papertrail
   - python_modules/libraries/dagster-snowflake-polars
   - python_modules/libraries/dagster-deltalake-polars
+  - python_modules/libraries/dagster-celery-docker
