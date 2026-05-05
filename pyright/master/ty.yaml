@@ -32,3 +32,29 @@ paths:
   - python_modules/libraries/dagster-airbyte
   - python_modules/libraries/dagster-clickhouse
   - python_modules/libraries/dagster-census
+  - examples/airlift-migration-tutorial
+  - examples/airlift-mwaa-example
+  - examples/assets_dynamic_partitions
+  - examples/assets_modern_data_stack
+  - examples/assets_pandas_pyspark
+  - examples/assets_pandas_type_metadata
+  - examples/components_yaml_checks_dsl
+  - examples/data-quality-patterns
+  - examples/development_to_production
+  - examples/docs_projects/project_ask_ai_dagster
+  - examples/docs_projects/project_dagster_modal_pipes
+  - examples/docs_projects/project_dspy
+  - examples/docs_projects/project_mini
+  - examples/docs_snippets
+  - examples/experimental/assets_yaml_dsl
+  - examples/ingestion-patterns
+  - examples/oss-metadata-to-plus
+  - examples/project_analytics
+  - examples/project_databricks_and_snowflake/projects/databricks-delta
+  - examples/project_databricks_and_snowflake/projects/snowflake-medallion
+  - examples/project_fully_featured
+  - examples/snowflake_cortex/dagster_snowflake
+  - examples/starlift-demo
+  - examples/use_case_repository
+  - examples/with_pyspark
+  - examples/with_wandb
