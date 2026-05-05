@@ -25,3 +25,4 @@ paths:
   - python_modules/libraries/dagster-duckdb-pyspark
   - python_modules/libraries/dagster-papertrail
   - python_modules/libraries/dagster-snowflake-polars
+  - python_modules/libraries/dagster-deltalake-polars
