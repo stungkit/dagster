@@ -31,3 +31,4 @@ paths:
   - python_modules/libraries/dagster-celery
   - python_modules/libraries/dagster-airbyte
   - python_modules/libraries/dagster-clickhouse
+  - python_modules/libraries/dagster-census
