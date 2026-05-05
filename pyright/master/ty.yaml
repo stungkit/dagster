@@ -17,3 +17,4 @@ paths:
   - python_modules/libraries/dagster-snowflake-pandas
   - python_modules/libraries/dagster-ge
   - python_modules/libraries/dagster-datadog
+  - python_modules/libraries/dagster-datahub
