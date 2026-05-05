@@ -61,3 +61,4 @@ paths:
   - examples/with_wandb
   - python_modules/libraries/dagster-docker
   - python_modules/libraries/dagster-gcp-pandas
+  - python_modules/libraries/dagster-dlt
