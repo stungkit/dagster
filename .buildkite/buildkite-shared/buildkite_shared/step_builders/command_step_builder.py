@@ -501,12 +501,6 @@ class CommandStepBuilder:
                         "envFrom": [
                             {"secretRef": {"name": "buildkite-dagster-secrets"}},
                             {"secretRef": {"name": "honeycomb-api-key"}},
-                            *(
-                                [{"secretRef": {"name": "aws-creds"}}]
-                                if self._step.get("agents", {}).get("queue")
-                                == BuildkiteQueue.KUBERNETES_GKE
-                                else []
-                            ),
                             *[
                                 {"secretRef": {"name": secret_name}}
                                 for secret_name in self._k8s_secrets
