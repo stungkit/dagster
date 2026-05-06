@@ -49,6 +49,7 @@ paths:
   - python_modules/libraries/dagster-msteams
   - python_modules/libraries/dagster-deltalake
   - python_modules/libraries/dagster-clickhouse-pandas
+  - python_modules/libraries/dagster-clickhouse-polars
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
