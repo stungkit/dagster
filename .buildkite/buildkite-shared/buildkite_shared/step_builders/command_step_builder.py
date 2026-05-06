@@ -437,6 +437,17 @@ class CommandStepBuilder:
                         "privileged": True,
                         "allowPrivilegeEscalation": True,
                     },
+                    # Block main containers from starting until dockerd has bound
+                    # /var/run/docker.sock. Without this, agent-stack-k8s only
+                    # gates on the sidecar container being "started", not on the
+                    # docker daemon being usable — causing intermittent
+                    # "Cannot connect to the Docker daemon" errors when test code
+                    # invokes `docker compose up` before dockerd finishes booting.
+                    "startupProbe": {
+                        "exec": {"command": ["test", "-S", "/var/run/docker.sock"]},
+                        "periodSeconds": 1,
+                        "failureThreshold": 30,
+                    },
                 }
             )
             self._k8s_volumes.append(
