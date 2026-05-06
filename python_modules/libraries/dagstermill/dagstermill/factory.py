@@ -211,6 +211,13 @@ def execute_notebook(
                         output_path=executed_notebook_path,
                         engine_name="dagstermill",
                         log_output=True,
+                        # Bump kernel-startup timeout from papermill's 60s default
+                        # to 120s. Without this, papermill's default propagates
+                        # through to nbclient and shadows DagstermillEngine's own
+                        # 120s default in `execute_managed_notebook`, leading to
+                        # spurious "Kernel didn't respond in 60 seconds" failures
+                        # on slow / loaded CI hosts.
+                        start_timeout=120,
                     )
                     break
                 except RuntimeError as re:
