@@ -76,3 +76,4 @@ paths:
   - python_modules/libraries/dagster-managed-elements
   - python_modules/libraries/dagster-mlflow
   - python_modules/libraries/dagster-github
+  - python_modules/libraries/dagster-hightouch
