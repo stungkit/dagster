@@ -46,6 +46,7 @@ paths:
   - python_modules/libraries/dagster-omni
   - python_modules/libraries/dagster-sigma
   - python_modules/libraries/dagster-powerbi
+  - python_modules/libraries/dagster-msteams
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
