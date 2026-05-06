@@ -65,6 +65,7 @@ paths:
   - python_modules/libraries/dagster-aws/dagster_aws/s3
   - python_modules/libraries/dagster-aws/dagster_aws_tests/s3_tests
   - python_modules/libraries/dagster-rest-resources
+  - python_modules/libraries/dagster-dg-cli
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
