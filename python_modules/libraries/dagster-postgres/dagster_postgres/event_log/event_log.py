@@ -390,7 +390,7 @@ class PostgresEventLogStorage(SqlEventLogStorage, ConfigurableClass):
                 ),
             ) as cursor_res,
         ):
-            return deserialize_value(cursor_res.scalar(), EventLogEntry)  # type: ignore
+            return deserialize_value(cursor_res.scalar(), EventLogEntry)
 
     def end_watch(self, run_id: str, handler: EventHandlerFn) -> None:
         if self._event_watcher:
