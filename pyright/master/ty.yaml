@@ -53,6 +53,7 @@ paths:
   - python_modules/libraries/dagster-soda
   - python_modules/libraries/dagster-snowflake
   - python_modules/libraries/dagster-slack
+  - python_modules/libraries/dagster-snowflake-pyspark
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
