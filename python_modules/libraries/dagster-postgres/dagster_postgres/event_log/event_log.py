@@ -126,7 +126,7 @@ class PostgresEventLogStorage(SqlEventLogStorage, ConfigurableClass):
         self, statement_timeout: int, pool_recycle: int, max_overflow: int
     ) -> None:
         # When running in dagster-webserver, hold an open connection and set statement_timeout
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "isolation_level": "AUTOCOMMIT",
             "pool_size": 1,
             "pool_recycle": pool_recycle,
