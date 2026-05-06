@@ -44,6 +44,7 @@ paths:
   - python_modules/libraries/dagster-pandas
   - python_modules/libraries/dagster-postgres
   - python_modules/libraries/dagster-omni
+  - python_modules/libraries/dagster-sigma
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
