@@ -58,6 +58,7 @@ paths:
   - python_modules/libraries/dagster-k8s
   - python_modules/libraries/dagster-databricks
   - python_modules/libraries/dagster-azure
+  - python_modules/libraries/dagster-airflow
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
