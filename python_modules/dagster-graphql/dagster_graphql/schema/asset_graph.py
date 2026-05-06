@@ -1526,9 +1526,7 @@ class GrapheneAssetNode(graphene.ObjectType):
         graphene_info: ResolveInfo,
         asset_graph_differ: AssetGraphDiffer | None,
         *,
-        child_keys: Sequence[AssetKey],
         has_asset_checks: bool,
-        repository_dict: dict,
     ) -> dict:
         from dagster_graphql.implementation.fetch_assets import get_unique_asset_id
         from dagster_graphql.implementation.utils import has_permission_for_location_or_owners
@@ -1559,11 +1557,9 @@ class GrapheneAssetNode(graphene.ObjectType):
             "__typename": "AssetNode",
             "id": "r." + get_unique_asset_id(snap.asset_key, location_name, repo_name),
             "graphName": snap.graph_name,
-            "opVersion": snap.code_version,
             "dependencyKeys": [
                 GrapheneAssetKey.to_manifest_dict(dep.parent_asset_key) for dep in snap.parent_edges
             ],
-            "dependedByKeys": [GrapheneAssetKey.to_manifest_dict(key) for key in child_keys],
             "changedReasons": changed_reasons,
             "groupName": snap.group_name,
             "opNames": snap.op_names,
@@ -1593,10 +1589,8 @@ class GrapheneAssetNode(graphene.ObjectType):
             "tags": [
                 GrapheneDefinitionTag.to_manifest_dict(k, v) for k, v in (snap.tags or {}).items()
             ],
-            "pools": sorted(snap.pools or []),
             "jobNames": snap.job_names,
             "kinds": GrapheneAssetNode._get_compute_kinds(snap),
-            "repository": repository_dict,
             "storageAddress": storage_address_dict,
         }
 
