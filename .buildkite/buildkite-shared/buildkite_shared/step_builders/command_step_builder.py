@@ -408,6 +408,14 @@ class CommandStepBuilder:
                 {
                     "image": docker_image,
                     "command": ["dockerd-entrypoint.sh"],
+                    # Bump max-concurrent-downloads/uploads from default 3 to 10 to
+                    # parallelize layer pulls. The dockerd-entrypoint.sh of the
+                    # docker:dind image execs `dockerd` with whatever args are
+                    # passed, so these forward through cleanly.
+                    "args": [
+                        "--max-concurrent-downloads=10",
+                        "--max-concurrent-uploads=10",
+                    ],
                     "resources": {
                         "requests": {
                             "cpu": self._resources.docker_cpu if self._resources else "500m"
