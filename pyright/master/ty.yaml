@@ -60,6 +60,8 @@ paths:
   - python_modules/libraries/dagster-azure
   - python_modules/libraries/dagster-airflow
   - python_modules/libraries/create-dagster
+  - python_modules/libraries/dagster-aws/dagster_aws/utils
+  - python_modules/libraries/dagster-aws/dagster_aws_tests/utils_tests
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
