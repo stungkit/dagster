@@ -67,3 +67,4 @@ paths:
   - python_modules/libraries/dagster-duckdb
   - python_modules/libraries/dagster-looker
   - python_modules/libraries/dagster-managed-elements
+  - python_modules/libraries/dagster-mlflow
