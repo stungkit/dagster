@@ -233,7 +233,7 @@ def execute_notebook(
             )
 
             if isinstance(ex, ExecutionError):
-                exception_name = ex.ename  # type: ignore
+                exception_name = ex.ename
                 if exception_name in ["RetryRequested", "Failure"]:
                     step_context.log.warn(
                         f"Encountered raised {exception_name} in notebook. Use"
@@ -432,7 +432,7 @@ def define_dagstermill_op(
         required_resource_keys.add(io_mgr_key)
         outs = {
             **outs,
-            cast("str", output_notebook_name): Out(io_manager_key=io_mgr_key),
+            output_notebook_name: Out(io_manager_key=io_mgr_key),
         }
 
     if isinstance(asset_key_prefix, str):
