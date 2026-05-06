@@ -43,6 +43,7 @@ paths:
   - python_modules/libraries/dagster-pyspark
   - python_modules/libraries/dagster-pandas
   - python_modules/libraries/dagster-postgres
+  - python_modules/libraries/dagster-omni
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
