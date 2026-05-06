@@ -39,6 +39,7 @@ paths:
   - python_modules/libraries/dagster-wandb
   - python_modules/libraries/dagster-twilio
   - python_modules/libraries/dagster-tableau
+  - python_modules/libraries/dagster-spark
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
