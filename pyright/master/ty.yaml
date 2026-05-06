@@ -75,3 +75,4 @@ paths:
   - python_modules/libraries/dagster-looker
   - python_modules/libraries/dagster-managed-elements
   - python_modules/libraries/dagster-mlflow
+  - python_modules/libraries/dagster-github
