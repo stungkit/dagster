@@ -84,3 +84,4 @@ paths:
   - python_modules/libraries/dagster-github
   - python_modules/libraries/dagster-hightouch
   - python_modules/libraries/dagster-polytomic
+  - python_modules/libraries/dagster-mysql
