@@ -52,6 +52,7 @@ paths:
   - python_modules/libraries/dagster-clickhouse-polars
   - python_modules/libraries/dagster-soda
   - python_modules/libraries/dagster-snowflake
+  - python_modules/libraries/dagster-slack
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
