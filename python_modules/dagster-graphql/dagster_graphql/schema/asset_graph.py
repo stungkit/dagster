@@ -1,3 +1,4 @@
+import os
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Union, cast
 
@@ -148,6 +149,23 @@ GrapheneAssetStaleCauseCategory = graphene.Enum.from_enum(
 )
 
 GrapheneAssetChangedReason = graphene.Enum.from_enum(AssetDefinitionChangeType, name="ChangeReason")
+
+# Cap on the per-asset description size in the workspace asset manifest.
+# The two surfaces that read this off the workspace path (the asset graph
+# node card and the legacy catalog row caption) both ellipsis at well
+# under 100 characters of one-line text, so anything past this cap is
+# never visible without navigating to the per-asset detail view, which
+# uses its own resolver and gets the full description.
+DEFAULT_MANIFEST_DESCRIPTION_MAX_CHARS = 240
+
+
+def get_manifest_description_max_chars() -> int:
+    return int(
+        os.getenv(
+            "DAGSTER_MANIFEST_DESCRIPTION_MAX_CHARS",
+            str(DEFAULT_MANIFEST_DESCRIPTION_MAX_CHARS),
+        )
+    )
 
 
 class GrapheneAssetStaleCause(graphene.ObjectType):
@@ -1584,7 +1602,11 @@ class GrapheneAssetNode(graphene.ObjectType):
             "internalFreshnessPolicy": freshness_policy,
             "partitionDefinition": partition_def,
             "automationCondition": automation_condition,
-            "description": snap.description,
+            "description": (
+                snap.description[: get_manifest_description_max_chars()]
+                if snap.description is not None
+                else None
+            ),
             "owners": [GrapheneAssetOwner.to_manifest_dict(o) for o in owners],
             "tags": [
                 GrapheneDefinitionTag.to_manifest_dict(k, v) for k, v in (snap.tags or {}).items()
