@@ -109,3 +109,5 @@ paths:
   - python_modules/libraries/dagster-hightouch
   - python_modules/libraries/dagster-polytomic
   - python_modules/libraries/dagster-mysql
+  - python_modules/libraries/dagster-aws/dagster_aws/pipes
+  - python_modules/libraries/dagster-aws/dagster_aws_tests/pipes_tests
