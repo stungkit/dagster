@@ -69,6 +69,7 @@ paths:
   - python_modules/libraries/dagster-aws/dagster_aws/ecs
   - python_modules/libraries/dagster-aws/dagster_aws_tests/ecs_tests
   - python_modules/libraries/dagster-gcp
+  - python_modules/libraries/dagster-shared
   - examples/airlift-migration-tutorial
   - examples/airlift-mwaa-example
   - examples/assets_dynamic_partitions
