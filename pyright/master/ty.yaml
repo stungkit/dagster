@@ -111,3 +111,6 @@ paths:
   - python_modules/libraries/dagster-mysql
   - python_modules/libraries/dagster-aws/dagster_aws/pipes
   - python_modules/libraries/dagster-aws/dagster_aws_tests/pipes_tests
+  - python_modules/dagster/dagster/_config
+  - python_modules/dagster/dagster_tests/core_tests/config_types_tests
+  - python_modules/dagster/dagster_tests/core_tests/pythonic_config_tests
