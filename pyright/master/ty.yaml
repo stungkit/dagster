@@ -119,3 +119,6 @@ paths:
   - python_modules/dagster/dagster_tests/scheduler_tests
   - python_modules/dagster-webserver
   - python_modules/dagster-pipes
+  - python_modules/dagster/dagster/_daemon
+  - python_modules/dagster/dagster_tests/daemon_tests
+  - python_modules/dagster/dagster_tests/daemon_sensor_tests
