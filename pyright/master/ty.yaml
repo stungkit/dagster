@@ -78,10 +78,7 @@ paths:
   - examples/assets_pandas_type_metadata
   - examples/data-quality-patterns
   - examples/development_to_production
-  - examples/docs_projects/project_ask_ai_dagster
-  - examples/docs_projects/project_dagster_modal_pipes
-  - examples/docs_projects/project_dspy
-  - examples/docs_projects/project_mini
+  - examples/docs_projects
   - examples/docs_snippets
   - examples/experimental/assets_yaml_dsl
   - examples/ingestion-patterns
