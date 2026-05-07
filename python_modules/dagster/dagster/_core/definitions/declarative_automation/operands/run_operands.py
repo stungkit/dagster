@@ -141,6 +141,7 @@ class NewUpdatesWithRunTagsCondition(SubsetAutomationCondition[AssetKey]):
         new_materializations = context.asset_graph_view.get_inner_queryer_for_back_compat().get_asset_materializations_updated_after_cursor(
             asset_key=context.key,
             after_cursor=context.previous_temporal_context.last_event_id,
+            before_cursor=context.max_storage_id,
         )
         if not new_materializations:
             return context.get_empty_subset()
