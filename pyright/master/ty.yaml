@@ -118,3 +118,4 @@ paths:
   - python_modules/dagster/dagster_tests/api_tests
   - python_modules/dagster/dagster/_scheduler
   - python_modules/dagster/dagster_tests/scheduler_tests
+  - python_modules/dagster-webserver
