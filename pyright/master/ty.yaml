@@ -122,3 +122,5 @@ paths:
   - python_modules/dagster/dagster/_daemon
   - python_modules/dagster/dagster_tests/daemon_tests
   - python_modules/dagster/dagster_tests/daemon_sensor_tests
+  - python_modules/dagster/dagster/_grpc
+  - python_modules/dagster/dagster_tests/general_tests/grpc_tests
