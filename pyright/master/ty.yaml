@@ -129,3 +129,5 @@ paths:
   - python_modules/dagster/dagster/_utils
   - python_modules/dagster/dagster_tests/utils_tests
   - python_modules/dagster/dagster_tests/general_tests
+  - python_modules/dagster/dagster/_cli
+  - python_modules/dagster/dagster_tests/cli_tests
