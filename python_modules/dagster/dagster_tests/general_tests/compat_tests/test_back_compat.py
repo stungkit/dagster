@@ -13,6 +13,7 @@ from typing import NamedTuple
 import dagster as dg
 import pytest
 import sqlalchemy as db
+import sqlalchemy.exc
 from dagster import _check as check
 from dagster._cli.debug import DebugRunPayload
 from dagster._core.definitions.data_version import DATA_VERSION_TAG

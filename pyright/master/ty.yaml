@@ -126,3 +126,6 @@ paths:
   - python_modules/dagster/dagster_tests/general_tests/grpc_tests
   - python_modules/dagster/dagster/_core/storage
   - python_modules/dagster/dagster_tests/storage_tests
+  - python_modules/dagster/dagster/_utils
+  - python_modules/dagster/dagster_tests/utils_tests
+  - python_modules/dagster/dagster_tests/general_tests

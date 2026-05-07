@@ -135,7 +135,7 @@ def build_job_with_input_stubs(
 
     return JobDefinition(
         name=job_def.name + "_stubbed",
-        graph_def=GraphDefinition(
+        graph_def=GraphDefinition(  # ty: ignore[missing-argument]
             node_defs=[*job_def.top_level_node_defs, *stub_node_defs],
             dependencies=deps,  # type: ignore
         ),
