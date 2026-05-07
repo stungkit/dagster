@@ -91,7 +91,7 @@ paths:
   - examples/project_databricks_and_snowflake/projects/databricks-delta
   - examples/project_databricks_and_snowflake/projects/snowflake-medallion
   - examples/project_fully_featured
-  - examples/snowflake_cortex/dagster_snowflake
+  - examples/snowflake_cortex
   - examples/starlift-demo
   - examples/use_case_repository
   - examples/with_pyspark
