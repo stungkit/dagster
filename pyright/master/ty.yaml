@@ -76,7 +76,6 @@ paths:
   - examples/assets_modern_data_stack
   - examples/assets_pandas_pyspark
   - examples/assets_pandas_type_metadata
-  - examples/components_yaml_checks_dsl
   - examples/data-quality-patterns
   - examples/development_to_production
   - examples/docs_projects/project_ask_ai_dagster
