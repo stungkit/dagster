@@ -119,3 +119,4 @@ paths:
   - python_modules/dagster/dagster/_scheduler
   - python_modules/dagster/dagster_tests/scheduler_tests
   - python_modules/dagster-webserver
+  - python_modules/dagster-pipes
