@@ -142,3 +142,4 @@ paths:
   - integration_tests/test_suites/daemon-test-suite
   - integration_tests/test_suites/dagster-azure-live-tests
   - python_modules/automation
+  - scripts
