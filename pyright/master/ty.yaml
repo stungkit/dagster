@@ -137,3 +137,4 @@ paths:
   - docs/sphinx/_ext/dagster-sphinx
   - integration_tests/test_suites/backcompat-test-suite
   - integration_tests/python_modules/dagster-k8s-test-infra
+  - integration_tests/test_suites/celery-k8s-test-suite
