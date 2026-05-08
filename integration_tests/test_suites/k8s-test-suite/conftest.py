@@ -12,6 +12,7 @@ from dagster_k8s_test_infra.cluster import (
     define_cluster_provider_fixture as define_cluster_provider_fixture,
     helm_postgres_url_for_k8s_run_launcher as helm_postgres_url_for_k8s_run_launcher,
 )
+from dagster_k8s_test_infra.helm import LOCALSTACK_IMAGE
 from dagster_test.test_project import build_and_tag_test_image, get_test_project_docker_image
 from tests.utils import BUSYBOX_IMAGE
 
@@ -37,6 +38,7 @@ cluster_provider = define_cluster_provider_fixture(
         f"docker.io/{BUSYBOX_IMAGE}",
         "docker.io/bitnamilegacy/rabbitmq:3.8.12",
         "docker.io/library/postgres:14.6",
+        f"docker.io/{LOCALSTACK_IMAGE}",
     ]
 )
 
