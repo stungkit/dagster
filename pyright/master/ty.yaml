@@ -65,6 +65,7 @@ paths:
   - python_modules/libraries/dagster-dg-cli
   - python_modules/libraries/dagster-gcp
   - python_modules/libraries/dagster-shared
+  - python_modules/libraries/dagster-dg-core
   - examples
   - python_modules/libraries/dagster-docker
   - python_modules/libraries/dagster-gcp-pandas
