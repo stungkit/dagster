@@ -133,3 +133,4 @@ paths:
   - python_modules/dagster/dagster/_core/execution
   - python_modules/dagster/dagster_tests/execution_tests
   - python_modules/dagster/dagster_tests/launcher_tests
+  - python_modules/dagit
