@@ -11,7 +11,7 @@ class PandasCsvIOManager(IOManager):
 
     def _get_path(self, output_context):
         return os.path.join(  # pyright: ignore[reportCallIssue]
-            self.base_dir,  # pyright: ignore[reportArgumentType]
+            self.base_dir,  # pyright: ignore[reportArgumentType]  # ty: ignore[invalid-argument-type]
             "storage",
             f"{output_context.step_key}_{output_context.name}.csv",
         )
@@ -32,7 +32,7 @@ def pandas_io_manager(init_context):
 
 
 class NumpyCsvIOManager(PandasCsvIOManager):
-    def load_input(self, context) -> np.ndarray:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def load_input(self, context) -> np.ndarray:  # pyright: ignore[reportIncompatibleMethodOverride]  # ty: ignore[invalid-method-override]
         if context.upstream_output:
             file_path = self._get_path(context.upstream_output)
             df = np.genfromtxt(file_path, delimiter=",", dtype=None)

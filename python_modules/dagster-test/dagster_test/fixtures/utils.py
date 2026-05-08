@@ -26,7 +26,7 @@ def retrying_requests():
     session = requests.Session()
     session.mount(
         "http://",
-        requests.adapters.HTTPAdapter(max_retries=Retry(total=5, backoff_factor=1)),  # pyright: ignore[reportAttributeAccessIssue]
+        requests.adapters.HTTPAdapter(max_retries=Retry(total=5, backoff_factor=1)),  # pyright: ignore[reportAttributeAccessIssue]  # ty: ignore[unresolved-attribute]
     )
     yield session
 
