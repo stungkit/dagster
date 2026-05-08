@@ -134,3 +134,4 @@ paths:
   - python_modules/dagster/dagster_tests/execution_tests
   - python_modules/dagster/dagster_tests/launcher_tests
   - python_modules/dagit
+  - docs/sphinx/_ext/dagster-sphinx
