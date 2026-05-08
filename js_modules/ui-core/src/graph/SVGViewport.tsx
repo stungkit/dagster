@@ -512,7 +512,7 @@ const SVGViewportInner = forwardRef<SVGViewportRef, SVGViewportProps>(
     const dotsize = Math.max(7, 22 * scale);
 
     const focusViewport = useCallback(() => {
-      element.current?.focus();
+      element.current?.focus({preventScroll: true});
     }, []);
 
     const getScale = useCallback(() => scale, [scale]);
