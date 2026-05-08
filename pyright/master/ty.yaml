@@ -149,3 +149,4 @@ paths:
   - python_modules/dagster/dagster/_core/definitions/decorators
   - python_modules/dagster/dagster_tests/asset_defs_tests
   - python_modules/dagster/dagster_tests/freshness_tests
+  - python_modules/dagster-test
