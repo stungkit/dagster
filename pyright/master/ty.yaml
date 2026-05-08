@@ -93,3 +93,4 @@ paths:
   - python_modules/automation
   - scripts
   - python_modules/dagster-test
+  - python_modules/libraries/dagster-dbt
