@@ -157,3 +157,5 @@ paths:
   - python_modules/dagster/dagster_tests/definitions_tests/test_time_window_partitions.py
   - python_modules/dagster/dagster_tests/definitions_tests/test_flatten_time_window_ranges.py
   - python_modules/dagster/dagster_tests/definitions_tests/freshness_checks_tests/test_time_partition_freshness.py
+  - python_modules/dagster/dagster/_core/definitions/declarative_automation
+  - python_modules/dagster/dagster_tests/declarative_automation_tests
