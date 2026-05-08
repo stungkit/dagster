@@ -419,9 +419,9 @@ class CommandStepBuilder:
             # Determine docker image based on queue (GKE vs EKS)
             queue = self._step.get("agents", {}).get("queue", "")
             if "gke" in queue:
-                docker_image = "us-central1-docker.pkg.dev/dagster-production/buildkite-images/docker:24.0.9-dind"
+                docker_image = "us-central1-docker.pkg.dev/dagster-production/buildkite-images/docker:28.5.2-dind"
             else:
-                docker_image = "public.ecr.aws/docker/library/docker:24.0.9-dind"
+                docker_image = "public.ecr.aws/docker/library/docker:28.5.2-dind"
 
             sidecars.append(
                 {
