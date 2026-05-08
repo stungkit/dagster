@@ -9,6 +9,7 @@ from pathlib import Path
 
 import dagster._check as check
 import kubernetes
+import kubernetes.client.rest
 import pytest
 import requests
 import yaml
@@ -123,7 +124,7 @@ def run_monitoring_namespace(cluster_provider, pytestconfig, should_cleanup):
     # w/ a kind cluster
     if should_cleanup:
         print(f"Deleting namespace {namespace}")
-        kube_api.delete_namespace(name=namespace)  # pyright: ignore[reportPossiblyUnboundVariable]
+        kube_api.delete_namespace(name=namespace)
 
 
 @contextmanager
@@ -208,7 +209,7 @@ def aws_configmap(namespace, should_cleanup):
     yield TEST_AWS_CONFIGMAP_NAME
 
     if should_cleanup and not IS_BUILDKITE:
-        kube_api.delete_namespaced_config_map(name=TEST_AWS_CONFIGMAP_NAME, namespace=namespace)  # pyright: ignore[reportPossiblyUnboundVariable]
+        kube_api.delete_namespaced_config_map(name=TEST_AWS_CONFIGMAP_NAME, namespace=namespace)
 
 
 @pytest.fixture(scope="session")
@@ -619,7 +620,7 @@ def _helm_chart_helper(
         if should_cleanup:
             print("Uninstalling helm chart")
             check_output(
-                ["helm", "uninstall", release_name, "--namespace", namespace],  # pyright: ignore[reportPossiblyUnboundVariable]
+                ["helm", "uninstall", release_name, "--namespace", namespace],
                 cwd=discover_oss_root(Path(__file__)),
             )
 
