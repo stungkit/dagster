@@ -1,6 +1,7 @@
 import time
 
 import kubernetes
+import kubernetes.client.rest
 import pytest
 from dagster_k8s.client import DagsterK8sError, DagsterKubernetesClient, WaitForPodState
 
@@ -467,7 +468,7 @@ def test_wait_for_job(cluster_provider, namespace, should_cleanup):
         if should_cleanup:
             for job in ["waitforjob", "sayhi2", "failwaitforjob"]:
                 try:
-                    api_client.batch_api.delete_namespaced_job(  # pyright: ignore[reportPossiblyUnboundVariable]
+                    api_client.batch_api.delete_namespaced_job(
                         job, namespace=namespace, propagation_policy="Foreground"
                     )
                 except kubernetes.client.rest.ApiException:

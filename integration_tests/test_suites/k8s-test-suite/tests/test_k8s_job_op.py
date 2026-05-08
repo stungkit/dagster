@@ -1,6 +1,7 @@
 import uuid
 
 import kubernetes
+import kubernetes.client.rest
 import pytest
 from dagster import RetryRequested, job, op
 from dagster._core.test_utils import instance_for_test

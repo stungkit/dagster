@@ -1,6 +1,7 @@
 import time
 
 import kubernetes
+import kubernetes.client.rest
 from dagster_k8s.client import DagsterKubernetesClient
 
 
