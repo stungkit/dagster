@@ -150,3 +150,10 @@ paths:
   - python_modules/dagster/dagster_tests/asset_defs_tests
   - python_modules/dagster/dagster_tests/freshness_tests
   - python_modules/dagster-test
+  - python_modules/dagster/dagster/_core/definitions/partitions
+  - python_modules/dagster/dagster_tests/definitions_tests/test_dynamic_partitions.py
+  - python_modules/dagster/dagster_tests/definitions_tests/test_multi_partitions.py
+  - python_modules/dagster/dagster_tests/definitions_tests/test_partitioned_schedule.py
+  - python_modules/dagster/dagster_tests/definitions_tests/test_time_window_partitions.py
+  - python_modules/dagster/dagster_tests/definitions_tests/test_flatten_time_window_ranges.py
+  - python_modules/dagster/dagster_tests/definitions_tests/freshness_checks_tests/test_time_partition_freshness.py
