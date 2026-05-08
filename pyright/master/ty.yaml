@@ -143,3 +143,9 @@ paths:
   - integration_tests/test_suites/dagster-azure-live-tests
   - python_modules/automation
   - scripts
+  - python_modules/dagster/dagster/_core/definitions/assets
+  - python_modules/dagster/dagster/_core/definitions/asset_checks
+  - python_modules/dagster/dagster/_core/definitions/asset_health
+  - python_modules/dagster/dagster/_core/definitions/decorators
+  - python_modules/dagster/dagster_tests/asset_defs_tests
+  - python_modules/dagster/dagster_tests/freshness_tests
