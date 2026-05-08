@@ -148,7 +148,13 @@ class CommandStepBuilder:
             "retry": retry,
             "plugins": plugins or [],
         }
-        self._requires_docker = True  # used for k8s queue
+        # Default off: most steps don't need a docker daemon (lints, type-checkers,
+        # k8s manifests, helm, kaniko image builds, dashboard publishing). Steps that
+        # actually invoke `docker compose`/`docker build`/`docker pull` opt in via
+        # `.with_docker()`. Off-by-default avoids attaching a privileged dind sidecar
+        # — which costs scheduling resources and is the kubelet's first eviction
+        # target under fan-out memory pressure — to steps that don't need one.
+        self._requires_docker = False  # used for k8s queue; opt in via .with_docker()
         self._resources = None
 
     def run(self, *argc: str) -> Self:
@@ -159,8 +165,8 @@ class CommandStepBuilder:
         self._resources = resources
         return self
 
-    def no_docker(self) -> Self:
-        self._requires_docker = False
+    def with_docker(self) -> Self:
+        self._requires_docker = True
         return self
 
     def on_python_image(
@@ -546,8 +552,8 @@ class CommandStepBuilder:
             BuildkiteQueue.KUBERNETES_GKE,
             BuildkiteQueue.KUBERNETES_EKS,
         )
-        if self._requires_docker is False and not on_k8s:
-            raise Exception("you specified .no_docker() but you're not running on kubernetes")
+        # Note: `self._requires_docker` is k8s-only. On non-k8s queues docker is
+        # provided by the host agent regardless of the flag, so we don't gate.
 
         if not on_k8s and self._k8s_secrets:
             raise Exception(
