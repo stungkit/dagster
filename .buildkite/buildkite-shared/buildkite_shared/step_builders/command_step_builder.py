@@ -24,13 +24,18 @@ class ResourceRequests:
     def __init__(
         self,
         cpu: str,
+        *,
         memory: str | None = None,
         docker_cpu: str = "500m",
+        docker_memory: str = "1Gi",
+        docker_memory_limit: str = "2Gi",
         ephemeral_storage: str | None = None,
     ) -> None:
         self._cpu = cpu
         self._memory = memory
         self._docker_cpu = docker_cpu
+        self._docker_memory = docker_memory
+        self._docker_memory_limit = docker_memory_limit
         self._ephemeral_storage = ephemeral_storage
 
     @property
@@ -44,6 +49,14 @@ class ResourceRequests:
     @property
     def docker_cpu(self) -> str:
         return self._docker_cpu
+
+    @property
+    def docker_memory(self) -> str:
+        return self._docker_memory
+
+    @property
+    def docker_memory_limit(self) -> str:
+        return self._docker_memory_limit
 
     @property
     def ephemeral_storage(self) -> str | None:
@@ -422,10 +435,23 @@ class CommandStepBuilder:
                         "--max-concurrent-downloads=10",
                         "--max-concurrent-uploads=10",
                     ],
+                    # Memory request/limit promote the dind sidecar from
+                    # BestEffort to Burstable QoS, so it isn't the first
+                    # container the kubelet evicts when a node is under
+                    # memory pressure during fan-out waves. Without this,
+                    # docker API calls (`containers.create` etc.) can hang
+                    # for minutes mid-test before the SDK's read timeout
+                    # fires — see test_docker_launcher.py flakes.
                     "resources": {
                         "requests": {
-                            "cpu": self._resources.docker_cpu if self._resources else "500m"
-                        }
+                            "cpu": self._resources.docker_cpu if self._resources else "500m",
+                            "memory": self._resources.docker_memory if self._resources else "1Gi",
+                        },
+                        "limits": {
+                            "memory": self._resources.docker_memory_limit
+                            if self._resources
+                            else "2Gi",
+                        },
                     },
                     "env": [
                         {
