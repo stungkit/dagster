@@ -123,6 +123,14 @@ fastapi>=0.115.6 # producing a bizarrely early version of fastapi without this
 types-setuptools==80.9.0.20250822  # Pinned due to overly strict _DictLike types in newer versions (20251223) causing false positives in setup.py files
 clickhouse-driver==0.2.9
 testcontainers[clickhouse]==4.9.1
+# Floors below prevent the resolver from picking ancient versions when the alt-1 example deps
+# (aiobotocore, snowflake-sqlalchemy, etc.) widen the solution space. Without them the resolver
+# trades mlflow 3.x → 1.27 (and pydantic/cssutils similarly) to keep pyarrow/packaging on
+# their newest versions; with these floors the env stays close to upstream master.
+mlflow>=3.11.1
+pydantic>=2.13.3
+cssutils>=2.15
+starlette>=1.0
 
 ### EXAMPLES
 
@@ -130,7 +138,7 @@ testcontainers[clickhouse]==4.9.1
 -e examples/assets_dynamic_partitions
 # -e examples/assets_modern_data_stack # it includes dagster-cloud
 -e examples/assets_pandas_pyspark
-# -e examples/assets_pandas_type_metadata
+-e examples/assets_pandas_type_metadata
 # -e examples/assets_smoke_test
 # -r examples/deploy_docker/requirements.txt
 # -r examples/deploy_ecs/requirements.txt  # (no reqs)
@@ -138,7 +146,7 @@ testcontainers[clickhouse]==4.9.1
 -e examples/development_to_production
 -e examples/docs_snippets[full]
 -e examples/feature_graph_backed_assets
-# -e examples/project_fully_featured
+-e examples/project_fully_featured[tests]
 # -e examples/quickstart_etl  # (analyzed but not installed)
 -e examples/tutorial_notebook_assets
 -e examples/with_great_expectations
