@@ -44,6 +44,11 @@ exclude = [
   "python_modules/libraries/dagstermill/dagstermill/examples/notebooks/yield_something.ipynb",
   # Deliberately-malformed scaffold used as a fixture for notebook-creation tests.
   "python_modules/libraries/dagstermill/dagstermill_tests/notebooks/cli_test_scaffold.ipynb",
+  # Documentation example trees contain illustrative snippets that reference
+  # community / scaffolded packages not installed in this env; type-checking
+  # them generates spurious unresolved-import diagnostics.
+  "examples/docs_snippets",
+  "examples/docs_projects",
 ]
 
 # Ignore all files that are git-ignored unless explicitly included.
