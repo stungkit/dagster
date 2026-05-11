@@ -11,11 +11,12 @@ import subprocess
 import sys
 import time
 from collections.abc import Mapping, Sequence
-from functools import reduce
+from functools import cache, reduce
 from itertools import groupby
 from pathlib import Path
 from typing import Any, Final, Literal, cast
 
+import tomli
 import yaml
 from typing_extensions import NotRequired, TypedDict
 
@@ -199,6 +200,28 @@ DEFAULT_REQUIREMENTS_FILE: Final = "requirements.txt"
 
 def get_env_root(env: str) -> Path:
     return Path(TY_ENV_ROOT, env).resolve()
+
+
+@cache
+def get_dagster_ty_version() -> str:
+    """Read the pinned ty version from `python_modules/dagster/pyproject.toml`.
+
+    Mirrors the pyright pin: the version lives in dagster's `[project.optional-dependencies].ty`
+    so it sits alongside the stub packages and is bumped via the same lockfile workflow.
+    """
+    dagster_pyproject = os.path.abspath(
+        os.path.join(__file__, "../../python_modules/dagster/pyproject.toml")
+    )
+    with open(dagster_pyproject, "rb") as f:
+        pyproject = tomli.loads(f.read().decode("utf-8"))
+    ty_deps = pyproject.get("project", {}).get("optional-dependencies", {}).get("ty", [])
+    for dep in ty_deps:
+        if dep.startswith("ty=="):
+            return dep.split("==")[1]
+    raise RuntimeError(
+        "Could not find a `ty==` entry in"
+        " python_modules/dagster/pyproject.toml's [project.optional-dependencies].ty"
+    )
 
 
 def load_ty_paths(env: str) -> Sequence[str]:
@@ -464,6 +487,8 @@ def run_ty(
         "uv",
         "tool",
         "run",
+        "--from",
+        f"ty=={get_dagster_ty_version()}",
         "ty",
         "check",
         f"--python={python_path}",
@@ -498,7 +523,10 @@ def run_ty(
 
     # Get ty version
     version_result = subprocess.run(
-        ["uv", "tool", "run", "ty", "version"], capture_output=True, text=True, check=False
+        ["uv", "tool", "run", "--from", f"ty=={get_dagster_ty_version()}", "ty", "version"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     ty_version = version_result.stdout.strip() if version_result.returncode == 0 else "unknown"
 
