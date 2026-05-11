@@ -35,7 +35,6 @@ root_module = "project_components_pdf_extraction"
 defs_module = "project_components_pdf_extraction.defs"
 
 [tool.uv.sources]
-dagster-test = { path = '../../../python_modules/dagster-test', editable = true }
 dagster-graphql = { path = '../../../python_modules/dagster-graphql', editable = true }
 dagster = { path = '../../../python_modules/dagster', editable = true }
 dagster-pipes = { path = '../../../python_modules/dagster-pipes', editable = true }
