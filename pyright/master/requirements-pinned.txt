@@ -10,6 +10,7 @@ aiohttp-retry==2.9.1
 aioresponses==0.7.8
 aiosignal==1.4.0
 aiosmtplib==5.1.0
+-e examples/airlift-federation-tutorial
 alabaster==1.0.0
 alembic==1.18.4
 altair==4.2.2
@@ -45,6 +46,8 @@ asn1crypto==1.5.1
 -e examples/assets_dynamic_partitions
 -e examples/assets_pandas_pyspark
 -e examples/assets_pandas_type_metadata
+-e examples/assets_smoke_test
+-e examples/experimental/assets_yaml_dsl
 astroid==4.0.4
 asttokens==3.0.1
 async-lru==2.3.0
@@ -215,7 +218,9 @@ dask-jobqueue==0.9.0
 dask-kubernetes==2022.9.0
 dask-yarn==0.9
 -e examples/data-quality-patterns
+-e examples/project_databricks_and_snowflake/projects/databricks-delta
 databricks-sdk==0.60.0
+databricks-sql-connector==4.2.6
 dataclasses-json==0.6.7
 datadog==0.52.1
 dataproperty==1.1.1
@@ -256,10 +261,12 @@ durationpy==0.10
 email-validator==2.3.0
 encutils==1.0.0
 entrypoints==0.4
+et-xmlfile==2.0.0
 -e examples/docs_projects/project_etl_tutorial
 execnet==2.1.2
 executing==2.2.1
 expandvars==1.1.2
+-e examples/experimental/external_assets
 faiss-cpu==1.8.0
 fastapi==0.136.1
 fastavro==1.12.2
@@ -410,6 +417,7 @@ locket==1.0.0
 lockfile==0.12.2
 looker-sdk==24.16.2
 lxml==6.1.0
+lz4==4.4.5
 makefun==1.16.0
 mako==1.3.12
 markdown==3.10.2
@@ -444,6 +452,7 @@ msgpack==1.1.2
 msgspec==0.21.1
 msrest==0.7.1
 multidict==6.7.1
+-e examples/airlift-mwaa-example
 mypy==1.19.1
 mypy-boto3-ecs==1.43.0
 mypy-boto3-emr==1.43.0
@@ -476,6 +485,7 @@ openai==2.36.0
 openapi-schema-validator==0.8.1
 openapi-spec-validator==0.8.5
 opencv-python==4.13.0.92
+openpyxl==3.1.5
 opentelemetry-api==1.41.1
 opentelemetry-exporter-otlp==1.41.1
 opentelemetry-exporter-otlp-proto-common==1.41.1
@@ -540,11 +550,14 @@ progressbar2==4.5.0
 -e examples/docs_projects/project_atproto_dashboard
 -e examples/docs_projects/project_components_pdf_extraction
 -e examples/docs_projects/project_dagster_modal_pipes
+-e examples/docs_projects/project_datastage
 -e examples/docs_projects/project_dbt
 -e examples/docs_projects/project_elt_pipeline
 -e examples/project_fully_featured
 -e examples/docs_projects/project_llm_fine_tune
+-e examples/docs_projects/project_mini
 -e examples/docs_projects/project_ml
+-e examples/project_multi_tenant
 -e examples/docs_projects/project_multi_workspace_databricks
 -e examples/docs_projects/project_prompt_eng
 prometheus-client==0.25.0
@@ -562,6 +575,7 @@ pyarrow==23.0.1
 pyasn1==0.6.3
 pyasn1-modules==0.4.2
 pybase64==1.4.3
+pybreaker==1.4.1
 pycparser==3.0
 pydantic==2.13.4
 pydantic-core==2.46.4
@@ -648,6 +662,7 @@ sentry-sdk==2.59.0
 setproctitle==1.3.7
 setuptools==70.3.0
 sgmllib3k==1.0.0
+-e examples/docs_projects/project_mini/shared
 shellingham==1.5.4
 simplejson==4.1.1
 six==1.17.0
@@ -656,12 +671,14 @@ skl2onnx==1.20.0
 skops==0.14.0
 slack-sdk==3.41.0
 sling==1.5.17
+-e examples/experimental/sling_decorator
 sling-mac-arm64==1.4.10.post2
 smmap==5.0.3
 sniffio==1.3.1
 snowballstemmer==3.0.1
 snowflake-connector-python==3.18.0
 snowflake-core==1.12.0
+-e examples/project_databricks_and_snowflake/projects/snowflake-medallion
 snowflake-snowpark-python==1.50.1
 snowflake-sqlalchemy==1.9.0
 snowplow-tracker==1.1.0
@@ -706,6 +723,7 @@ terminado==0.18.1
 testcontainers==4.9.1
 text-unidecode==1.3
 threadpoolctl==3.6.0
+thrift==0.22.0
 tiktoken==0.12.0
 tinycss2==1.4.0
 tokenizers==0.23.1
@@ -786,6 +804,7 @@ wirerope==1.0.0
 -e examples/with_great_expectations
 -e examples/with_openai
 -e examples/with_pyspark
+-e examples/with_pyspark_emr
 -e examples/with_wandb
 wordcloud==1.9.6
 wrapt==2.1.2

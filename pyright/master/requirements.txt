@@ -139,7 +139,7 @@ starlette>=1.0
 # -e examples/assets_modern_data_stack # it includes dagster-cloud
 -e examples/assets_pandas_pyspark
 -e examples/assets_pandas_type_metadata
-# -e examples/assets_smoke_test
+-e examples/assets_smoke_test
 # -r examples/deploy_docker/requirements.txt
 # -r examples/deploy_ecs/requirements.txt  # (no reqs)
 # -r examples/deploy_k8s/requirements.txt  # (no reqs)
@@ -174,3 +174,15 @@ starlette>=1.0
 -e examples/docs_projects/project_multi_workspace_databricks
 -e examples/docs_projects/project_etl_tutorial
 -e examples/docs_projects/project_ml
+-e examples/docs_projects/project_datastage
+-e examples/docs_projects/project_mini
+-e examples/airlift-federation-tutorial
+-e examples/airlift-mwaa-example
+# project_databricks_and_snowflake is a workspace meta; install its two real subprojects:
+-e examples/project_databricks_and_snowflake/projects/databricks-delta
+-e examples/project_databricks_and_snowflake/projects/snowflake-medallion
+-e examples/project_multi_tenant
+-e examples/with_pyspark_emr
+-e examples/experimental/assets_yaml_dsl
+-e examples/experimental/external_assets
+-e examples/experimental/sling_decorator
