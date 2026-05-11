@@ -10,7 +10,8 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from functools import cache, reduce
 from itertools import groupby
 from pathlib import Path
@@ -467,6 +468,55 @@ def convert_ty_diagnostic_to_pyright_format(ty_diag: TyDiagnostic) -> Diagnostic
     )
 
 
+@contextmanager
+def temp_ty_config_file(env: str) -> Iterator[str]:
+    """Write a per-env ty config to cwd and yield its path.
+
+    The base config is read from `[tool.ty]` in `pyproject.toml`. The
+    `[src].include` field is replaced with the paths assigned to this
+    env via `pyright/<env>/ty.yaml`, so that ty's path filtering matches
+    what this env actually owns.
+    """
+    with open("pyproject.toml", encoding="utf-8") as f:
+        toml_data = tomli.loads(f.read())
+    config = cast("dict[str, Any]", toml_data.get("tool", {}).get("ty", {}))
+    include_paths = list(load_ty_paths(env))
+    src = cast("dict[str, Any]", config.setdefault("src", {}))
+    # ty errors on an empty include list; use a non-existent placeholder.
+    src["include"] = include_paths or ["__placeholder__"]
+    temp_config_path = f"ty-{env}.toml"
+    print(f"Creating temporary ty config file at {temp_config_path}")
+    try:
+        with open(temp_config_path, "w", encoding="utf-8") as f:
+            f.write(_serialize_ty_config(config))
+        yield temp_config_path
+    finally:
+        os.remove(temp_config_path)
+
+
+def _serialize_ty_config(config: Mapping[str, Any]) -> str:
+    """Serialize a ty config dict (table-of-tables) to TOML."""
+    sections: list[str] = []
+    for section_name, section_body in config.items():
+        lines = [f"[{section_name}]"]
+        for key, value in section_body.items():
+            lines.append(f"{key} = {_toml_value(value)}")
+        sections.append("\n".join(lines))
+    return "\n\n".join(sections) + "\n"
+
+
+def _toml_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return json.dumps(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(v) for v in value) + "]"
+    if isinstance(value, (int, float)):
+        return str(value)
+    raise ValueError(f"Unsupported TOML value type: {type(value).__name__}")
+
+
 def run_ty(
     env: str,
     paths: Sequence[str] | None,
@@ -480,28 +530,29 @@ def run_ty(
     # Load paths assigned to ty for this env
     include_paths = load_ty_paths(env)
 
-    # Build ty command
-    # ty uses --python to specify the venv interpreter
-    # ty uses --output-format gitlab for JSON output
-    base_ty_cmd_parts = [
-        "uv",
-        "tool",
-        "run",
-        "--from",
-        f"ty=={get_dagster_ty_version()}",
-        "ty",
-        "check",
-        f"--python={python_path}",
-        "--output-format=gitlab",
-    ]
+    with temp_ty_config_file(env) as config_path:
+        # ty uses --python to specify the venv interpreter and --config-file
+        # to bypass auto-discovery of pyproject.toml.
+        base_ty_cmd_parts = [
+            "uv",
+            "tool",
+            "run",
+            "--from",
+            f"ty=={get_dagster_ty_version()}",
+            "ty",
+            "check",
+            f"--config-file={config_path}",
+            f"--python={python_path}",
+            "--output-format=gitlab",
+        ]
 
-    # Add paths to check - either explicit paths or include paths
-    check_paths = list(paths) if paths else list(include_paths)
+        # Add paths to check - either explicit paths or include paths
+        check_paths = list(paths) if paths else list(include_paths)
 
-    shell_cmd = " \\\n".join([" ".join(base_ty_cmd_parts), *[f"    {p}" for p in check_paths]])
-    print(f"Running ty for environment `{env}`...")
-    print(f"  {shell_cmd}")
-    result = subprocess.run(shell_cmd, capture_output=True, shell=True, text=True, check=False)
+        shell_cmd = " \\\n".join([" ".join(base_ty_cmd_parts), *[f"    {p}" for p in check_paths]])
+        print(f"Running ty for environment `{env}`...")
+        print(f"  {shell_cmd}")
+        result = subprocess.run(shell_cmd, capture_output=True, shell=True, text=True, check=False)
 
     elapsed_time = time.time() - start_time
 
