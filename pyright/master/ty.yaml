@@ -102,3 +102,4 @@ paths:
   - python_modules/dagster/dagster_tests/core_tests/config_types_tests
   - python_modules/dagster/dagster_tests/core_tests/snap_tests
   - python_modules/dagster/dagster_tests/definitions_tests
+  - python_modules/dagster/dagster/_core/definitions
