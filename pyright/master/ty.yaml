@@ -80,6 +80,7 @@ paths:
   - python_modules/libraries/dagster-hightouch
   - python_modules/libraries/dagster-polytomic
   - python_modules/libraries/dagster-mysql
+  - python_modules/dagster/dagster_tests/core_tests/instance_tests
   # - python_modules/dagster
   - python_modules/dagster/dagster_tests/core_tests/runtime_types_tests
   # - python_modules/dagster-graphql
