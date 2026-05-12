@@ -91,6 +91,55 @@ paths:
   - python_modules/dagster-graphql/dagster_graphql/test
   - python_modules/dagster-graphql/dagster_graphql/cli.py
   - python_modules/dagster-graphql/dagster_graphql_tests
+  - python_modules/dagster-graphql/dagster_graphql/schema/pipelines
+  - python_modules/dagster-graphql/dagster_graphql/schema/schedules
+  # dagster-graphql/schema (rest): top-level files under schema/ — subdirs (roots/, pipelines/, logs/, schedules/) have their own entries
+  - python_modules/dagster-graphql/dagster_graphql/schema/__init__.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/asset_checks.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/asset_condition_evaluations.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/asset_graph.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/asset_health.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/asset_selections.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/auto_materialize_asset_evaluations.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/auto_materialize_policy.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/automation_condition.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/backfill.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/config_type_or_error.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/config_types.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/dagster_types.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/entity_key.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/env_vars.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/errors.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/execution.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/external.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/freshness.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/freshness_policy.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/inputs.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/instance.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/instigation.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/instigators.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/metadata.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/owners.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/partition_keys.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/partition_mappings.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/partition_sets.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/permissions.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/repository_origin.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/resources.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/run_config.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/runs.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/runs_feed.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/schedule_dry_run.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/sensor_dry_run.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/sensors.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/solids.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/table.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/tags.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/test.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/used_solid.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/util.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/pipelines
+  - python_modules/dagster-graphql/dagster_graphql/schema/schedules
   - python_modules/dagster-webserver
   - python_modules/dagster-pipes
   - python_modules/dagit
@@ -155,4 +204,3 @@ paths:
   - python_modules/dagster/dagster_tests/core_tests/test_user_code_boundary.py
   - python_modules/dagster/dagster_tests/core_tests/test_utils.py
   - python_modules/dagster/dagster_tests/core_tests/test_validate_run_config.py
-  - python_modules/dagster-graphql/dagster_graphql/schema/pipelines
