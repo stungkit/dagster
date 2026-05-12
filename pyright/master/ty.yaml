@@ -204,3 +204,43 @@ paths:
   - python_modules/dagster/dagster_tests/core_tests/test_user_code_boundary.py
   - python_modules/dagster/dagster_tests/core_tests/test_utils.py
   - python_modules/dagster/dagster_tests/core_tests/test_validate_run_config.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/pipelines
+  # _core (rest): source-only sub-paths (definitions/storage/execution have their own entries)
+  - python_modules/dagster/dagster/_core/asset_graph_view
+  - python_modules/dagster/dagster/_core/container_context
+  - python_modules/dagster/dagster/_core/events
+  - python_modules/dagster/dagster/_core/executor
+  - python_modules/dagster/dagster/_core/instance
+  - python_modules/dagster/dagster/_core/launcher
+  - python_modules/dagster/dagster/_core/pipes
+  - python_modules/dagster/dagster/_core/remote_representation
+  - python_modules/dagster/dagster/_core/run_coordinator
+  - python_modules/dagster/dagster/_core/scheduler
+  - python_modules/dagster/dagster/_core/secrets
+  - python_modules/dagster/dagster/_core/selector
+  - python_modules/dagster/dagster/_core/snap
+  - python_modules/dagster/dagster/_core/system_config
+  - python_modules/dagster/dagster/_core/types
+  - python_modules/dagster/dagster/_core/workspace
+  # _core (rest): top-level files
+  - python_modules/dagster/dagster/_core/__init__.py
+  - python_modules/dagster/dagster/_core/assets.py
+  - python_modules/dagster/dagster/_core/captured_log_api.py
+  - python_modules/dagster/dagster/_core/code_pointer.py
+  - python_modules/dagster/dagster/_core/debug.py
+  - python_modules/dagster/dagster/_core/decorator_utils.py
+  - python_modules/dagster/dagster/_core/errors.py
+  - python_modules/dagster/dagster/_core/event_api.py
+  - python_modules/dagster/dagster/_core/instance_for_test.py
+  - python_modules/dagster/dagster/_core/libraries.py
+  - python_modules/dagster/dagster/_core/loader.py
+  - python_modules/dagster/dagster/_core/log_manager.py
+  - python_modules/dagster/dagster/_core/nux.py
+  - python_modules/dagster/dagster/_core/op_concurrency_limits_counter.py
+  - python_modules/dagster/dagster/_core/origin.py
+  - python_modules/dagster/dagster/_core/remote_origin.py
+  - python_modules/dagster/dagster/_core/telemetry.py
+  - python_modules/dagster/dagster/_core/telemetry_upload.py
+  - python_modules/dagster/dagster/_core/test_utils.py
+  - python_modules/dagster/dagster/_core/utility_ops.py
+  - python_modules/dagster/dagster/_core/utils.py
