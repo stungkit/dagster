@@ -83,6 +83,7 @@ paths:
   - python_modules/dagster/dagster_tests/core_tests/instance_tests
   # - python_modules/dagster
   - python_modules/dagster/dagster_tests/core_tests/runtime_types_tests
+  - python_modules/dagster/dagster_tests/core_tests/pythonic_config_tests
   # - python_modules/dagster-graphql
   - python_modules/dagster-webserver
   - python_modules/dagster-pipes
