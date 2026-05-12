@@ -105,3 +105,7 @@ paths:
   - python_modules/dagster/dagster/_core/definitions
   - python_modules/dagster/dagster_tests/core_tests/system_config_tests
   - python_modules/dagster/dagster_tests/core_tests/resource_tests
+  - python_modules/dagster/dagster_tests/general_tests
+  - python_modules/dagster/dagster_tests/logging_tests
+  - python_modules/dagster/dagster_tests/model_tests
+  - python_modules/dagster/dagster_tests/utils_tests
