@@ -103,3 +103,4 @@ paths:
   - python_modules/dagster/dagster_tests/core_tests/snap_tests
   - python_modules/dagster/dagster_tests/definitions_tests
   - python_modules/dagster/dagster/_core/definitions
+  - python_modules/dagster/dagster_tests/core_tests/system_config_tests
