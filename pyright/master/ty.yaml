@@ -90,6 +90,7 @@ paths:
   - python_modules/dagster-graphql/dagster_graphql/client
   - python_modules/dagster-graphql/dagster_graphql/test
   - python_modules/dagster-graphql/dagster_graphql/cli.py
+  - python_modules/dagster-graphql/dagster_graphql_tests
   - python_modules/dagster-webserver
   - python_modules/dagster-pipes
   - python_modules/dagit
