@@ -109,3 +109,43 @@ paths:
   - python_modules/dagster/dagster_tests/logging_tests
   - python_modules/dagster/dagster_tests/model_tests
   - python_modules/dagster/dagster_tests/utils_tests
+  # core_tests (rest): in-scope sub-dirs (other core_tests/* sub-dirs have their own entries)
+  - python_modules/dagster/dagster_tests/core_tests/asset_graph_view_tests
+  - python_modules/dagster/dagster_tests/core_tests/graph_tests
+  - python_modules/dagster/dagster_tests/core_tests/hook_tests
+  - python_modules/dagster/dagster_tests/core_tests/host_representation_tests
+  - python_modules/dagster/dagster_tests/core_tests/partition_tests
+  - python_modules/dagster/dagster_tests/core_tests/run_coordinator_tests
+  - python_modules/dagster/dagster_tests/core_tests/selector_tests
+  - python_modules/dagster/dagster_tests/core_tests/serdes_tests
+  - python_modules/dagster/dagster_tests/core_tests/workspace_tests
+  # core_tests (rest): top-level test files
+  - python_modules/dagster/dagster_tests/core_tests/__init__.py
+  - python_modules/dagster/dagster_tests/core_tests/test_compute_only_job.py
+  - python_modules/dagster/dagster_tests/core_tests/test_configured.py
+  - python_modules/dagster/dagster_tests/core_tests/test_data_time.py
+  - python_modules/dagster/dagster_tests/core_tests/test_data_versions.py
+  - python_modules/dagster/dagster_tests/core_tests/test_decorator_utils.py
+  - python_modules/dagster/dagster_tests/core_tests/test_errors.py
+  - python_modules/dagster/dagster_tests/core_tests/test_event_logging.py
+  - python_modules/dagster/dagster_tests/core_tests/test_event_utils.py
+  - python_modules/dagster/dagster_tests/core_tests/test_external_execution_plan.py
+  - python_modules/dagster/dagster_tests/core_tests/test_input_injection.py
+  - python_modules/dagster/dagster_tests/core_tests/test_job_errors.py
+  - python_modules/dagster/dagster_tests/core_tests/test_job_execution.py
+  - python_modules/dagster/dagster_tests/core_tests/test_job_init.py
+  - python_modules/dagster/dagster_tests/core_tests/test_mask_user_code_errors.py
+  - python_modules/dagster/dagster_tests/core_tests/test_metadata.py
+  - python_modules/dagster/dagster_tests/core_tests/test_misc.py
+  - python_modules/dagster/dagster_tests/core_tests/test_multi_dependency.py
+  - python_modules/dagster/dagster_tests/core_tests/test_multiple_outputs.py
+  - python_modules/dagster/dagster_tests/core_tests/test_naming_collisions.py
+  - python_modules/dagster/dagster_tests/core_tests/test_nothing_dependencies.py
+  - python_modules/dagster/dagster_tests/core_tests/test_op_aliases.py
+  - python_modules/dagster/dagster_tests/core_tests/test_op_arguments.py
+  - python_modules/dagster/dagster_tests/core_tests/test_op_invocation.py
+  - python_modules/dagster/dagster_tests/core_tests/test_op_with_config.py
+  - python_modules/dagster/dagster_tests/core_tests/test_telemetry_upload.py
+  - python_modules/dagster/dagster_tests/core_tests/test_user_code_boundary.py
+  - python_modules/dagster/dagster_tests/core_tests/test_utils.py
+  - python_modules/dagster/dagster_tests/core_tests/test_validate_run_config.py
