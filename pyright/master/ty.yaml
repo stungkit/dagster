@@ -150,3 +150,4 @@ paths:
   - python_modules/dagster/dagster_tests/core_tests/test_user_code_boundary.py
   - python_modules/dagster/dagster_tests/core_tests/test_utils.py
   - python_modules/dagster/dagster_tests/core_tests/test_validate_run_config.py
+  - python_modules/dagster-graphql/dagster_graphql/schema/pipelines
