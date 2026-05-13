@@ -35,7 +35,6 @@ def build_node_invocation_snap(graph_def: GraphDefinition, node: Node) -> "NodeI
     return NodeInvocationSnap(
         node_name=node.name,
         node_def_name=node.definition.name,
-        tags=node.tags,
         input_dep_snaps=input_def_snaps,
         is_dynamic_mapped=dep_structure.is_dynamic_mapped(node.name),
     )
@@ -201,6 +200,9 @@ class InputDependencySnap(
 @whitelist_for_serdes(
     storage_name="SolidInvocationSnap",
     storage_field_names={"node_name": "solid_name", "node_def_name": "solid_def_name"},
+    # `tags` was removed — emit `{}` so older readers (which require the field) can still
+    # deserialize new payloads.
+    old_fields={"tags": {}},
 )
 class NodeInvocationSnap(
     NamedTuple(
@@ -208,7 +210,6 @@ class NodeInvocationSnap(
         [
             ("node_name", str),
             ("node_def_name", str),
-            ("tags", Mapping[str, str]),
             ("input_dep_snaps", Sequence[InputDependencySnap]),
             ("is_dynamic_mapped", bool),
         ],
@@ -218,7 +219,6 @@ class NodeInvocationSnap(
         cls,
         node_name: str,
         node_def_name: str,
-        tags: Mapping[str, str],
         input_dep_snaps: Sequence[InputDependencySnap],
         is_dynamic_mapped: bool = False,
     ):
@@ -226,7 +226,6 @@ class NodeInvocationSnap(
             cls,
             node_name=check.str_param(node_name, "node_name"),
             node_def_name=check.str_param(node_def_name, "node_def_name"),
-            tags=check.mapping_param(tags, "tags", key_type=str, value_type=str),
             input_dep_snaps=check.sequence_param(
                 input_dep_snaps, "input_dep_snaps", of_type=InputDependencySnap
             ),

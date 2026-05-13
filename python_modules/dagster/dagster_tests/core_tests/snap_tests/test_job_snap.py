@@ -88,6 +88,26 @@ def test_noop_deps_snap():
     assert isinstance(invocations[0], NodeInvocationSnap)
 
 
+def test_node_invocation_snap_tags_field_backcompat():
+    # NodeInvocationSnap used to carry a `tags` field (storage name SolidInvocationSnap.tags).
+    # The field was removed; legacy serialized payloads with a populated tags dict must still
+    # deserialize (extra field is silently ignored).
+    legacy_payload = (
+        '{"__class__": "SolidInvocationSnap", "input_dep_snaps": [], '
+        '"is_dynamic_mapped": false, "solid_def_name": "noop_op", '
+        '"solid_name": "noop_op", "tags": {"dagster/compute_kind": "python"}}'
+    )
+    invocation = deserialize_value(legacy_payload, NodeInvocationSnap)
+    assert invocation.node_name == "noop_op"
+    assert invocation.node_def_name == "noop_op"
+    assert not hasattr(invocation, "tags")
+
+    # Forward-compat: newly serialized payloads must still include `tags: {}` so older
+    # readers (whose NodeInvocationSnap.__new__ required `tags` positionally) can deserialize.
+    new_payload = serialize_value(invocation)
+    assert '"tags": {}' in new_payload
+
+
 def test_two_invocations_deps_snap(snapshot):
     @op
     def noop_op(_):
