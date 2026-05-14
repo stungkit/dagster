@@ -82,6 +82,7 @@ paths:
   - python_modules/libraries/dagster-mysql
   - python_modules/dagster/dagster_tests/core_tests/instance_tests
   # - python_modules/dagster
+  - python_modules/dagster/dagster  # source root; subsumes individual `_core/...` entries listed below — kept as-is for traceability with prior PRs
   - python_modules/dagster/dagster_tests/core_tests/runtime_types_tests
   - python_modules/dagster/dagster_tests/core_tests/pythonic_config_tests
   # - python_modules/dagster-graphql
