@@ -30,17 +30,6 @@ TEMPORARILY_SOFT_FAIL_STEP_KEYS = frozenset(
         "assets-dbt-python-pypi-3-10",
         "assets-modern-data-stack-pypi-3-12",
         "quickstart-etl-pypi-3-12",
-        "docs-snippets-all-3-12",
-        "docs-snippets-integrations-3-12",
-        "docs-snippets-dbt-component-docs-snapshot-test-3-12",
-        "docs-snippets-dbt-component-remote-docs-snapshot-test-3-12",
-        "docs-snippets-customizing-existing-component-docs-snapshot-test-3-12",
-        "docs-snippets-using-env-docs-snapshot-test-3-12",
-        "docs-snippets-dg-docs-workspace-docs-snapshot-test-3-12",
-        "docs-snippets-scaffolding-project-docs-snapshot-test-3-12",
-        "docs-snippets-rest-1-3-docs-snapshot-test-3-12",
-        "docs-snippets-rest-2-3-docs-snapshot-test-3-12",
-        "docs-snippets-rest-3-3-docs-snapshot-test-3-12",
     }
 )
 
