@@ -14,7 +14,8 @@ Dagster’s <PyObject section="components" module="dagster" object="TemplatedSql
 
 :::info
 
-<PyObject section="libraries" integration="clickhouse" module="dagster_clickhouse" object="ClickhouseQueryComponent" /> is currently **preview**. Behavior and configuration may change in minor releases.
+<PyObject section="libraries" integration="clickhouse" module="dagster_clickhouse" object="ClickhouseQueryComponent" />
+is currently **preview**. Behavior and configuration may change in minor releases.
 
 :::
 
