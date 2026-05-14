@@ -27,7 +27,6 @@ TEMPORARILY_SOFT_FAIL_STEP_KEYS = frozenset(
         "create-dagster-3-12",
         "dagster-dg-cli-2-4-slow-3-12",
         "dagster-dg-core-3-12",
-        "dagstermill-2-2-papermill2-3-12",
         "assets-dbt-python-pypi-3-10",
         "assets-modern-data-stack-pypi-3-12",
         "quickstart-etl-pypi-3-12",

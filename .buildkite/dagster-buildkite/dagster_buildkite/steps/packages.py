@@ -1196,20 +1196,8 @@ def _library_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
         PackageSpec(
             oss_path("python_modules/libraries/dagstermill"),
             pytest_tox_factors=[
-                ToxFactor("papermill1", splits=2),
                 ToxFactor("papermill2", splits=2, queue=BuildkiteQueue.MEDIUM),
             ],
-            unsupported_python_versions=(
-                lambda tox_factor: (
-                    [
-                        AvailablePythonVersion.V3_12,
-                        AvailablePythonVersion.V3_13,
-                        AvailablePythonVersion.V3_14,
-                    ]
-                    if (tox_factor and tox_factor.factor == "papermill1")
-                    else []
-                )
-            ),
         ),
         PackageSpec(
             oss_path("python_modules/libraries/dagster-airlift/perf-harness"),
