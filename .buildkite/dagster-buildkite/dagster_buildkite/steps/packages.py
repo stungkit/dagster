@@ -621,10 +621,8 @@ def _example_packages_with_custom_config(ctx: BuildkiteContext) -> list[PackageS
         PackageSpec(
             oss_path("examples/with_wandb"),
             unsupported_python_versions=[
-                # dagster-wandb dep
-                AvailablePythonVersion.V3_12,
-                AvailablePythonVersion.V3_13,
-                AvailablePythonVersion.V3_14,
+                # onnxruntime no longer ships cp310 wheels
+                AvailablePythonVersion.V3_10,
             ],
         ),
         # The 6 tutorials referenced in cloud onboarding cant test "source" due to dagster-cloud dep

@@ -41,7 +41,6 @@ TEMPORARILY_SOFT_FAIL_STEP_KEYS = frozenset(
         "docs-snippets-rest-1-3-docs-snapshot-test-3-12",
         "docs-snippets-rest-2-3-docs-snapshot-test-3-12",
         "docs-snippets-rest-3-3-docs-snapshot-test-3-12",
-        "with-wandb-3-10",
     }
 )
 
