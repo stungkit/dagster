@@ -5,6 +5,7 @@ import click
 from dagster_dg_core.shared_options import dg_global_options, dg_path_options
 from dagster_dg_core.utils import DG_CLI_MAX_OUTPUT_WIDTH, DgClickGroup
 
+from dagster_dg_cli.cli.ai import ai_group
 from dagster_dg_cli.cli.api import api_group
 from dagster_dg_cli.cli.check import check_group
 from dagster_dg_cli.cli.dev import dev_command
@@ -20,6 +21,7 @@ def create_dg_cli():
     @click.group(
         name="dg",
         commands={
+            "ai": ai_group,
             "api": api_group,
             "check": check_group,
             "utils": utils_group,
