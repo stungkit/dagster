@@ -1,4 +1,4 @@
-"""Scaffold a GitHub Actions workflow for `dg ai dispatch`."""
+"""Scaffold a GitHub Actions workflow for `dg labs ai dispatch`."""
 
 from pathlib import Path
 
@@ -15,20 +15,7 @@ _WORKFLOW_TEMPLATE = (
 _WORKFLOW_OUTPUT = Path(".github") / "workflows" / "dg-ai-dispatch.yml"
 
 
-@click.command(
-    name="github-actions-ai-dispatch",
-    cls=DgClickCommand,
-    hidden=True,
-    context_settings={"help_option_names": ["-h", "--help"]},
-)
-@click.option("--git-root", type=Path, help="Path to the git root of the repository")
-@click.option("--force", is_flag=True, help="Overwrite an existing workflow file")
-@dg_global_options
-@cli_telemetry_wrapper
-def scaffold_github_actions_ai_dispatch_command(
-    git_root: Path | None, force: bool, **global_options: object
-) -> None:
-    """Scaffold the GitHub Actions workflow required by `dg ai dispatch`."""
+def _scaffold_github_actions_ai_dispatch(git_root: Path | None, force: bool) -> None:
     resolved_git_root = git_root or search_for_git_root(Path.cwd())
     if resolved_git_root is None:
         exit_with_error(
@@ -46,13 +33,50 @@ def scaffold_github_actions_ai_dispatch_command(
     workflow_path.write_text(_WORKFLOW_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
 
     click.echo(
-        click.style("GitHub Actions workflow for dg ai dispatch created successfully.", fg="green")
+        click.style(
+            "GitHub Actions workflow for dg labs ai dispatch created successfully.", fg="green"
+        )
     )
     click.echo(f"Created: {workflow_path}")
-    click.echo("Commit and push this file before running `dg ai dispatch` against the repository.")
+    click.echo(
+        "Commit and push this file before running `dg labs ai dispatch` against the repository."
+    )
     click.echo(
         "Before running the workflow, configure the ANTHROPIC_API_KEY GitHub Actions secret."
     )
     click.echo(
         "Optional: set the CLAUDE_ENABLED repository variable to false to disable dispatch runs."
     )
+
+
+@click.command(
+    name="github-actions-ai-dispatch",
+    cls=DgClickCommand,
+    hidden=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+@click.option("--git-root", type=Path, help="Path to the git root of the repository")
+@click.option("--force", is_flag=True, help="Overwrite an existing workflow file")
+@dg_global_options
+@cli_telemetry_wrapper
+def scaffold_github_actions_ai_dispatch_command(
+    git_root: Path | None, force: bool, **global_options: object
+) -> None:
+    """Scaffold the GitHub Actions workflow required by `dg labs ai dispatch`."""
+    _scaffold_github_actions_ai_dispatch(git_root=git_root, force=force)
+
+
+@click.command(
+    name="github-actions-ai-dispatch",
+    cls=DgClickCommand,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+@click.option("--git-root", type=Path, help="Path to the git root of the repository")
+@click.option("--force", is_flag=True, help="Overwrite an existing workflow file")
+@dg_global_options
+@cli_telemetry_wrapper
+def labs_scaffold_github_actions_ai_dispatch_command(
+    git_root: Path | None, force: bool, **global_options: object
+) -> None:
+    """Scaffold the GitHub Actions workflow required by `dg labs ai dispatch`."""
+    _scaffold_github_actions_ai_dispatch(git_root=git_root, force=force)

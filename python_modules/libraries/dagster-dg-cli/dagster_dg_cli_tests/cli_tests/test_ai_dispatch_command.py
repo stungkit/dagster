@@ -14,7 +14,7 @@ from dagster_dg_cli.cli.ai.dispatch import (
     _get_repo_url,
 )
 from dagster_dg_cli.cli.scaffold.github_actions_ai_dispatch import (
-    scaffold_github_actions_ai_dispatch_command,
+    labs_scaffold_github_actions_ai_dispatch_command,
 )
 from dagster_dg_cli.utils.github import parse_github_remote_url
 from dagster_rest_resources.__generated__.enums import IssueStatus
@@ -22,16 +22,17 @@ from dagster_rest_resources.schemas.issue import DgApiIssue
 from dagster_test.dg_utils.utils import ProxyRunner, assert_runner_result
 
 
-def test_ai_group_visible_in_help() -> None:
+def test_ai_group_not_visible_in_top_level_help() -> None:
     with ProxyRunner.test() as runner:
         result = runner.invoke("--help")
         assert_runner_result(result)
-        assert " ai " in result.output
+        assert " ai " not in result.output
+        assert " labs " in result.output
 
 
-def test_ai_subcommands_visible_in_help() -> None:
+def test_labs_ai_subcommands_visible_in_help() -> None:
     with ProxyRunner.test() as runner:
-        result = runner.invoke("ai", "--help")
+        result = runner.invoke("labs", "ai", "--help")
         assert_runner_result(result)
         assert " dispatch " in result.output
 
@@ -273,7 +274,7 @@ def test_scaffold_github_actions_ai_dispatch_creates_workflow() -> None:
     with runner.isolated_filesystem():
         subprocess.run(["git", "init"], check=True, capture_output=True)
 
-        result = runner.invoke(scaffold_github_actions_ai_dispatch_command)
+        result = runner.invoke(labs_scaffold_github_actions_ai_dispatch_command)
 
         assert result.exit_code == 0, result.output
         workflow_path = Path(".github/workflows/dg-ai-dispatch.yml")
@@ -301,7 +302,7 @@ def test_scaffold_github_actions_ai_dispatch_refuses_to_overwrite() -> None:
         workflow_path.parent.mkdir(parents=True, exist_ok=True)
         workflow_path.write_text("existing workflow\n", encoding="utf-8")
 
-        result = runner.invoke(scaffold_github_actions_ai_dispatch_command)
+        result = runner.invoke(labs_scaffold_github_actions_ai_dispatch_command)
 
         assert result.exit_code != 0
         assert "Workflow already exists" in result.output
