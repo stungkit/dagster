@@ -39,7 +39,7 @@ parser.add_argument(
     default=False,
     help=(
         "Run ty for all environments. Environments are discovered by looking for directories"
-        " at `pyright/*`."
+        " at `ty/*`."
     ),
 )
 
@@ -58,7 +58,7 @@ parser.add_argument(
     action="append",
     default=[],
     help=(
-        "Names of ty environment to run. Must be a directory in pyright/. Can be passed multiple times."
+        "Names of ty environment to run. Must be a directory in ty/. Can be passed multiple times."
     ),
 )
 
@@ -153,7 +153,6 @@ class TyDiagnostic(TypedDict):
     location: Location
 
 
-# Output format compatible with pyright for backwards compat
 class Diagnostic(TypedDict):
     file: str
     message: str
@@ -192,8 +191,7 @@ class EnvPathSpec(TypedDict):
 # ##### LOGIC
 # ########################
 
-# Use pyright folder temporarily until full migration to ty is complete
-TY_ENV_ROOT: Final = "pyright"
+TY_ENV_ROOT: Final = "ty"
 
 DEFAULT_REQUIREMENTS_FILE: Final = "requirements.txt"
 
@@ -206,8 +204,8 @@ def get_env_root(env: str) -> Path:
 def get_dagster_ty_version() -> str:
     """Read the pinned ty version from `python_modules/dagster/pyproject.toml`.
 
-    Mirrors the pyright pin: the version lives in dagster's `[project.optional-dependencies].ty`
-    so it sits alongside the stub packages and is bumped via the same lockfile workflow.
+    The version lives in dagster's `[project.optional-dependencies].ty` so it
+    sits alongside the stub packages and is bumped via the same lockfile workflow.
     """
     dagster_pyproject = os.path.abspath(
         os.path.join(__file__, "../../python_modules/dagster/pyproject.toml")
@@ -227,7 +225,7 @@ def get_dagster_ty_version() -> str:
 def load_ty_paths(env: str) -> Sequence[str]:
     """Load paths assigned to `ty` for the given env.
 
-    Paths are read from `pyright/<env>/ty.yaml`. Each entry may be a
+    Paths are read from `ty/<env>/ty.yaml`. Each entry may be a
     library root or any subpath within a library; both are passed
     directly to `ty` as check targets. Returns an empty list if the
     file does not exist.
@@ -473,7 +471,7 @@ def temp_ty_config_file(env: str) -> Iterator[str]:
 
     The base config is read from `[tool.ty]` in `pyproject.toml`. The
     `[src].include` field is replaced with the paths assigned to this
-    env via `pyright/<env>/ty.yaml`, so that ty's path filtering matches
+    env via `ty/<env>/ty.yaml`, so that ty's path filtering matches
     what this env actually owns.
     """
     with open("pyproject.toml", encoding="utf-8") as f:
@@ -683,7 +681,7 @@ def get_hints(output: TyOutput) -> Sequence[str]:
                     ),
                     (
                         "If you have added an entirely new package, add it to"
-                        " pyright/master/requirements.txt and then run `just rebuild_ty_pins`."
+                        " ty/master/requirements.txt and then run `just rebuild_ty_pins`."
                     ),
                 ]
             )
@@ -721,7 +719,7 @@ def print_report(result: RunResult) -> None:
 
 
 if __name__ == "__main__":
-    # Verify we're in a git repo and at the OSS repo root (has pyright/ directory)
+    # Verify we're in a git repo and at the OSS repo root (has ty/ directory)
     assert Path(TY_ENV_ROOT).exists(), "Must be run from the root of the dagster repository"
     args = parser.parse_args()
     params = get_params(args)
