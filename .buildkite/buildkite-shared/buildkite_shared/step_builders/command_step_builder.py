@@ -1,4 +1,3 @@
-import hashlib
 import os
 from collections.abc import Callable, Mapping, Sequence
 from enum import StrEnum
@@ -75,14 +74,6 @@ class BuildkiteQueue(StrEnum):
     @classmethod
     def contains(cls, value: str) -> bool:
         return isinstance(value, cls)
-
-
-def _default_queue_for_key(key: str) -> BuildkiteQueue:
-    # Stable ~50/50 split of step keys between EKS and MEDIUM. Same key -> same
-    # queue across builds. Explicit .on_queue() / PackageSpec(queue=...) overrides
-    # still win since they overwrite this field after __init__.
-    bucket = int.from_bytes(hashlib.md5(key.encode()).digest()[:8], "big") / (1 << 64)
-    return BuildkiteQueue.KUBERNETES_EKS if bucket < 0.5 else BuildkiteQueue.MEDIUM
 
 
 class CommandStepConfiguration(TypedDict, closed=True):
@@ -164,7 +155,7 @@ class CommandStepBuilder:
             ]
 
         self._step = {
-            "agents": {"queue": _default_queue_for_key(key).value},
+            "agents": {"queue": BuildkiteQueue.KUBERNETES_EKS.value},
             "key": key,
             "label": make_label(key, label_emojis),
             "timeout_in_minutes": timeout_in_minutes,
