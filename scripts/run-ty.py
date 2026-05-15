@@ -190,6 +190,20 @@ class EnvPathSpec(TypedDict):
 TY_ENV_ROOT: Final = "ty"
 
 
+def _discover_envs() -> Sequence[str]:
+    """Return env names under `ty/` that look like real uv projects.
+
+    Filters out leftover directories that only contain stale `.venv/` from a
+    deleted env — those would otherwise crash `temp_ty_config_file` (no
+    pyproject.toml) or run with an empty config.
+    """
+    return sorted(
+        d.name
+        for d in Path(TY_ENV_ROOT).iterdir()
+        if d.is_dir() and (d / "pyproject.toml").exists() and (d / "ty.yaml").exists()
+    )
+
+
 def get_env_root(env: str) -> Path:
     return Path(TY_ENV_ROOT, env).resolve()
 
@@ -245,7 +259,7 @@ def get_params(args: argparse.Namespace) -> Params:
     mode: Literal["env", "path"]
     if args.env or use_all:
         mode = "env"
-        targets = os.listdir(TY_ENV_ROOT) if use_all else args.env or ["master"]
+        targets = _discover_envs() if use_all else args.env or ["master"]
         for env in targets:
             if not get_env_root(env).exists():
                 raise Exception(f"Environment {env} not found in {TY_ENV_ROOT}.")
@@ -290,7 +304,7 @@ def match_path(path: str, path_spec: EnvPathSpec) -> bool:
 
 def map_paths_to_envs(paths: Sequence[str]) -> Mapping[str, Sequence[str]]:
     env_path_specs: list[EnvPathSpec] = []
-    for env in os.listdir(TY_ENV_ROOT):
+    for env in _discover_envs():
         env_path_specs.append(EnvPathSpec(env=env, include=load_ty_paths(env), exclude=[]))
     env_path_map: dict[str, list[str]] = {}
     for path in paths:
