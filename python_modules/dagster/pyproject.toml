@@ -53,7 +53,7 @@ dependencies = [
     "filelock",
     "dagster-pipes==1!0+dev",
     "dagster-shared==1!0+dev",
-    "antlr4-python3-runtime",
+    "antlr4-python3-runtime<4.14",
 ]
 
 [project.urls]
