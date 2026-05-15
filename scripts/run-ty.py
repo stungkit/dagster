@@ -23,13 +23,11 @@ from typing_extensions import NotRequired, TypedDict
 parser = argparse.ArgumentParser(
     prog="run-ty",
     description=(
-        "Run ty for every specified ty environment and print the merged results.\n\nBy"
-        " default, the venv for each ty environment is built using `requirements-pinned.txt`."
-        " This speeds up venv construction on a development machine and in CI. Occasionally, these"
-        " pinned requirements will need to be updated. To do this, pass `--update-pins`. This will"
-        " cause the venv to be rebuilt with the looser requirements specified in"
-        " `requirements.txt`, and `requirements-pinned.txt` updated with the resulting dependency"
-        " list."
+        "Run ty for every specified ty environment and print the merged results.\n\nEach"
+        " environment is a uv project at `ty/<env>/`, with `pyproject.toml` (source-of-truth"
+        " dep list) and `uv.lock` (pinned resolved tree). The venv is built by `uv sync`"
+        " against the lockfile. Pass `--update-pins` to refresh `uv.lock` to the newest"
+        " versions matching the pyproject constraints."
     ),
 )
 
@@ -89,11 +87,9 @@ parser.add_argument(
     action="store_true",
     default=False,
     help=(
-        "Update `requirements-pinned.txt` for selected environments (implies `--rebuild`). The"
-        " virtual env for the selected environment will be rebuilt using the abstract requirements"
-        " specified in `requirements.txt`. After the environment is built, the full dependency list"
-        " will be extracted with `uv pip freeze` and written to `requirements-pinned.txt` (this is"
-        " what is used in CI and for building the default venv)."
+        "Refresh `uv.lock` for selected environments to the newest versions matching the"
+        " `pyproject.toml` constraints, then sync the venv to match. Equivalent to"
+        " `uv lock --upgrade` followed by `uv sync --frozen`."
     ),
 )
 
@@ -192,8 +188,6 @@ class EnvPathSpec(TypedDict):
 # ########################
 
 TY_ENV_ROOT: Final = "ty"
-
-DEFAULT_REQUIREMENTS_FILE: Final = "requirements.txt"
 
 
 def get_env_root(env: str) -> Path:
@@ -323,89 +317,57 @@ def normalize_env(
     venv_python: str,
     no_cache: bool,
 ) -> None:
-    venv_path = get_env_root(env) / ".venv"
-    python_path = f"{venv_path}/bin/python"
-    if (rebuild or update_pins) and venv_path.exists():
+    """Ensure `ty/<env>/.venv` matches `ty/<env>/uv.lock`.
+
+    - `--update-pins`: refresh `uv.lock` to newest matching versions, then sync.
+    - `--rebuild`: blow away the venv and re-create from `uv.lock`.
+    - default: `uv sync --frozen` (no resolution, just install the locked set).
+
+    `editable-mode=compat` is set via `--config-setting` so editable in-repo
+    installs land as legacy `.pth` files that ty can read. Tracking uv bug:
+        https://github.com/astral-sh/uv/issues/7028
+    """
+    env_root = get_env_root(env)
+    venv_path = env_root / ".venv"
+
+    if rebuild and venv_path.exists():
         print(f"Removing existing virtualenv for ty environment {env}...")
         shutil.rmtree(venv_path)
+
+    if update_pins:
+        print(f"Refreshing uv.lock for ty environment {env}...")
+        subprocess.run(
+            ["uv", "lock", "--upgrade", "--no-cache"] if no_cache else ["uv", "lock", "--upgrade"],
+            cwd=env_root,
+            check=True,
+        )
+
     if not venv_path.exists():
         print(f"Creating virtualenv for ty environment {env}...")
-        if update_pins:
-            requirements_path = get_env_root(env) / "requirements.txt"
-            extra_pip_install_args = []
-        else:
-            requirements_path = get_env_root(env) / "requirements-pinned.txt"
-            extra_pip_install_args = ["--no-deps"]
-
-        # This is a hack to get around a bug in uv wherein "--editable-mode=compat" is not respected
-        # if the package is in uv's global cache. This forces uv to reinstall the package and
-        # thereby respect --editable-mode=compat, which is necessary to guarantee that ty can
-        # read the pth file for the editable install. Tracking uv issue here:
-        #  https://github.com/astral-sh/uv/issues/7028
-        reinstall_package_args = [
-            f"--reinstall-package {pkg}" for pkg in get_all_editable_packages(env)
-        ]
-
-        # Use --no-config in uv pip install to avoid discovery of constraints in uv config further
-        # up the file tree.
-        build_venv_cmd = " && ".join(
-            [
-                f"uv venv --python={venv_python} --seed {venv_path}",
-                f"uv pip install --no-config --python {python_path} -U pip setuptools wheel",
-                " ".join(
-                    [
-                        "uv",
-                        "pip",
-                        "install",
-                        "--no-config",
-                        "--python",
-                        python_path,
-                        # editable-mode=compat ensures dagster-internal editable installs are done
-                        # in a way that is legible to ty (i.e. not using import hooks). See:
-                        #  https://github.com/microsoft/pyright/blob/main/docs/import-resolution.md#editable-installs
-                        "--config-settings",
-                        "editable-mode=compat",
-                        "-r",
-                        str(requirements_path),
-                        "--no-cache" if no_cache else "",
-                        *extra_pip_install_args,
-                        *reinstall_package_args,
-                    ]
-                ),
-            ]
-        )
-        try:
-            subprocess.run(build_venv_cmd, shell=True, check=True)
-            validate_editable_installs(env)
-        except subprocess.CalledProcessError:
-            if venv_path.exists():
-                shutil.rmtree(venv_path)
-                print(f"Partially built virtualenv for ty environment {env} deleted.")
-            raise
-
-        if update_pins:
-            update_pinned_requirements(env)
-
-
-def extract_package_name_from_editable_requirement(line: str) -> str:
-    trailing_component = line.strip("/").rsplit("/", 1)[1]  # last component of requirement
-    pkg = trailing_component.split("[")[0]  # remove extras if present
-    return pkg.replace("-", "_")
-
-
-def get_all_editable_packages(env: str) -> Sequence[str]:
-    requirements = get_env_root(env) / "requirements.txt"
-    with open(requirements, encoding="utf-8") as f:
-        lines = [line.strip() for line in f.readlines()]
-    return [
-        extract_package_name_from_editable_requirement(line)
-        for line in lines
-        if line.startswith("-e")
+    cmd = [
+        "uv",
+        "sync",
+        "--frozen",
+        "--python",
+        venv_python,
+        "--config-setting",
+        "editable-mode=compat",
     ]
+    if no_cache:
+        cmd.append("--no-cache")
+    try:
+        subprocess.run(cmd, cwd=env_root, check=True)
+        validate_editable_installs(env)
+    except subprocess.CalledProcessError:
+        if venv_path.exists():
+            shutil.rmtree(venv_path)
+            print(f"Partially built virtualenv for ty environment {env} deleted.")
+        raise
 
 
-# This ensures that all of our editable installs are "legacy" style, which is required to work with
-# ty.
+# Ensures all editable installs are "legacy" style (`__editable__*.pth` with an
+# absolute path on the first line). Modern-style uv editables use a custom
+# `MetaPathFinder` that ty cannot follow.
 def validate_editable_installs(env: str) -> None:
     venv_path = get_env_root(env) / ".venv"
     for pth_file in glob.glob(f"{venv_path}/lib/python*/site-packages/__editable__*.pth"):
@@ -414,35 +376,6 @@ def validate_editable_installs(env: str) -> None:
         # Not a legacy pth-- all legacy pth files contain an absolute path on the first line
         if first_line[0] != "/":
             raise Exception(f"Found unexpected modern-style pth file in env: {pth_file}.")
-
-
-def update_pinned_requirements(env: str) -> None:
-    print(f"Updating pinned requirements for ty environment {env}...")
-    venv_path = get_env_root(env) / ".venv"
-    python_path = f"{venv_path}/bin/python"
-    raw_dep_list = subprocess.run(
-        f"uv pip freeze --python={python_path}",
-        capture_output=True,
-        shell=True,
-        text=True,
-        check=True,
-    ).stdout
-
-    cwd = os.getcwd()
-    dagster_git_repo_dir = os.environ.get("DAGSTER_GIT_REPO_DIR")
-    if dagster_git_repo_dir is None:
-        # OSS repo: cwd is the OSS root.
-        dep_list = re.sub(f"-e file://{cwd}/(.+)", "-e \\1", raw_dep_list)
-    else:
-        # Internal repo: cwd is the internal root; OSS lives at DAGSTER_GIT_REPO_DIR.
-        oss_root = dagster_git_repo_dir.rstrip("/")
-        dep_list = re.sub(
-            f"-e file://{oss_root}/(.+)", "-e ${DAGSTER_GIT_REPO_DIR}/\\1", raw_dep_list
-        )
-        dep_list = re.sub(f"-e file://{cwd}/(.+)", "-e \\1", dep_list)
-
-    with open(get_env_root(env) / "requirements-pinned.txt", "w", encoding="utf-8") as f:
-        f.write(dep_list)
 
 
 def convert_ty_diagnostic_to_pyright_format(ty_diag: TyDiagnostic) -> Diagnostic:
@@ -681,7 +614,7 @@ def get_hints(output: TyOutput) -> Sequence[str]:
                     ),
                     (
                         "If you have added an entirely new package, add it to"
-                        " ty/master/requirements.txt and then run `just rebuild_ty_pins`."
+                        " ty/master/pyproject.toml and then run `just rebuild_ty_pins`."
                     ),
                 ]
             )
