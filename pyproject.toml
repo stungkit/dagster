@@ -49,6 +49,12 @@ exclude = [
   # them generates spurious unresolved-import diagnostics.
   "examples/docs_snippets",
   "examples/docs_projects",
+
+  # There is code in dagster_graphql/implementation that as of ty 0.0.35 breaks
+  # ty and causes runaway memory consumption. Tracked here:
+  #   https://github.com/astral-sh/ty/issues/3445#issuecomment-4426769715
+  "python_modules/dagster-graphql/dagster_graphql/implementation",
+
   # Vendored third-party code (croniter, dateutil). Mirrors pyright's
   # `**/_vendored` exclude in `[tool.pyright].exclude`.
   "python_modules/dagster/dagster/_vendored",

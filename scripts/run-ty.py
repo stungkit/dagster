@@ -569,6 +569,10 @@ def run_ty(
             f"--python={python_path}",
             "--output-format=gitlab",
             "--error-on-warning",
+            # `-v` makes ty emit "INFO Indexed N file(s) in ...s" to stderr,
+            # which we parse below to populate filesAnalyzed accurately.
+            # Without this we have no way to know how many files ty visited.
+            "-v",
         ]
 
         # Add paths to check - either explicit paths or include paths
@@ -606,8 +610,15 @@ def run_ty(
     )
     ty_version = version_result.stdout.strip() if version_result.returncode == 0 else "unknown"
 
-    # Get unique files analyzed (from diagnostics - ty doesn't report this directly)
-    files_analyzed = len([p for p in check_paths if Path(p).is_file()]) if check_paths else 0
+    # Parse the file count from ty's verbose stderr output ("INFO Indexed N file(s)").
+    # If ty re-indexes mid-run, multiple lines may appear — sum them.
+    indexed_matches = re.findall(r"^INFO Indexed (\d+) file\(s\)", result.stderr, re.MULTILINE)
+    if indexed_matches:
+        files_analyzed = sum(int(n) for n in indexed_matches)
+    else:
+        # Fall back to counting file-typed entries in check_paths. This undercounts
+        # when entries are directories, but it's the best we can do without verbose output.
+        files_analyzed = len([p for p in check_paths if Path(p).is_file()]) if check_paths else 0
 
     return {
         "returncode": result.returncode,
